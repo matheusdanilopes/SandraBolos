@@ -52,5 +52,5 @@ npm run dev
 ## Deploy (Vercel)
 
 - Use o preset padrão **Next.js**.
-- Não configure `Output Directory` manualmente para `public`.
-- Deixe o Vercel detectar a saída automaticamente para evitar `404: NOT_FOUND`.
+- Este repositório inclui `vercel.json` com `outputDirectory: .next` para evitar fallback incorreto em `public`.
+- Se o projeto no dashboard estiver com `Output Directory = public`, limpe esse valor ou mantenha `.next`.
