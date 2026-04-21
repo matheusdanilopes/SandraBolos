@@ -1,5 +1,6 @@
 'use client';
 
+import { getBrowserSupabaseClient } from '@/lib/supabase';
 import { useState } from 'react';
 
 export function ClientForm({
@@ -12,17 +13,45 @@ export function ClientForm({
   const [nome, setNome] = useState('');
   const [telefone, setTelefone] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function resolveAuthToken(): Promise<string | null> {
+    if (authToken) return authToken;
+
+    const supabase = getBrowserSupabaseClient();
+    if (!supabase) return null;
+
+    const {
+      data: { session }
+    } = await supabase.auth.getSession();
+
+    return session?.access_token ? `Bearer ${session.access_token}` : null;
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!authToken) return;
+    setError('');
+
+    const token = await resolveAuthToken();
+    if (!token) {
+      setError('Sessão não encontrada. Faça login novamente.');
+      return;
+    }
 
     setLoading(true);
-    await fetch('/api/clients', {
+
+    const res = await fetch('/api/clients', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: authToken },
+      headers: { 'Content-Type': 'application/json', Authorization: token },
       body: JSON.stringify({ nome, telefone })
     });
+
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { message?: string };
+      setError(body.message ?? 'Falha ao cadastrar cliente.');
+      setLoading(false);
+      return;
+    }
 
     setNome('');
     setTelefone('');
@@ -47,6 +76,7 @@ export function ClientForm({
         required
         className="w-full rounded border px-3 py-2"
       />
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
       <button disabled={loading} className="rounded bg-blue-600 px-3 py-2 text-white">
         {loading ? 'Salvando...' : 'Criar cliente'}
       </button>
