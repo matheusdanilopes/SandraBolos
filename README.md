@@ -54,3 +54,8 @@ npm run dev
 - Use o preset padrão **Next.js**.
 - Este repositório inclui `vercel.json` com `outputDirectory: .next` para evitar fallback incorreto em `public`.
 - Se o projeto no dashboard estiver com `Output Directory = public`, limpe esse valor ou mantenha `.next`.
+
+## Troubleshooting
+
+- Se aparecer erro no browser sobre `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`, configure essas variáveis no ambiente de deploy e faça redeploy.
+- Um `404` em `/favicon.ico` é resolvido mantendo `public/favicon.ico` no projeto.

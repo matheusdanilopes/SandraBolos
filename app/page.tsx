@@ -4,7 +4,7 @@ import { AuthForm } from '@/components/auth-form';
 import { ClientForm } from '@/components/client-form';
 import { OrderForm } from '@/components/order-form';
 import { OrdersList } from '@/components/orders-list';
-import { getBrowserSupabaseClient } from '@/lib/supabase';
+import { getBrowserSupabaseClient, hasSupabaseEnv } from '@/lib/supabase';
 import type { Cliente, OrderStatus, Pedido } from '@/lib/types';
 import { useEffect, useState } from 'react';
 
@@ -16,6 +16,8 @@ export default function HomePage() {
 
   async function getAuthHeader() {
     const supabase = getBrowserSupabaseClient();
+    if (!supabase) return undefined;
+
     const {
       data: { session }
     } = await supabase.auth.getSession();
@@ -62,6 +64,8 @@ export default function HomePage() {
 
   async function logout() {
     const supabase = getBrowserSupabaseClient();
+    if (!supabase) return;
+
     await supabase.auth.signOut();
     await carregarDados();
   }
@@ -69,6 +73,18 @@ export default function HomePage() {
   useEffect(() => {
     void carregarDados();
   }, []);
+
+  if (!hasSupabaseEnv()) {
+    return (
+      <main className="mx-auto mt-10 max-w-xl rounded bg-white p-6 shadow">
+        <h1 className="text-2xl font-bold">Configuração pendente</h1>
+        <p className="mt-2 text-slate-700">
+          Defina <code>NEXT_PUBLIC_SUPABASE_URL</code> e <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> no ambiente
+          (ex.: Vercel Project Settings → Environment Variables).
+        </p>
+      </main>
+    );
+  }
 
   if (!token && !loading) {
     return <AuthForm onAuthenticated={carregarDados} />;

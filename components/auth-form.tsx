@@ -15,6 +15,12 @@ export function AuthForm({ onAuthenticated }: { onAuthenticated: () => Promise<v
     setError('');
 
     const supabase = getBrowserSupabaseClient();
+    if (!supabase) {
+      setError('Configuração ausente: defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+      setLoading(false);
+      return;
+    }
+
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
 
     if (signInError) {
