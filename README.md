@@ -29,7 +29,7 @@ npm install
 cp .env.example .env.local
 ```
 
-3. Preencha `.env.local` com URL e `anon key` do Supabase.
+3. Preencha `.env.local` com URL e `anon key` do Supabase (opcionalmente `SUPABASE_SERVICE_ROLE_KEY` para APIs server-side com privilégios de escrita).
 
 4. Execute o SQL de `supabase/schema.sql` no Supabase SQL Editor.
 

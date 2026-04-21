@@ -1,4 +1,5 @@
 import { getAuthenticatedClient } from '@/lib/auth';
+import { createServiceSupabaseClient } from '@/lib/supabase';
 import type { OrderStatus } from '@/lib/types';
 import { atualizarStatusPedido } from '@/services/order-service';
 import { NextResponse } from 'next/server';
@@ -9,14 +10,16 @@ type Params = { params: { id: string } };
 
 export async function PATCH(request: Request, { params }: Params) {
   try {
-    const client = await getAuthenticatedClient(request);
+    const authClient = await getAuthenticatedClient(request);
+    const dbClient = createServiceSupabaseClient() ?? authClient;
+
     const body = (await request.json()) as { status?: OrderStatus };
 
     if (!body.status || !validStatus.includes(body.status)) {
       return NextResponse.json({ message: 'Status inválido.' }, { status: 400 });
     }
 
-    await atualizarStatusPedido(client, params.id, body.status);
+    await atualizarStatusPedido(dbClient, params.id, body.status);
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json({ message: (error as Error).message }, { status: 401 });
