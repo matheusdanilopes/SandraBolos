@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#efe9df"/>
+  <circle cx="256" cy="256" r="210" fill="none" stroke="#cfa29a" stroke-width="6"/>
+  <ellipse cx="256" cy="150" rx="70" ry="20" fill="none" stroke="#6b4b3e" stroke-width="4"/>
+  <rect x="220" y="130" width="70" height="28" fill="#9b6b56"/>
+  <polygon points="226,130 282,130 270,105 238,105" fill="#d9b3a8"/>
+  <ellipse cx="255" cy="95" rx="12" ry="11" fill="#d9b3a8"/>
+  <text x="256" y="245" text-anchor="middle" font-size="76" font-family="cursive" font-weight="700" fill="#000">Sandra</text>
+  <text x="256" y="318" text-anchor="middle" font-size="80" font-family="cursive" font-weight="700" fill="#000">Zampoli</text>
+  <text x="256" y="395" text-anchor="middle" font-size="45" font-family="serif" fill="#111">TORTERIA</text>
+  <text x="256" y="440" text-anchor="middle" font-size="45" font-family="serif" fill="#111">ARTESANAL</text>
+</svg>
