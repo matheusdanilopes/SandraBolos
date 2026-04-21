@@ -1,7 +1,7 @@
 'use client';
 
 import type { Cliente } from '@/lib/types';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 export function OrderForm({
   clientes,
@@ -12,6 +12,8 @@ export function OrderForm({
   onCreated: () => Promise<void>;
   authToken: string | null;
 }) {
+  const [clientesLocal, setClientesLocal] = useState<Cliente[]>(clientes);
+  const [buscaCliente, setBuscaCliente] = useState('');
   const [clienteId, setClienteId] = useState('');
   const [dataEntrega, setDataEntrega] = useState('');
   const [valor, setValor] = useState('');
@@ -20,6 +22,31 @@ export function OrderForm({
   const [preco, setPreco] = useState('0');
   const [observacoes, setObservacoes] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setClientesLocal(clientes);
+  }, [clientes]);
+
+  useEffect(() => {
+    async function carregarClientesFallback() {
+      if (!authToken || clientes.length > 0) return;
+
+      const res = await fetch('/api/clients', { headers: { Authorization: authToken } });
+      const data = await res.json();
+      if (Array.isArray(data)) setClientesLocal(data);
+    }
+
+    void carregarClientesFallback();
+  }, [authToken, clientes.length]);
+
+  const clientesFiltrados = useMemo(() => {
+    const termo = buscaCliente.trim().toLowerCase();
+    if (!termo) return clientesLocal;
+
+    return clientesLocal.filter(
+      (c) => c.nome.toLowerCase().includes(termo) || c.telefone.toLowerCase().includes(termo)
+    );
+  }, [buscaCliente, clientesLocal]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -59,6 +86,12 @@ export function OrderForm({
   return (
     <form onSubmit={submit} className="space-y-2 rounded bg-white p-4 shadow">
       <h2 className="text-lg font-semibold">Novo pedido</h2>
+      <input
+        value={buscaCliente}
+        onChange={(e) => setBuscaCliente(e.target.value)}
+        placeholder="Buscar cliente por nome/telefone"
+        className="w-full rounded border px-3 py-2"
+      />
       <select
         value={clienteId}
         onChange={(e) => setClienteId(e.target.value)}
@@ -66,7 +99,7 @@ export function OrderForm({
         className="w-full rounded border px-3 py-2"
       >
         <option value="">Selecione o cliente</option>
-        {clientes.map((cliente) => (
+        {clientesFiltrados.map((cliente) => (
           <option key={cliente.id} value={cliente.id}>
             {cliente.nome} - {cliente.telefone}
           </option>

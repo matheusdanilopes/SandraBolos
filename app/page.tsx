@@ -71,7 +71,28 @@ export default function HomePage() {
   }
 
   useEffect(() => {
+    if (!hasSupabaseEnv()) {
+      setLoading(false);
+      return;
+    }
+
+    const supabase = getBrowserSupabaseClient();
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+
     void carregarDados();
+
+    const {
+      data: { subscription }
+    } = supabase.auth.onAuthStateChange(() => {
+      void carregarDados();
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   if (!hasSupabaseEnv()) {
