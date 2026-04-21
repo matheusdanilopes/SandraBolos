@@ -1,0 +1,14 @@
+{
+  "name": "Sandra Zampoli Torteria Artesanal",
+  "short_name": "Sandra Zampoli",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "theme_color": "#efe9df",
+  "background_color": "#efe9df",
+  "display": "standalone"
+}

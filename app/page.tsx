@@ -7,6 +7,7 @@ import { OrdersList } from '@/components/orders-list';
 import { getBrowserSupabaseClient, hasSupabaseEnv } from '@/lib/supabase';
 import type { Cliente, OrderStatus, Pedido } from '@/lib/types';
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 
 export default function HomePage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -115,7 +116,10 @@ export default function HomePage() {
     <main className="mx-auto max-w-6xl space-y-6 p-6">
       <header className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Gestão de Pedidos de Bolos</h1>
+          <div className="flex items-center gap-3">
+            <Image src="/logo.svg" alt="Logo Sandra Zampoli" width={56} height={56} className="rounded-full border border-slate-200 bg-white" />
+            <h1 className="text-2xl font-bold">Gestão de Pedidos de Bolos</h1>
+          </div>
           <p className="text-slate-600">Uso interno: clientes, pedidos e atualização de status.</p>
         </div>
         <button className="rounded bg-slate-900 px-3 py-2 text-white" onClick={logout}>

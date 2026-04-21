@@ -59,3 +59,8 @@ npm run dev
 
 - Se aparecer erro no browser sobre `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`, configure essas variáveis no ambiente de deploy e faça redeploy.
 - Um `404` em `/favicon.ico` é resolvido mantendo `public/favicon.ico` no projeto.
+
+## Branding
+
+- Logo principal em `public/logo.svg`.
+- Ícones para web/app (`Android/iOS`) configurados via `app/icon.svg`, `app/apple-icon.svg` e `public/site.webmanifest`.
