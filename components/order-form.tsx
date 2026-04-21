@@ -5,10 +5,12 @@ import { useState } from 'react';
 
 export function OrderForm({
   clientes,
-  onCreated
+  onCreated,
+  authToken
 }: {
   clientes: Cliente[];
   onCreated: () => Promise<void>;
+  authToken: string | null;
 }) {
   const [clienteId, setClienteId] = useState('');
   const [dataEntrega, setDataEntrega] = useState('');
@@ -21,11 +23,12 @@ export function OrderForm({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
+    if (!authToken) return;
 
+    setLoading(true);
     await fetch('/api/orders', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: authToken },
       body: JSON.stringify({
         cliente_id: clienteId,
         data_entrega: dataEntrega,

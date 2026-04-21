@@ -11,7 +11,7 @@ Sistema web interno para gestão de pedidos de bolos com:
 
 - `app/` páginas e rotas API
 - `components/` componentes de interface
-- `lib/` integrações e tipos
+- `lib/` integrações, auth e tipos
 - `services/` serviços de acesso a dados
 - `supabase/schema.sql` schema inicial
 
@@ -29,19 +29,22 @@ npm install
 cp .env.example .env.local
 ```
 
-Preencha com as credenciais do seu projeto Supabase.
+3. Preencha `.env.local` com URL e `anon key` do Supabase.
 
-3. Execute o schema SQL no Supabase (`supabase/schema.sql`).
+4. Execute o SQL de `supabase/schema.sql` no Supabase SQL Editor.
 
-4. Rode localmente:
+5. No Supabase Auth, crie um usuário (email/senha) para login interno.
+
+6. Rode localmente:
 
 ```bash
 npm run dev
 ```
 
-## Funcionalidades iniciais
+## Fluxo inicial
 
-- Criar cliente
-- Criar pedido com item
-- Listar pedidos
-- Atualizar status do pedido
+1. Login com email/senha (Supabase Auth)
+2. Criar cliente
+3. Criar pedido com item
+4. Listar pedidos
+5. Atualizar status do pedido

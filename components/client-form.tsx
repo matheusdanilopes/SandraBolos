@@ -2,18 +2,25 @@
 
 import { useState } from 'react';
 
-export function ClientForm({ onCreated }: { onCreated: () => Promise<void> }) {
+export function ClientForm({
+  onCreated,
+  authToken
+}: {
+  onCreated: () => Promise<void>;
+  authToken: string | null;
+}) {
   const [nome, setNome] = useState('');
   const [telefone, setTelefone] = useState('');
   const [loading, setLoading] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
+    if (!authToken) return;
 
+    setLoading(true);
     await fetch('/api/clients', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: authToken },
       body: JSON.stringify({ nome, telefone })
     });
 

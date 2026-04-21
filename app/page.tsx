@@ -1,8 +1,10 @@
 'use client';
 
+import { AuthForm } from '@/components/auth-form';
 import { ClientForm } from '@/components/client-form';
 import { OrderForm } from '@/components/order-form';
 import { OrdersList } from '@/components/orders-list';
+import { getBrowserSupabaseClient } from '@/lib/supabase';
 import type { Cliente, OrderStatus, Pedido } from '@/lib/types';
 import { useEffect, useState } from 'react';
 
@@ -10,24 +12,57 @@ export default function HomePage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState<string | null>(null);
+
+  async function getAuthHeader() {
+    const supabase = getBrowserSupabaseClient();
+    const {
+      data: { session }
+    } = await supabase.auth.getSession();
+
+    return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined;
+  }
 
   async function carregarDados() {
-    const [clientesRes, pedidosRes] = await Promise.all([fetch('/api/clients'), fetch('/api/orders')]);
+    const headers = await getAuthHeader();
+
+    if (!headers) {
+      setToken(null);
+      setClientes([]);
+      setPedidos([]);
+      setLoading(false);
+      return;
+    }
+
+    setToken(headers.Authorization);
+
+    const [clientesRes, pedidosRes] = await Promise.all([
+      fetch('/api/clients', { headers }),
+      fetch('/api/orders', { headers })
+    ]);
 
     const [clientesData, pedidosData] = await Promise.all([clientesRes.json(), pedidosRes.json()]);
 
-    setClientes(clientesData);
-    setPedidos(pedidosData);
+    setClientes(Array.isArray(clientesData) ? clientesData : []);
+    setPedidos(Array.isArray(pedidosData) ? pedidosData : []);
     setLoading(false);
   }
 
   async function atualizarStatus(id: string, status: OrderStatus) {
+    if (!token) return;
+
     await fetch(`/api/orders/${id}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: token },
       body: JSON.stringify({ status })
     });
 
+    await carregarDados();
+  }
+
+  async function logout() {
+    const supabase = getBrowserSupabaseClient();
+    await supabase.auth.signOut();
     await carregarDados();
   }
 
@@ -35,16 +70,25 @@ export default function HomePage() {
     void carregarDados();
   }, []);
 
+  if (!token && !loading) {
+    return <AuthForm onAuthenticated={carregarDados} />;
+  }
+
   return (
     <main className="mx-auto max-w-6xl space-y-6 p-6">
-      <header>
-        <h1 className="text-2xl font-bold">Gestão de Pedidos de Bolos</h1>
-        <p className="text-slate-600">Uso interno: clientes, pedidos e atualização de status.</p>
+      <header className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Gestão de Pedidos de Bolos</h1>
+          <p className="text-slate-600">Uso interno: clientes, pedidos e atualização de status.</p>
+        </div>
+        <button className="rounded bg-slate-900 px-3 py-2 text-white" onClick={logout}>
+          Sair
+        </button>
       </header>
 
       <section className="grid gap-6 md:grid-cols-2">
-        <ClientForm onCreated={carregarDados} />
-        <OrderForm clientes={clientes} onCreated={carregarDados} />
+        <ClientForm onCreated={carregarDados} authToken={token} />
+        <OrderForm clientes={clientes} onCreated={carregarDados} authToken={token} />
       </section>
 
       <section className="space-y-3">

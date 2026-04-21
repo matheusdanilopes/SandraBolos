@@ -1,15 +1,40 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+function getEnv() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseServiceRole) {
-  throw new Error('Defina NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no .env.local.');
+  if (!url || !anonKey) {
+    throw new Error('Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY no .env.local.');
+  }
+
+  return { url, anonKey };
 }
 
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRole, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false
-  }
-});
+export function createServerSupabaseClient(accessToken?: string): SupabaseClient {
+  const { url, anonKey } = getEnv();
+
+  return createClient(url, anonKey, {
+    global: accessToken
+      ? {
+          headers: {
+            Authorization: `Bearer ${accessToken}`
+          }
+        }
+      : undefined,
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    }
+  });
+}
+
+let browserClient: SupabaseClient | null = null;
+
+export function getBrowserSupabaseClient(): SupabaseClient {
+  if (browserClient) return browserClient;
+
+  const { url, anonKey } = getEnv();
+  browserClient = createClient(url, anonKey);
+  return browserClient;
+}

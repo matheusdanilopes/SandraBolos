@@ -1,3 +1,4 @@
+import { getAuthenticatedClient } from '@/lib/auth';
 import type { OrderStatus } from '@/lib/types';
 import { atualizarStatusPedido } from '@/services/order-service';
 import { NextResponse } from 'next/server';
@@ -8,15 +9,16 @@ type Params = { params: { id: string } };
 
 export async function PATCH(request: Request, { params }: Params) {
   try {
+    const client = await getAuthenticatedClient(request);
     const body = (await request.json()) as { status?: OrderStatus };
 
     if (!body.status || !validStatus.includes(body.status)) {
       return NextResponse.json({ message: 'Status inválido.' }, { status: 400 });
     }
 
-    await atualizarStatusPedido(params.id, body.status);
+    await atualizarStatusPedido(client, params.id, body.status);
     return NextResponse.json({ ok: true });
   } catch (error) {
-    return NextResponse.json({ message: (error as Error).message }, { status: 500 });
+    return NextResponse.json({ message: (error as Error).message }, { status: 401 });
   }
 }
