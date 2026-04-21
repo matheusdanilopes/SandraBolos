@@ -48,3 +48,9 @@ npm run dev
 3. Criar pedido com item
 4. Listar pedidos
 5. Atualizar status do pedido
+
+## Deploy (Vercel)
+
+- Use o preset padrão **Next.js**.
+- Não configure `Output Directory` manualmente para `public`.
+- Deixe o Vercel detectar a saída automaticamente para evitar `404: NOT_FOUND`.
