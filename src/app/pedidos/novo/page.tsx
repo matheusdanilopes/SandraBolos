@@ -1,6 +1,8 @@
 import { supabase } from "@/lib/supabase";
 import { PedidoForm } from "../PedidoForm";
 
+export const dynamic = "force-dynamic";
+
 export default async function NovoPedidoPage() {
   const { data: clientes } = await supabase
     .from("clientes")

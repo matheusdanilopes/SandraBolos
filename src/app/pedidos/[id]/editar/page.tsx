@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { PedidoForm } from "../../PedidoForm";
+import { type Pedido } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export default async function EditarPedidoPage({ params }: { params: { id: strin
   return (
     <div className="py-4 space-y-4">
       <h1 className="text-xl font-bold text-gray-900">Editar Pedido</h1>
-      <PedidoForm clientes={clientes ?? []} pedido={pedido} />
+      <PedidoForm clientes={clientes ?? []} pedido={pedido as unknown as Pedido} />
     </div>
   );
 }

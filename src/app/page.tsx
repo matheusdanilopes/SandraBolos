@@ -6,6 +6,8 @@ import { AlertaBadge } from "@/components/AlertaBadge";
 import { TIPO_LABELS, type PedidoComCliente } from "@/types/database";
 import { Plus, Package, Loader, CheckCircle, AlertTriangle } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 async function getDashboardData() {
   const { data: pedidos } = await supabase
     .from("pedidos")
