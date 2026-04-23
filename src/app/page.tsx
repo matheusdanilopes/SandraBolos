@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { formatDate, isEntregaHoje, pedidoAlerta } from "@/lib/utils";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AlertaBadge } from "@/components/AlertaBadge";
-import { TIPO_LABELS, type Pedido } from "@/types/database";
+import { TIPO_LABELS, type PedidoComCliente } from "@/types/database";
 import { Plus, Package, Loader, CheckCircle, AlertTriangle } from "lucide-react";
 
 async function getDashboardData() {
@@ -66,7 +66,7 @@ export default async function DashboardPage() {
           <div className="mt-2 space-y-1">
             {atrasados.map((p) => (
               <Link key={p.id} href={`/pedidos/${p.id}`} className="block text-xs text-red-700 hover:underline">
-                {(p.clientes as any)?.nome ?? "Cliente"} — {formatDate(p.data_entrega)}
+                {(p as unknown as PedidoComCliente).clientes?.nome ?? "Cliente"} — {formatDate(p.data_entrega)}
               </Link>
             ))}
           </div>
@@ -84,7 +84,7 @@ export default async function DashboardPage() {
         ) : (
           <div className="space-y-2">
             {todos.map((pedido) => (
-              <PedidoCard key={pedido.id} pedido={pedido as Pedido & { clientes?: { nome: string } | null }} />
+              <PedidoCard key={pedido.id} pedido={pedido as unknown as PedidoComCliente} />
             ))}
           </div>
         )}
@@ -93,7 +93,7 @@ export default async function DashboardPage() {
   );
 }
 
-function PedidoCard({ pedido }: { pedido: Pedido & { clientes?: { nome: string } | null } }) {
+function PedidoCard({ pedido }: { pedido: PedidoComCliente }) {
   return (
     <Link href={`/pedidos/${pedido.id}`} className="card p-3 flex items-center gap-3 hover:shadow-md transition-shadow active:bg-gray-50 block">
       <div className="flex-1 min-w-0">

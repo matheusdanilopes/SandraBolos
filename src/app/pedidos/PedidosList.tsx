@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, Filter } from "lucide-react";
+import { Search } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AlertaBadge } from "@/components/AlertaBadge";
 import { formatDate, isEntregaHoje, isEntregaSemana, pedidoAlerta } from "@/lib/utils";
-import { TIPO_LABELS, STATUS_LABELS, type Pedido, type StatusPedido } from "@/types/database";
+import { TIPO_LABELS, STATUS_LABELS, type PedidoComCliente, type StatusPedido } from "@/types/database";
 
 type Filtro = "todos" | "hoje" | "semana" | "atrasados" | StatusPedido;
 
@@ -21,7 +21,7 @@ const FILTROS: { value: Filtro; label: string }[] = [
   { value: "entregue", label: STATUS_LABELS.entregue },
 ];
 
-export function PedidosList({ pedidos }: { pedidos: (Pedido & { clientes?: { nome: string; telefone: string } | null })[] }) {
+export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("todos");
 

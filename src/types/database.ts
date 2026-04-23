@@ -2,6 +2,7 @@ export type TipoPedido = "bolo" | "doce" | "kit";
 export type StatusPedido = "novo" | "produzindo" | "feito" | "entregue";
 export type Topper = "sim" | "nao" | "brinde";
 
+// Application-level types (Row without join fields)
 export interface Cliente {
   id: string;
   nome: string;
@@ -24,7 +25,10 @@ export interface Pedido {
   preco_corrigido: number | null;
   valor_cobrado: number | null;
   created_at: string;
-  clientes?: Cliente | null;
+}
+
+export interface PedidoComCliente extends Pedido {
+  clientes?: { nome: string; telefone: string } | null;
 }
 
 export interface ImagemPedido {
@@ -36,25 +40,49 @@ export interface ImagemPedido {
   created_at: string;
 }
 
+// Supabase Database type — must conform to GenericSchema structure
 export interface Database {
   public: {
     Tables: {
       clientes: {
         Row: Cliente;
         Insert: Omit<Cliente, "id" | "created_at"> & { id?: string; created_at?: string };
-        Update: Partial<Omit<Cliente, "id">>;
+        Update: Partial<Omit<Cliente, "id" | "created_at">>;
+        Relationships: [];
       };
       pedidos: {
         Row: Pedido;
-        Insert: Omit<Pedido, "id" | "created_at" | "clientes"> & { id?: string; created_at?: string };
-        Update: Partial<Omit<Pedido, "id" | "clientes">>;
+        Insert: Omit<Pedido, "id" | "created_at"> & { id?: string; created_at?: string };
+        Update: Partial<Omit<Pedido, "id" | "created_at">>;
+        Relationships: [
+          {
+            foreignKeyName: "pedidos_cliente_id_fkey";
+            columns: ["cliente_id"];
+            isOneToOne: false;
+            referencedRelation: "clientes";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       imagens_pedido: {
         Row: ImagemPedido;
         Insert: Omit<ImagemPedido, "id" | "created_at"> & { id?: string; created_at?: string };
-        Update: Partial<Omit<ImagemPedido, "id">>;
+        Update: Partial<Omit<ImagemPedido, "id" | "created_at">>;
+        Relationships: [
+          {
+            foreignKeyName: "imagens_pedido_pedido_id_fkey";
+            columns: ["pedido_id"];
+            isOneToOne: false;
+            referencedRelation: "pedidos";
+            referencedColumns: ["id"];
+          }
+        ];
       };
     };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
   };
 }
 

@@ -4,8 +4,8 @@ import { supabase } from "@/lib/supabase";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AlertaBadge } from "@/components/AlertaBadge";
 import { formatDate, formatCurrency, formatPhone, calcularValorFinal } from "@/lib/utils";
-import { TIPO_LABELS, TOPPER_LABELS, STATUS_FLOW, STATUS_LABELS } from "@/types/database";
-import { Edit, ArrowRight } from "lucide-react";
+import { TIPO_LABELS, TOPPER_LABELS, STATUS_FLOW, STATUS_LABELS, type PedidoComCliente } from "@/types/database";
+import { Edit } from "lucide-react";
 import { StatusActions } from "./StatusActions";
 import { PrecificacaoForm } from "./PrecificacaoForm";
 import { EntregaForm } from "./EntregaForm";
@@ -22,15 +22,17 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
 
   if (!pedido) notFound();
 
+  const pedidoTyped = pedido as unknown as PedidoComCliente;
+
   const { data: imagens } = await supabase
     .from("imagens_pedido")
     .select("*")
     .eq("pedido_id", params.id)
     .order("created_at");
 
-  const cliente = pedido.clientes as { nome: string; telefone: string } | null;
-  const valorFinal = calcularValorFinal(pedido);
-  const proximoStatus = STATUS_FLOW[pedido.status];
+  const cliente = pedidoTyped.clientes ?? null;
+  const valorFinal = calcularValorFinal(pedidoTyped);
+  const proximoStatus = STATUS_FLOW[pedidoTyped.status];
 
   return (
     <div className="py-4 space-y-4">
@@ -39,12 +41,12 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-xl font-bold text-gray-900">{cliente?.nome ?? "Sem cliente"}</h1>
-            <StatusBadge status={pedido.status} />
-            <AlertaBadge dataEntrega={pedido.data_entrega} status={pedido.status} />
+            <StatusBadge status={pedidoTyped.status} />
+            <AlertaBadge dataEntrega={pedidoTyped.data_entrega} status={pedidoTyped.status} />
           </div>
-          <p className="text-sm text-gray-500 mt-0.5">{TIPO_LABELS[pedido.tipo]} • Entrega: {formatDate(pedido.data_entrega)}</p>
+          <p className="text-sm text-gray-500 mt-0.5">{TIPO_LABELS[pedidoTyped.tipo]} • Entrega: {formatDate(pedidoTyped.data_entrega)}</p>
         </div>
-        <Link href={`/pedidos/${pedido.id}/editar`} className="btn-secondary flex items-center gap-1 text-sm px-3 py-1.5">
+        <Link href={`/pedidos/${pedidoTyped.id}/editar`} className="btn-secondary flex items-center gap-1 text-sm px-3 py-1.5">
           <Edit size={14} /> Editar
         </Link>
       </div>
@@ -64,49 +66,49 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
           <div>
             <dt className="text-xs text-gray-500">Tipo</dt>
-            <dd className="font-medium">{TIPO_LABELS[pedido.tipo]}</dd>
+            <dd className="font-medium">{TIPO_LABELS[pedidoTyped.tipo]}</dd>
           </div>
           <div>
             <dt className="text-xs text-gray-500">Topper</dt>
-            <dd className="font-medium">{TOPPER_LABELS[pedido.topper]}</dd>
+            <dd className="font-medium">{TOPPER_LABELS[pedidoTyped.topper]}</dd>
           </div>
-          {pedido.peso && (
+          {pedidoTyped.peso && (
             <div>
               <dt className="text-xs text-gray-500">Peso</dt>
-              <dd className="font-medium">{pedido.peso} kg</dd>
+              <dd className="font-medium">{pedidoTyped.peso} kg</dd>
             </div>
           )}
-          {pedido.quantidade && (
+          {pedidoTyped.quantidade && (
             <div>
               <dt className="text-xs text-gray-500">Quantidade</dt>
-              <dd className="font-medium">{pedido.quantidade} un.</dd>
+              <dd className="font-medium">{pedidoTyped.quantidade} un.</dd>
             </div>
           )}
         </dl>
-        {pedido.descricao && (
+        {pedidoTyped.descricao && (
           <div>
             <p className="text-xs text-gray-500 mb-1">Descrição</p>
-            <p className="text-sm text-gray-700 whitespace-pre-wrap">{pedido.descricao}</p>
+            <p className="text-sm text-gray-700 whitespace-pre-wrap">{pedidoTyped.descricao}</p>
           </div>
         )}
       </div>
 
       {/* Imagens */}
-      <ImagensSection pedidoId={pedido.id} imagens={imagens ?? []} />
+      <ImagensSection pedidoId={pedidoTyped.id} imagens={imagens ?? []} />
 
       {/* Precificação — aparece quando status = feito e tipo = bolo */}
-      {pedido.tipo === "bolo" && (pedido.status === "feito" || pedido.status === "entregue") && (
-        <PrecificacaoForm pedido={pedido} />
+      {pedidoTyped.tipo === "bolo" && (pedidoTyped.status === "feito" || pedidoTyped.status === "entregue") && (
+        <PrecificacaoForm pedido={pedidoTyped} />
       )}
 
       {/* Entrega */}
-      {pedido.status === "entregue" && (
-        <EntregaForm pedido={pedido} valorFinal={valorFinal} />
+      {pedidoTyped.status === "entregue" && (
+        <EntregaForm pedido={pedidoTyped} valorFinal={valorFinal} />
       )}
 
       {/* Avançar Status */}
       {proximoStatus && (
-        <StatusActions pedidoId={pedido.id} currentStatus={pedido.status} proximoStatus={proximoStatus} />
+        <StatusActions pedidoId={pedidoTyped.id} currentStatus={pedidoTyped.status} proximoStatus={proximoStatus} />
       )}
     </div>
   );

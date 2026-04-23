@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { PedidosList } from "./PedidosList";
+import { type PedidoComCliente } from "@/types/database";
 import { Plus } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +22,7 @@ export default async function PedidosPage() {
         </Link>
       </div>
 
-      <PedidosList pedidos={pedidos ?? []} />
+      <PedidosList pedidos={(pedidos ?? []) as unknown as PedidoComCliente[]} />
     </div>
   );
 }
