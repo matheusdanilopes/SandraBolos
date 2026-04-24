@@ -94,7 +94,7 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
       </div>
 
       {/* Imagens */}
-      <ImagensSection pedidoId={pedidoTyped.id} imagens={imagens ?? []} />
+      <ImagensSection pedidoId={pedidoTyped.id} imagens={imagens ?? []} driveFolderId={pedidoTyped.drive_folder_id} />
 
       {/* Precificação — aparece quando status = feito e tipo = bolo */}
       {pedidoTyped.tipo === "bolo" && (pedidoTyped.status === "feito" || pedidoTyped.status === "entregue") && (

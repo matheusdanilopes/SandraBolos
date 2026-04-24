@@ -13,6 +13,8 @@ export interface Cliente {
 export interface Pedido {
   id: string;
   cliente_id: string | null;
+  nome_cliente: string | null;
+  drive_folder_id: string | null;
   data_entrega: string;
   tipo: TipoPedido;
   descricao: string | null;
@@ -71,6 +73,8 @@ export type Database = {
         Row: {
           id: string
           cliente_id: string | null
+          nome_cliente: string | null
+          drive_folder_id: string | null
           data_entrega: string
           tipo: string
           descricao: string | null
@@ -87,6 +91,8 @@ export type Database = {
         Insert: {
           id?: string
           cliente_id?: string | null
+          nome_cliente?: string | null
+          drive_folder_id?: string | null
           data_entrega: string
           tipo: string
           descricao?: string | null
@@ -103,6 +109,8 @@ export type Database = {
         Update: {
           id?: string
           cliente_id?: string | null
+          nome_cliente?: string | null
+          drive_folder_id?: string | null
           data_entrega?: string
           tipo?: string
           descricao?: string | null
