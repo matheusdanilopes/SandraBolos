@@ -89,9 +89,13 @@ export async function POST(req: NextRequest) {
   let url: string;
   try {
     ({ fileId, url } = await uploadFileToDrive(folderId, compressed, fileName, "image/jpeg"));
-  } catch (driveErr) {
+  } catch (driveErr: unknown) {
+    const e = driveErr as { message?: string; code?: number };
     console.error("[Drive] uploadFileToDrive failed:", driveErr);
-    return NextResponse.json({ error: "Falha no upload para o Drive" }, { status: 502 });
+    return NextResponse.json(
+      { error: `Drive upload: ${e.message ?? String(driveErr)}`, code: e.code },
+      { status: 502 }
+    );
   }
 
   // Persist reference in DB

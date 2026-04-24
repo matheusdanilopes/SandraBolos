@@ -1,6 +1,5 @@
 import { google } from "googleapis";
 import type { drive_v3 } from "googleapis";
-import { Readable } from "stream";
 
 function getDriveClient(): drive_v3.Drive {
   // Prefer a single JSON credentials blob (avoids OpenSSL 3.x newline issues
@@ -95,7 +94,7 @@ export async function uploadFileToDrive(
 
   const res = await drive.files.create({
     requestBody: { name: fileName, parents: [folderId] },
-    media: { mimeType, body: Readable.from(buffer) },
+    media: { mimeType, body: buffer },
     fields: "id",
   });
 
