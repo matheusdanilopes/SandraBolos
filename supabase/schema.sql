@@ -40,6 +40,17 @@ alter table pedidos add column if not exists valor_cobrado numeric;
 alter table pedidos add column if not exists drive_folder_id text;
 alter table pedidos add column if not exists nome_cliente text;
 
+-- Tabela configuracoes (linha única, id = 1)
+create table if not exists configuracoes (
+  id integer primary key default 1,
+  limite_peso_extra_kg numeric not null default 0.300,
+  updated_at timestamp with time zone default now()
+);
+
+insert into configuracoes (id, limite_peso_extra_kg)
+values (1, 0.300)
+on conflict (id) do nothing;
+
 -- Tabela imagens_pedido
 create table if not exists imagens_pedido (
   id uuid primary key default uuid_generate_v4(),
@@ -60,15 +71,18 @@ create index if not exists idx_imagens_pedido_id on imagens_pedido(pedido_id);
 alter table clientes enable row level security;
 alter table pedidos enable row level security;
 alter table imagens_pedido enable row level security;
+alter table configuracoes enable row level security;
 
 -- Policies (drop and recreate para evitar duplicatas)
 drop policy if exists "allow_all_clientes" on clientes;
 drop policy if exists "allow_all_pedidos" on pedidos;
 drop policy if exists "allow_all_imagens" on imagens_pedido;
+drop policy if exists "allow_all_configuracoes" on configuracoes;
 
 create policy "allow_all_clientes" on clientes for all using (true) with check (true);
 create policy "allow_all_pedidos" on pedidos for all using (true) with check (true);
 create policy "allow_all_imagens" on imagens_pedido for all using (true) with check (true);
+create policy "allow_all_configuracoes" on configuracoes for all using (true) with check (true);
 
 -- Recarrega o schema cache do PostgREST
 notify pgrst, 'reload schema';

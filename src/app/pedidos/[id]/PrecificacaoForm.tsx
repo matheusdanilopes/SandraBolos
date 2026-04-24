@@ -6,8 +6,6 @@ import { formatCurrency } from "@/lib/utils";
 import type { Pedido } from "@/types/database";
 import { AlertTriangle, Info } from "lucide-react";
 
-const LIMITE_EXTRA_KG = 0.3;
-
 function derivarPesoReal(pedido: Pedido): string {
   if (pedido.valor_calculado && pedido.preco_por_kg) {
     return (pedido.valor_calculado / pedido.preco_por_kg).toFixed(2);
@@ -15,7 +13,12 @@ function derivarPesoReal(pedido: Pedido): string {
   return pedido.peso?.toString() ?? "";
 }
 
-export function PrecificacaoForm({ pedido }: { pedido: Pedido }) {
+interface Props {
+  pedido: Pedido;
+  limiteExtraKg: number;
+}
+
+export function PrecificacaoForm({ pedido, limiteExtraKg }: Props) {
   const [isPending, startTransition] = useTransition();
   const [pesoReal, setPesoReal] = useState(derivarPesoReal(pedido));
   const [precoPorKg, setPrecoPorKg] = useState(pedido.preco_por_kg?.toString() ?? "");
@@ -30,8 +33,9 @@ export function PrecificacaoForm({ pedido }: { pedido: Pedido }) {
   // Preço 1: multiplicação total (peso real × preço/kg)
   const valorTotal = pesoRealNum && precoKgNum ? pesoRealNum * precoKgNum : null;
 
-  // Preço 2: se peso real > peso pedido + 300g, cobra só até peso pedido + 300g
-  const limiteKg = pesoPedido + LIMITE_EXTRA_KG;
+  // Preço 2: se peso real > peso pedido + limite configurado, cobra só até esse teto
+  const limiteKg = pesoPedido + limiteExtraKg;
+  const limiteExtraG = Math.round(limiteExtraKg * 1000);
   const aplicouCorte = pesoRealNum !== null && pesoRealNum > limiteKg;
   const pesoParaCorte = aplicouCorte ? limiteKg : pesoRealNum;
   const valorAjustado = pesoParaCorte && precoKgNum ? pesoParaCorte * precoKgNum : null;
@@ -129,7 +133,7 @@ export function PrecificacaoForm({ pedido }: { pedido: Pedido }) {
           </p>
           {aplicouCorte && (
             <p className="text-[10px] text-orange-600">
-              Peso real ({pesoRealNum} kg) excede o pedido em mais de 300g — cobrado até{" "}
+              Peso real ({pesoRealNum} kg) excede o pedido em mais de {limiteExtraG}g — cobrado até{" "}
               {limiteKg.toFixed(2)} kg × {formatCurrency(precoKgNum)}
             </p>
           )}

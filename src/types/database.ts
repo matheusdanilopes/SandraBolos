@@ -33,6 +33,12 @@ export interface PedidoComCliente extends Pedido {
   clientes?: { nome: string; telefone: string } | null;
 }
 
+export interface Configuracoes {
+  id: number;
+  limite_peso_extra_kg: number;
+  updated_at: string;
+}
+
 export interface ImagemPedido {
   id: string;
   pedido_id: string;
@@ -133,6 +139,24 @@ export type Database = {
             referencedColumns: ["id"]
           }
         ]
+      }
+      configuracoes: {
+        Row: {
+          id: number
+          limite_peso_extra_kg: number
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          limite_peso_extra_kg?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          limite_peso_extra_kg?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       imagens_pedido: {
         Row: {

@@ -13,22 +13,19 @@ import { ImagensSection } from "./ImagensSection";
 
 export const dynamic = "force-dynamic";
 
+const LIMITE_PADRAO_KG = 0.3;
+
 export default async function PedidoDetailPage({ params }: { params: { id: string } }) {
-  const { data: pedido } = await supabase
-    .from("pedidos")
-    .select("*, clientes(nome, telefone)")
-    .eq("id", params.id)
-    .single();
+  const [{ data: pedido }, { data: imagens }, { data: config }] = await Promise.all([
+    supabase.from("pedidos").select("*, clientes(nome, telefone)").eq("id", params.id).single(),
+    supabase.from("imagens_pedido").select("*").eq("pedido_id", params.id).order("created_at"),
+    supabase.from("configuracoes").select("limite_peso_extra_kg").eq("id", 1).single(),
+  ]);
 
   if (!pedido) notFound();
 
   const pedidoTyped = pedido as unknown as PedidoComCliente;
-
-  const { data: imagens } = await supabase
-    .from("imagens_pedido")
-    .select("*")
-    .eq("pedido_id", params.id)
-    .order("created_at");
+  const limiteExtraKg = (config as any)?.limite_peso_extra_kg ?? LIMITE_PADRAO_KG;
 
   const cliente = pedidoTyped.clientes ?? null;
   const valorFinal = calcularValorFinal(pedidoTyped);
@@ -98,7 +95,7 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
 
       {/* Precificação — aparece quando status = feito e tipo = bolo */}
       {pedidoTyped.tipo === "bolo" && (pedidoTyped.status === "feito" || pedidoTyped.status === "entregue") && (
-        <PrecificacaoForm pedido={pedidoTyped} />
+        <PrecificacaoForm pedido={pedidoTyped} limiteExtraKg={limiteExtraKg} />
       )}
 
       {/* Entrega */}

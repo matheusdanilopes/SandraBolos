@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ShoppingBag, Users } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Users, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const links = [
@@ -18,7 +18,19 @@ export function Navbar() {
     <>
       <header className="bg-brand-600 text-white px-4 py-3 flex items-center gap-2 sticky top-0 z-40 shadow-sm">
         <span className="text-xl">🎂</span>
-        <span className="font-semibold text-lg">Sandra Bolos</span>
+        <span className="font-semibold text-lg flex-1">Sandra Bolos</span>
+        <Link
+          href="/configuracoes"
+          aria-label="Configurações"
+          className={cn(
+            "p-1.5 rounded-lg transition-colors",
+            pathname === "/configuracoes"
+              ? "bg-brand-700 text-white"
+              : "text-brand-100 hover:bg-brand-700 hover:text-white"
+          )}
+        >
+          <Settings size={18} />
+        </Link>
       </header>
 
       <nav className="bg-white border-b border-gray-200 sticky top-12 z-30">
