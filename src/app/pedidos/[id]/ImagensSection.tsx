@@ -14,7 +14,7 @@ interface Props {
   driveFolderId?: string | null;
 }
 
-export function ImagensSection({ pedidoId, imagens: initialImagens, driveFolderId }: Props) {
+export function ImagensSection({ pedidoId, imagens: initialImagens }: Props) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [imagens, setImagens] = useState(initialImagens);
@@ -61,7 +61,7 @@ export function ImagensSection({ pedidoId, imagens: initialImagens, driveFolderI
         <h2 className="font-semibold text-sm text-gray-700">
           Imagens de Referência ({imagens.length}/{MAX_IMAGENS})
         </h2>
-        {canAdd && driveFolderId && (
+        {canAdd && (
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={loading}
@@ -70,9 +70,6 @@ export function ImagensSection({ pedidoId, imagens: initialImagens, driveFolderI
             {loading ? <Upload size={14} className="animate-bounce" /> : <Plus size={14} />}
             {loading ? "Enviando..." : "Adicionar"}
           </button>
-        )}
-        {canAdd && !driveFolderId && (
-          <span className="text-xs text-gray-400 italic">Drive não configurado</span>
         )}
       </div>
 

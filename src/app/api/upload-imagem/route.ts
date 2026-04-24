@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
-import { uploadFileToDrive } from "@/lib/googleDrive";
+import { createPedidoFolder, uploadFileToDrive } from "@/lib/googleDrive";
 import sharp from "sharp";
 
 const MAX_IMAGENS = 5;
@@ -22,10 +22,10 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServerSupabaseClient();
 
-  // Verify pedido exists and get drive_folder_id
+  // Fetch pedido with client name for folder naming
   const { data: pedido, error: pedidoError } = await supabase
     .from("pedidos")
-    .select("id, drive_folder_id")
+    .select("id, drive_folder_id, nome_cliente, clientes(nome)")
     .eq("id", pedidoId)
     .single();
 
@@ -46,11 +46,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!pedido.drive_folder_id) {
-    return NextResponse.json(
-      { error: "Pedido não possui pasta no Drive configurada" },
-      { status: 422 }
-    );
+  // Lazy folder creation: create Drive folder now if not yet created
+  let folderId = pedido.drive_folder_id;
+  if (!folderId) {
+    const clienteNome =
+      (pedido.clientes as { nome: string } | null)?.nome ??
+      pedido.nome_cliente ??
+      "pedido";
+
+    try {
+      folderId = await createPedidoFolder(pedido.id, clienteNome);
+      await supabase.from("pedidos").update({ drive_folder_id: folderId }).eq("id", pedido.id);
+    } catch (driveErr) {
+      console.error("[Drive] createPedidoFolder failed:", driveErr);
+      return NextResponse.json({ error: "Falha ao criar pasta no Drive" }, { status: 502 });
+    }
   }
 
   // Read and compress the image
@@ -66,12 +76,7 @@ export async function POST(req: NextRequest) {
   let fileId: string;
   let url: string;
   try {
-    ({ fileId, url } = await uploadFileToDrive(
-      pedido.drive_folder_id,
-      compressed,
-      fileName,
-      "image/jpeg"
-    ));
+    ({ fileId, url } = await uploadFileToDrive(folderId, compressed, fileName, "image/jpeg"));
   } catch (driveErr) {
     console.error("[Drive] uploadFileToDrive failed:", driveErr);
     return NextResponse.json({ error: "Falha no upload para o Drive" }, { status: 502 });
@@ -80,12 +85,7 @@ export async function POST(req: NextRequest) {
   // Persist reference in DB
   const { data: imagem, error: imgError } = await supabase
     .from("imagens_pedido")
-    .insert({
-      pedido_id: pedidoId,
-      file_id: fileId,
-      url,
-      nome_arquivo: fileName,
-    })
+    .insert({ pedido_id: pedidoId, file_id: fileId, url, nome_arquivo: fileName })
     .select()
     .single();
 
