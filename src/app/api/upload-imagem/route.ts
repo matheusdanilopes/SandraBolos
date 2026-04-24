@@ -22,14 +22,19 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServerSupabaseClient();
 
-  // Fetch pedido with client name for folder naming
+  // Fetch pedido — use * so missing optional columns (drive_folder_id, nome_cliente)
+  // don't cause PostgREST to error when migration hasn't been applied yet.
   const { data: pedido, error: pedidoError } = await supabase
     .from("pedidos")
-    .select("id, drive_folder_id, nome_cliente, clientes(nome)")
+    .select("*, clientes(nome)")
     .eq("id", pedidoId)
     .single();
 
-  if (pedidoError || !pedido) {
+  if (pedidoError) {
+    console.error("[upload-imagem] pedido fetch error:", pedidoError);
+    return NextResponse.json({ error: pedidoError.message }, { status: 500 });
+  }
+  if (!pedido) {
     return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 });
   }
 
