@@ -62,9 +62,13 @@ export async function POST(req: NextRequest) {
     try {
       folderId = await createPedidoFolder(pedido.id, clienteNome);
       await supabase.from("pedidos").update({ drive_folder_id: folderId }).eq("id", pedido.id);
-    } catch (driveErr) {
+    } catch (driveErr: unknown) {
+      const e = driveErr as { message?: string; code?: number };
       console.error("[Drive] createPedidoFolder failed:", driveErr);
-      return NextResponse.json({ error: "Falha ao criar pasta no Drive" }, { status: 502 });
+      return NextResponse.json(
+        { error: `Drive: ${e.message ?? String(driveErr)}`, code: e.code },
+        { status: 502 }
+      );
     }
   }
 
