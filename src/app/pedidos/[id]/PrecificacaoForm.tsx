@@ -1,31 +1,36 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { useState, useTransition } from "react";
+import { salvarPrecificacaoAction } from "./actions";
 import { formatCurrency } from "@/lib/utils";
 import type { Pedido } from "@/types/database";
 
 export function PrecificacaoForm({ pedido }: { pedido: Pedido }) {
-  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [precoPorKg, setPrecoPorKg] = useState(pedido.preco_por_kg?.toString() ?? "");
   const [precoCorrigido, setPrecoCorrigido] = useState(pedido.preco_corrigido?.toString() ?? "");
-  const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
 
   const valorCalculado = pedido.peso && precoPorKg ? pedido.peso * parseFloat(precoPorKg) : null;
   const valorFinal = precoCorrigido ? parseFloat(precoCorrigido) : valorCalculado;
 
-  async function handleSave() {
-    setLoading(true);
-    await supabase.from("pedidos").update({
-      preco_por_kg: precoPorKg ? parseFloat(precoPorKg) : null,
-      valor_calculado: valorCalculado,
-      preco_corrigido: precoCorrigido ? parseFloat(precoCorrigido) : null,
-    }).eq("id", pedido.id);
-    setSaved(true);
-    setLoading(false);
-    router.refresh();
+  function handleSave() {
+    setSaved(false);
+    setError("");
+    startTransition(async () => {
+      const result = await salvarPrecificacaoAction(
+        pedido.id,
+        precoPorKg ? parseFloat(precoPorKg) : null,
+        valorCalculado,
+        precoCorrigido ? parseFloat(precoCorrigido) : null
+      );
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setSaved(true);
+      }
+    });
   }
 
   return (
@@ -74,8 +79,10 @@ export function PrecificacaoForm({ pedido }: { pedido: Pedido }) {
         </div>
       )}
 
-      <button onClick={handleSave} disabled={loading || !precoPorKg} className="btn-primary w-full">
-        {loading ? "Salvando..." : saved ? "Salvo!" : "Salvar Precificação"}
+      {error && <p className="text-sm text-red-600">{error}</p>}
+
+      <button onClick={handleSave} disabled={isPending || !precoPorKg} className="btn-primary w-full">
+        {isPending ? "Salvando..." : saved ? "Salvo!" : "Salvar Precificação"}
       </button>
     </div>
   );

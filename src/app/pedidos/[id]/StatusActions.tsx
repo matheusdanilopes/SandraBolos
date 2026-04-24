@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { useTransition } from "react";
+import { avancarStatusAction } from "./actions";
 import { STATUS_LABELS, type StatusPedido } from "@/types/database";
 import { ArrowRight } from "lucide-react";
 
@@ -13,14 +12,12 @@ interface Props {
 }
 
 export function StatusActions({ pedidoId, currentStatus, proximoStatus }: Props) {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
-  async function avancarStatus() {
-    setLoading(true);
-    await supabase.from("pedidos").update({ status: proximoStatus }).eq("id", pedidoId);
-    router.refresh();
-    setLoading(false);
+  function avancarStatus() {
+    startTransition(async () => {
+      await avancarStatusAction(pedidoId, proximoStatus);
+    });
   }
 
   return (
@@ -31,8 +28,8 @@ export function StatusActions({ pedidoId, currentStatus, proximoStatus }: Props)
         <ArrowRight size={14} className="text-gray-400" />
         <span className="text-sm font-medium text-brand-600">{STATUS_LABELS[proximoStatus]}</span>
       </div>
-      <button onClick={avancarStatus} disabled={loading} className="btn-primary w-full">
-        {loading ? "Atualizando..." : `Marcar como ${STATUS_LABELS[proximoStatus]}`}
+      <button onClick={avancarStatus} disabled={isPending} className="btn-primary w-full">
+        {isPending ? "Atualizando..." : `Marcar como ${STATUS_LABELS[proximoStatus]}`}
       </button>
     </div>
   );
