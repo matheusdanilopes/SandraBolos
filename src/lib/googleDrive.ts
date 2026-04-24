@@ -3,9 +3,13 @@ import type { drive_v3 } from "googleapis";
 import { Readable } from "stream";
 
 function getDriveClient(): drive_v3.Drive {
-  const auth = new google.auth.JWT({
-    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+  // GoogleAuth with credentials object avoids the OpenSSL 3.x
+  // "DECODER routines::unsupported" error that occurs with JWT + raw key.
+  const auth = new google.auth.GoogleAuth({
+    credentials: {
+      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+    },
     scopes: ["https://www.googleapis.com/auth/drive"],
   });
   return google.drive({ version: "v3", auth });
@@ -47,7 +51,6 @@ export async function createPedidoFolder(
   const anoId = await getOrCreateFolder(drive, ano, rootId);
   const mesId = await getOrCreateFolder(drive, mes, anoId);
 
-  // Sanitize folder name: keep letters, numbers, spaces, hyphens
   const safeName = nomeCliente.replace(/[^a-zA-Z0-9À-ÿ\s\-]/g, "").trim();
   const folderName = `${safeName}-${pedidoId.slice(0, 8)}`;
 

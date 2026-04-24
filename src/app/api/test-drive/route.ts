@@ -20,16 +20,14 @@ export async function GET() {
     return NextResponse.json({ ok: false, envCheck, error: "Variáveis de ambiente faltando" });
   }
 
-  const key = rawKey.replace(/\\n/g, "\n");
-
   try {
-    const auth = new google.auth.JWT({
-      email,
-      key,
+    const auth = new google.auth.GoogleAuth({
+      credentials: {
+        client_email: email,
+        private_key: rawKey.replace(/\\n/g, "\n"),
+      },
       scopes: ["https://www.googleapis.com/auth/drive"],
     });
-
-    await auth.authorize();
 
     const drive = google.drive({ version: "v3", auth });
 
@@ -38,21 +36,11 @@ export async function GET() {
       fields: "id,name,mimeType",
     });
 
-    return NextResponse.json({
-      ok: true,
-      envCheck,
-      rootFolder: res.data,
-    });
+    return NextResponse.json({ ok: true, envCheck, rootFolder: res.data });
   } catch (err: unknown) {
     const e = err as { message?: string; code?: number; errors?: unknown };
     return NextResponse.json(
-      {
-        ok: false,
-        envCheck,
-        error: e.message ?? String(err),
-        code: e.code,
-        details: e.errors,
-      },
+      { ok: false, envCheck, error: e.message ?? String(err), code: e.code, details: e.errors },
       { status: 500 }
     );
   }
