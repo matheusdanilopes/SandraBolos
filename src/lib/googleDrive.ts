@@ -3,16 +3,11 @@ import type { drive_v3 } from "googleapis";
 import { PassThrough } from "stream";
 
 function getDriveClient(): drive_v3.Drive {
-  // Prefer a single JSON credentials blob (avoids OpenSSL 3.x newline issues
-  // that occur when the private key is split across env vars in Vercel).
-  // Fallback: build credentials from individual env vars.
   let credentials: { client_email: string; private_key: string };
 
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
     credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
   } else {
-    // Strip surrounding quotes that some tools add (e.g. copy-pasting .env format into Vercel)
-    // then convert literal \n sequences to actual newlines.
     let rawKey = process.env.GOOGLE_PRIVATE_KEY!;
     if (rawKey.startsWith('"') && rawKey.endsWith('"')) rawKey = rawKey.slice(1, -1);
     credentials = {
@@ -37,6 +32,9 @@ async function getOrCreateFolder(
     q: `name='${name}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
     fields: "files(id)",
     spaces: "drive",
+    // Required for Shared Drive support
+    includeItemsFromAllDrives: true,
+    supportsAllDrives: true,
   });
   if (res.data.files?.length) return res.data.files[0].id!;
 
@@ -47,6 +45,7 @@ async function getOrCreateFolder(
       parents: [parentId],
     },
     fields: "id",
+    supportsAllDrives: true,
   });
   return folder.data.id!;
 }
@@ -74,12 +73,14 @@ export async function createPedidoFolder(
       parents: [mesId],
     },
     fields: "id",
+    supportsAllDrives: true,
   });
 
   const folderId = folder.data.id!;
   await drive.permissions.create({
     fileId: folderId,
     requestBody: { role: "reader", type: "anyone" },
+    supportsAllDrives: true,
   });
 
   return folderId;
@@ -93,7 +94,6 @@ export async function uploadFileToDrive(
 ): Promise<{ fileId: string; url: string }> {
   const drive = getDriveClient();
 
-  // PassThrough gives googleapis a proper pipeable stream (Buffer alone has no .pipe())
   const body = new PassThrough();
   body.end(buffer);
 
@@ -101,12 +101,14 @@ export async function uploadFileToDrive(
     requestBody: { name: fileName, parents: [folderId] },
     media: { mimeType, body },
     fields: "id",
+    supportsAllDrives: true,
   });
 
   const fileId = res.data.id!;
   await drive.permissions.create({
     fileId,
     requestBody: { role: "reader", type: "anyone" },
+    supportsAllDrives: true,
   });
 
   return { fileId, url: `https://drive.google.com/uc?id=${fileId}` };
