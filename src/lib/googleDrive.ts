@@ -1,5 +1,6 @@
 import { google } from "googleapis";
 import type { drive_v3 } from "googleapis";
+import { PassThrough } from "stream";
 
 function getDriveClient(): drive_v3.Drive {
   // Prefer a single JSON credentials blob (avoids OpenSSL 3.x newline issues
@@ -92,9 +93,13 @@ export async function uploadFileToDrive(
 ): Promise<{ fileId: string; url: string }> {
   const drive = getDriveClient();
 
+  // PassThrough gives googleapis a proper pipeable stream (Buffer alone has no .pipe())
+  const body = new PassThrough();
+  body.end(buffer);
+
   const res = await drive.files.create({
     requestBody: { name: fileName, parents: [folderId] },
-    media: { mimeType, body: buffer },
+    media: { mimeType, body },
     fields: "id",
   });
 
