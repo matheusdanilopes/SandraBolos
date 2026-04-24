@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { criarSaborAction, editarSaborAction } from "./actions";
 import { TIPO_SABOR_LABELS, type Sabor, type TipoSabor } from "@/types/database";
 
-const TIPOS: TipoSabor[] = ["bolo", "doce", "ambos"];
+const TIPOS: TipoSabor[] = ["bolo", "doce"];
 
 export function SaborForm({ sabor }: { sabor?: Sabor }) {
   const router = useRouter();
@@ -14,6 +14,8 @@ export function SaborForm({ sabor }: { sabor?: Sabor }) {
   const [nome, setNome] = useState(sabor?.nome ?? "");
   const [tipo, setTipo] = useState<TipoSabor>(sabor?.tipo ?? "bolo");
   const [ativo, setAtivo] = useState(sabor?.ativo ?? true);
+  const [precoPorKg, setPrecoPorKg] = useState(sabor?.preco_por_kg?.toString() ?? "");
+  const [precoPorCento, setPrecoPorCento] = useState(sabor?.preco_por_cento?.toString() ?? "");
   const [error, setError] = useState("");
 
   function handleSubmit(e: React.FormEvent) {
@@ -21,9 +23,11 @@ export function SaborForm({ sabor }: { sabor?: Sabor }) {
     if (!nome.trim()) { setError("Nome é obrigatório"); return; }
     setError("");
     startTransition(async () => {
+      const kg = precoPorKg ? parseFloat(precoPorKg) : null;
+      const cento = precoPorCento ? parseFloat(precoPorCento) : null;
       const result = isEdit
-        ? await editarSaborAction(sabor.id, nome, tipo, ativo)
-        : await criarSaborAction(nome, tipo);
+        ? await editarSaborAction(sabor.id, nome, tipo, ativo, kg, cento)
+        : await criarSaborAction(nome, tipo, kg, cento);
       if (result?.error) setError(result.error);
     });
   }
@@ -42,7 +46,7 @@ export function SaborForm({ sabor }: { sabor?: Sabor }) {
       </div>
 
       <div>
-        <label className="label">Aplicável a</label>
+        <label className="label">Tipo</label>
         <div className="flex gap-2">
           {TIPOS.map((t) => (
             <button
@@ -60,6 +64,38 @@ export function SaborForm({ sabor }: { sabor?: Sabor }) {
           ))}
         </div>
       </div>
+
+      {/* Preço condicional por tipo */}
+      {tipo === "bolo" && (
+        <div>
+          <label className="label">Preço por kg (R$)</label>
+          <input
+            className="input"
+            type="number"
+            step="0.01"
+            min="0"
+            value={precoPorKg}
+            onChange={(e) => setPrecoPorKg(e.target.value)}
+            placeholder="Ex: 80.00"
+          />
+        </div>
+      )}
+
+      {tipo === "doce" && (
+        <div>
+          <label className="label">Preço por cento (R$)</label>
+          <input
+            className="input"
+            type="number"
+            step="0.01"
+            min="0"
+            value={precoPorCento}
+            onChange={(e) => setPrecoPorCento(e.target.value)}
+            placeholder="Ex: 45.00"
+          />
+          <p className="text-xs text-gray-400 mt-1">Valor cobrado por 100 unidades</p>
+        </div>
+      )}
 
       {isEdit && (
         <label className="flex items-center gap-2 cursor-pointer">
@@ -79,16 +115,10 @@ export function SaborForm({ sabor }: { sabor?: Sabor }) {
         </label>
       )}
 
-      {error && (
-        <p className="text-sm text-red-600">{error}</p>
-      )}
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
       <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="btn-secondary flex-1"
-        >
+        <button type="button" onClick={() => router.back()} className="btn-secondary flex-1">
           Cancelar
         </button>
         <button type="submit" disabled={isPending} className="btn-primary flex-1">

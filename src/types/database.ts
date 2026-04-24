@@ -33,20 +33,21 @@ export interface PedidoComCliente extends Pedido {
   clientes?: { nome: string; telefone: string } | null;
 }
 
-export type TipoSabor = "bolo" | "doce" | "ambos";
+export type TipoSabor = "bolo" | "doce";
 
 export interface Sabor {
   id: string;
   nome: string;
   tipo: TipoSabor;
   ativo: boolean;
+  preco_por_kg: number | null;
+  preco_por_cento: number | null;
   created_at: string;
 }
 
 export const TIPO_SABOR_LABELS: Record<TipoSabor, string> = {
   bolo: "Bolo",
   doce: "Doce",
-  ambos: "Bolo e Doce",
 };
 
 export interface Configuracoes {
@@ -162,6 +163,8 @@ export type Database = {
           nome: string
           tipo: string
           ativo: boolean
+          preco_por_kg: number | null
+          preco_por_cento: number | null
           created_at: string
         }
         Insert: {
@@ -169,6 +172,8 @@ export type Database = {
           nome: string
           tipo?: string
           ativo?: boolean
+          preco_por_kg?: number | null
+          preco_por_cento?: number | null
           created_at?: string
         }
         Update: {
@@ -176,6 +181,8 @@ export type Database = {
           nome?: string
           tipo?: string
           ativo?: boolean
+          preco_por_kg?: number | null
+          preco_por_cento?: number | null
           created_at?: string
         }
         Relationships: []

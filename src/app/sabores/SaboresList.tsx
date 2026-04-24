@@ -3,11 +3,8 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { deletarSaborAction } from "./actions";
-import {
-  TIPO_SABOR_LABELS,
-  type Sabor,
-  type TipoSabor,
-} from "@/types/database";
+import { TIPO_SABOR_LABELS, type Sabor, type TipoSabor } from "@/types/database";
+import { formatCurrency } from "@/lib/utils";
 import { Edit, Trash2, Search, AlertTriangle } from "lucide-react";
 
 type Filtro = "todos" | TipoSabor | "inativos";
@@ -16,14 +13,12 @@ const FILTROS: { value: Filtro; label: string }[] = [
   { value: "todos", label: "Todos" },
   { value: "bolo", label: "Bolo" },
   { value: "doce", label: "Doce" },
-  { value: "ambos", label: "Bolo e Doce" },
   { value: "inativos", label: "Inativos" },
 ];
 
 const TIPO_COLORS: Record<TipoSabor, string> = {
   bolo: "bg-brand-100 text-brand-700",
   doce: "bg-pink-100 text-pink-700",
-  ambos: "bg-purple-100 text-purple-700",
 };
 
 function ConfirmDelete({
@@ -46,11 +41,7 @@ function ConfirmDelete({
         </p>
       </div>
       <div className="flex gap-2">
-        <button
-          onClick={onCancel}
-          disabled={isPending}
-          className="btn-secondary flex-1 text-sm py-1.5"
-        >
+        <button onClick={onCancel} disabled={isPending} className="btn-secondary flex-1 text-sm py-1.5">
           Cancelar
         </button>
         <button
@@ -85,6 +76,12 @@ export function SaboresList({ sabores }: { sabores: Sabor[] }) {
     });
   }
 
+  function precoLabel(s: Sabor): string | null {
+    if (s.tipo === "bolo" && s.preco_por_kg) return `${formatCurrency(s.preco_por_kg)}/kg`;
+    if (s.tipo === "doce" && s.preco_por_cento) return `${formatCurrency(s.preco_por_cento)}/cento`;
+    return null;
+  }
+
   return (
     <div className="space-y-3">
       {/* Search */}
@@ -116,7 +113,9 @@ export function SaboresList({ sabores }: { sabores: Sabor[] }) {
         ))}
       </div>
 
-      <p className="text-xs text-gray-500">{filtered.length} sabor{filtered.length !== 1 ? "es" : ""}</p>
+      <p className="text-xs text-gray-500">
+        {filtered.length} sabor{filtered.length !== 1 ? "es" : ""}
+      </p>
 
       {filtered.length === 0 ? (
         <div className="card p-8 text-center text-gray-400 text-sm">
@@ -141,7 +140,11 @@ export function SaboresList({ sabores }: { sabores: Sabor[] }) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium text-sm text-gray-900">{sabor.nome}</span>
-                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${TIPO_COLORS[sabor.tipo as TipoSabor]}`}>
+                    <span
+                      className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                        TIPO_COLORS[sabor.tipo as TipoSabor]
+                      }`}
+                    >
                       {TIPO_SABOR_LABELS[sabor.tipo as TipoSabor]}
                     </span>
                     {!sabor.ativo && (
@@ -150,6 +153,9 @@ export function SaboresList({ sabores }: { sabores: Sabor[] }) {
                       </span>
                     )}
                   </div>
+                  {precoLabel(sabor) && (
+                    <p className="text-xs text-gray-400 mt-0.5">{precoLabel(sabor)}</p>
+                  )}
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <Link
