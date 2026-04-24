@@ -1,9 +1,9 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { avancarStatusAction, voltarStatusAction } from "./actions";
 import { STATUS_LABELS, type StatusPedido } from "@/types/database";
-import { Check, ChevronLeft } from "lucide-react";
+import { Check, ChevronLeft, AlertTriangle } from "lucide-react";
 
 const STATUS_ORDER: StatusPedido[] = ["novo", "produzindo", "feito", "entregue"];
 
@@ -15,6 +15,8 @@ interface Props {
 
 export function StatusActions({ pedidoId, currentStatus, proximoStatus }: Props) {
   const [isPending, startTransition] = useTransition();
+  const [confirmandoVoltar, setConfirmandoVoltar] = useState(false);
+
   const currentIndex = STATUS_ORDER.indexOf(currentStatus);
   const statusAnterior = currentIndex > 0 ? STATUS_ORDER[currentIndex - 1] : null;
 
@@ -25,9 +27,9 @@ export function StatusActions({ pedidoId, currentStatus, proximoStatus }: Props)
     });
   }
 
-  function voltarStatus() {
+  function executarVoltar() {
     if (!statusAnterior) return;
-    if (!confirm(`Voltar para "${STATUS_LABELS[statusAnterior]}"?`)) return;
+    setConfirmandoVoltar(false);
     startTransition(async () => {
       await voltarStatusAction(pedidoId, statusAnterior);
     });
@@ -83,29 +85,59 @@ export function StatusActions({ pedidoId, currentStatus, proximoStatus }: Props)
         })}
       </div>
 
-      {/* Action buttons */}
-      {(statusAnterior || proximoStatus) && (
-        <div className="flex gap-2 pt-1">
-          {statusAnterior && (
+      {/* Confirmação de retorno */}
+      {confirmandoVoltar && statusAnterior ? (
+        <div className="rounded-xl border border-orange-200 bg-orange-50 p-3 space-y-3">
+          <div className="flex items-start gap-2">
+            <AlertTriangle size={16} className="text-orange-500 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-orange-800">
+              Desfazer <span className="font-semibold">"{STATUS_LABELS[currentStatus]}"</span> e
+              voltar para{" "}
+              <span className="font-semibold">"{STATUS_LABELS[statusAnterior]}"</span>?
+            </p>
+          </div>
+          <div className="flex gap-2">
             <button
-              onClick={voltarStatus}
+              onClick={() => setConfirmandoVoltar(false)}
               disabled={isPending}
-              className="btn-secondary flex-none flex items-center gap-1 text-sm px-3 py-2"
+              className="btn-secondary flex-1 text-sm py-1.5"
             >
-              <ChevronLeft size={14} />
-              Voltar
+              Cancelar
             </button>
-          )}
-          {proximoStatus && (
             <button
-              onClick={avancarStatus}
+              onClick={executarVoltar}
               disabled={isPending}
-              className="btn-primary flex-1 text-sm"
+              className="flex-1 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white text-sm py-1.5 px-4 rounded-lg font-medium transition-colors disabled:opacity-50"
             >
-              {isPending ? "Atualizando..." : `Marcar como ${STATUS_LABELS[proximoStatus]}`}
+              {isPending ? "Voltando..." : "Sim, voltar"}
             </button>
-          )}
+          </div>
         </div>
+      ) : (
+        /* Botões normais */
+        (statusAnterior || proximoStatus) && (
+          <div className="flex gap-2 pt-1">
+            {statusAnterior && (
+              <button
+                onClick={() => setConfirmandoVoltar(true)}
+                disabled={isPending}
+                className="btn-secondary flex-none flex items-center gap-1 text-sm px-3 py-2"
+              >
+                <ChevronLeft size={14} />
+                Voltar
+              </button>
+            )}
+            {proximoStatus && (
+              <button
+                onClick={avancarStatus}
+                disabled={isPending}
+                className="btn-primary flex-1 text-sm"
+              >
+                {isPending ? "Atualizando..." : `Marcar como ${STATUS_LABELS[proximoStatus]}`}
+              </button>
+            )}
+          </div>
+        )
       )}
     </div>
   );

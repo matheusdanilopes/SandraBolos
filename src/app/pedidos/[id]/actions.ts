@@ -43,12 +43,18 @@ export async function salvarPrecificacaoAction(
   pedidoId: string,
   precoPorKg: number | null,
   valorCalculado: number | null,
-  precoCorrigido: number | null
+  precoCorrigido: number | null,
+  valorCobrado: number | null
 ): Promise<{ error?: string }> {
   const supabase = createServerSupabaseClient();
   const { error } = await supabase
     .from("pedidos")
-    .update({ preco_por_kg: precoPorKg, valor_calculado: valorCalculado, preco_corrigido: precoCorrigido })
+    .update({
+      preco_por_kg: precoPorKg,
+      valor_calculado: valorCalculado,
+      preco_corrigido: precoCorrigido,
+      valor_cobrado: valorCobrado,
+    })
     .eq("id", pedidoId);
 
   if (error) return { error: error.message };
