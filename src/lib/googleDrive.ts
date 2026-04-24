@@ -11,9 +11,13 @@ function getDriveClient(): drive_v3.Drive {
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
     credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
   } else {
+    // Strip surrounding quotes that some tools add (e.g. copy-pasting .env format into Vercel)
+    // then convert literal \n sequences to actual newlines.
+    let rawKey = process.env.GOOGLE_PRIVATE_KEY!;
+    if (rawKey.startsWith('"') && rawKey.endsWith('"')) rawKey = rawKey.slice(1, -1);
     credentials = {
       client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
-      private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, "\n"),
+      private_key: rawKey.replace(/\\n/g, "\n"),
     };
   }
 
