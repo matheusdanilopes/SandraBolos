@@ -1,39 +1,144 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { useState, useTransition } from "react";
+import { avancarStatusAction, voltarStatusAction } from "./actions";
 import { STATUS_LABELS, type StatusPedido } from "@/types/database";
-import { ArrowRight } from "lucide-react";
+import { Check, ChevronLeft, AlertTriangle } from "lucide-react";
+
+const STATUS_ORDER: StatusPedido[] = ["novo", "produzindo", "feito", "entregue"];
 
 interface Props {
   pedidoId: string;
   currentStatus: StatusPedido;
-  proximoStatus: StatusPedido;
+  proximoStatus: StatusPedido | null;
 }
 
 export function StatusActions({ pedidoId, currentStatus, proximoStatus }: Props) {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [confirmandoVoltar, setConfirmandoVoltar] = useState(false);
 
-  async function avancarStatus() {
-    setLoading(true);
-    await supabase.from("pedidos").update({ status: proximoStatus }).eq("id", pedidoId);
-    router.refresh();
-    setLoading(false);
+  const currentIndex = STATUS_ORDER.indexOf(currentStatus);
+  const statusAnterior = currentIndex > 0 ? STATUS_ORDER[currentIndex - 1] : null;
+
+  function avancarStatus() {
+    if (!proximoStatus) return;
+    startTransition(async () => {
+      await avancarStatusAction(pedidoId, proximoStatus);
+    });
+  }
+
+  function executarVoltar() {
+    if (!statusAnterior) return;
+    setConfirmandoVoltar(false);
+    startTransition(async () => {
+      await voltarStatusAction(pedidoId, statusAnterior);
+    });
   }
 
   return (
-    <div className="card p-4">
-      <h2 className="font-semibold text-sm text-gray-700 mb-3">Avançar Status</h2>
-      <div className="flex items-center gap-3 mb-3">
-        <span className="text-sm text-gray-500">{STATUS_LABELS[currentStatus]}</span>
-        <ArrowRight size={14} className="text-gray-400" />
-        <span className="text-sm font-medium text-brand-600">{STATUS_LABELS[proximoStatus]}</span>
+    <div className="card p-4 space-y-4">
+      <h2 className="font-semibold text-sm text-gray-700">Status do Pedido</h2>
+
+      {/* Stepper */}
+      <div className="flex items-start">
+        {STATUS_ORDER.map((status, i) => {
+          const idx = STATUS_ORDER.indexOf(status);
+          const isDone = idx < currentIndex;
+          const isActive = status === currentStatus;
+          const isLast = i === STATUS_ORDER.length - 1;
+
+          return (
+            <div key={status} className="flex items-center flex-1 min-w-0">
+              <div className="flex flex-col items-center flex-1 min-w-0">
+                <div
+                  className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
+                    isDone
+                      ? "bg-brand-600 text-white"
+                      : isActive
+                      ? "bg-brand-600 text-white ring-4 ring-brand-100"
+                      : "bg-gray-100 text-gray-400"
+                  }`}
+                >
+                  {isDone ? (
+                    <Check size={14} strokeWidth={2.5} />
+                  ) : (
+                    <span className="text-xs font-bold">{i + 1}</span>
+                  )}
+                </div>
+                <span
+                  className={`text-[10px] mt-1.5 text-center leading-tight font-medium px-0.5 ${
+                    isActive ? "text-brand-700" : isDone ? "text-gray-500" : "text-gray-300"
+                  }`}
+                >
+                  {STATUS_LABELS[status]}
+                </span>
+              </div>
+              {!isLast && (
+                <div
+                  className={`h-0.5 flex-1 mx-1 -mt-5 transition-colors ${
+                    isDone ? "bg-brand-500" : "bg-gray-200"
+                  }`}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
-      <button onClick={avancarStatus} disabled={loading} className="btn-primary w-full">
-        {loading ? "Atualizando..." : `Marcar como ${STATUS_LABELS[proximoStatus]}`}
-      </button>
+
+      {/* Confirmação de retorno */}
+      {confirmandoVoltar && statusAnterior ? (
+        <div className="rounded-xl border border-orange-200 bg-orange-50 p-3 space-y-3">
+          <div className="flex items-start gap-2">
+            <AlertTriangle size={16} className="text-orange-500 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-orange-800">
+              Desfazer <span className="font-semibold">"{STATUS_LABELS[currentStatus]}"</span> e
+              voltar para{" "}
+              <span className="font-semibold">"{STATUS_LABELS[statusAnterior]}"</span>?
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setConfirmandoVoltar(false)}
+              disabled={isPending}
+              className="btn-secondary flex-1 text-sm py-1.5"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={executarVoltar}
+              disabled={isPending}
+              className="flex-1 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white text-sm py-1.5 px-4 rounded-lg font-medium transition-colors disabled:opacity-50"
+            >
+              {isPending ? "Voltando..." : "Sim, voltar"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* Botões normais */
+        (statusAnterior || proximoStatus) && (
+          <div className="flex gap-2 pt-1">
+            {statusAnterior && (
+              <button
+                onClick={() => setConfirmandoVoltar(true)}
+                disabled={isPending}
+                className="btn-secondary flex-none flex items-center gap-1 text-sm px-3 py-2"
+              >
+                <ChevronLeft size={14} />
+                Voltar
+              </button>
+            )}
+            {proximoStatus && (
+              <button
+                onClick={avancarStatus}
+                disabled={isPending}
+                className="btn-primary flex-1 text-sm"
+              >
+                {isPending ? "Atualizando..." : `Marcar como ${STATUS_LABELS[proximoStatus]}`}
+              </button>
+            )}
+          </div>
+        )
+      )}
     </div>
   );
 }

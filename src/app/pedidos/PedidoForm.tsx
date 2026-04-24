@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { criarPedidoAction, editarPedidoAction } from "./actions";
 import { type Cliente, type Pedido, type TipoPedido, type Topper } from "@/types/database";
 import { ChevronDown } from "lucide-react";
 
@@ -14,6 +14,7 @@ interface Props {
 export function PedidoForm({ clientes, pedido }: Props) {
   const router = useRouter();
   const isEdit = !!pedido;
+  const [isPending, startTransition] = useTransition();
 
   const [clienteId, setClienteId] = useState(pedido?.cliente_id ?? "");
   const [novoCliente, setNovoCliente] = useState(!pedido?.cliente_id);
@@ -26,7 +27,6 @@ export function PedidoForm({ clientes, pedido }: Props) {
   const [topper, setTopper] = useState<Topper>(pedido?.topper ?? "nao");
   const [peso, setPeso] = useState(pedido?.peso?.toString() ?? "");
   const [quantidade, setQuantidade] = useState(pedido?.quantidade?.toString() ?? "");
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const needsPeso = tipo === "bolo" || tipo === "kit";
@@ -39,58 +39,39 @@ export function PedidoForm({ clientes, pedido }: Props) {
     if (!dataEntrega) { setError("Data de entrega é obrigatória"); return; }
     if (needsPeso && !peso) { setError("Peso é obrigatório para este tipo"); return; }
     if (needsQuantidade && !quantidade) { setError("Quantidade é obrigatória para este tipo"); return; }
+    if (!isEdit && (novoCliente || !clienteId)) {
+      if (!nomeCliente) { setError("Nome do cliente é obrigatório"); return; }
+      if (!telefoneCliente) { setError("Telefone do cliente é obrigatório"); return; }
+    }
 
-    setLoading(true);
-    try {
-      let resolvedClienteId: string | null = clienteId || null;
-
-      if (novoCliente || !clienteId) {
-        if (!nomeCliente) { setError("Nome do cliente é obrigatório"); setLoading(false); return; }
-        if (!telefoneCliente) { setError("Telefone do cliente é obrigatório"); setLoading(false); return; }
-
-        const { data: clienteData, error: clienteError } = await supabase
-          .from("clientes")
-          .insert({ nome: nomeCliente, telefone: telefoneCliente })
-          .select()
-          .single();
-
-        if (clienteError) throw clienteError;
-        resolvedClienteId = clienteData.id;
-      }
-
-      const payload = {
-        cliente_id: resolvedClienteId,
-        data_entrega: dataEntrega,
-        tipo,
-        descricao: descricao || null,
-        topper,
-        peso: needsPeso && peso ? parseFloat(peso) : null,
-        quantidade: needsQuantidade && quantidade ? parseInt(quantidade) : null,
-      };
+    startTransition(async () => {
+      let result: { error?: string };
 
       if (isEdit) {
-        const { error: updateError } = await supabase
-          .from("pedidos")
-          .update(payload)
-          .eq("id", pedido.id);
-        if (updateError) throw updateError;
-        router.push(`/pedidos/${pedido.id}`);
+        result = await editarPedidoAction(pedido.id, {
+          tipo,
+          dataEntrega,
+          descricao,
+          topper,
+          peso: needsPeso && peso ? parseFloat(peso) : null,
+          quantidade: needsQuantidade && quantidade ? parseInt(quantidade) : null,
+        });
       } else {
-        const { data: novoPedido, error: insertError } = await supabase
-          .from("pedidos")
-          .insert({ ...payload, status: "novo" })
-          .select()
-          .single();
-        if (insertError) throw insertError;
-        router.push(`/pedidos/${novoPedido.id}`);
+        result = await criarPedidoAction({
+          clienteId: clienteId || undefined,
+          novoClienteNome: nomeCliente || undefined,
+          novoClienteTelefone: telefoneCliente || undefined,
+          tipo,
+          dataEntrega,
+          descricao,
+          topper,
+          peso: needsPeso && peso ? parseFloat(peso) : null,
+          quantidade: needsQuantidade && quantidade ? parseInt(quantidade) : null,
+        });
       }
 
-      router.refresh();
-    } catch (err: any) {
-      setError(err.message ?? "Erro ao salvar pedido");
-    } finally {
-      setLoading(false);
-    }
+      if (result?.error) setError(result.error);
+    });
   }
 
   return (
@@ -222,8 +203,8 @@ export function PedidoForm({ clientes, pedido }: Props) {
         <button type="button" onClick={() => router.back()} className="btn-secondary flex-1">
           Cancelar
         </button>
-        <button type="submit" disabled={loading} className="btn-primary flex-1">
-          {loading ? "Salvando..." : isEdit ? "Salvar" : "Criar Pedido"}
+        <button type="submit" disabled={isPending} className="btn-primary flex-1">
+          {isPending ? "Salvando..." : isEdit ? "Salvar" : "Criar Pedido"}
         </button>
       </div>
     </form>

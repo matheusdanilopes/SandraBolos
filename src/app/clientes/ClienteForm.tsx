@@ -1,16 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { criarClienteAction, editarClienteAction } from "./actions";
 import type { Cliente } from "@/types/database";
 
 export function ClienteForm({ cliente }: { cliente?: Cliente }) {
   const router = useRouter();
   const isEdit = !!cliente;
+  const [isPending, startTransition] = useTransition();
   const [nome, setNome] = useState(cliente?.nome ?? "");
   const [telefone, setTelefone] = useState(cliente?.telefone ?? "");
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
@@ -18,24 +18,14 @@ export function ClienteForm({ cliente }: { cliente?: Cliente }) {
     if (!nome) { setError("Nome é obrigatório"); return; }
     if (!telefone) { setError("Telefone é obrigatório"); return; }
 
-    setLoading(true);
     setError("");
-    try {
-      if (isEdit) {
-        const { error: err } = await supabase.from("clientes").update({ nome, telefone }).eq("id", cliente.id);
-        if (err) throw err;
-        router.push(`/clientes/${cliente.id}`);
-      } else {
-        const { data, error: err } = await supabase.from("clientes").insert({ nome, telefone }).select().single();
-        if (err) throw err;
-        router.push(`/clientes/${data.id}`);
-      }
-      router.refresh();
-    } catch (err: any) {
-      setError(err.message ?? "Erro ao salvar");
-    } finally {
-      setLoading(false);
-    }
+    startTransition(async () => {
+      const result = isEdit
+        ? await editarClienteAction(cliente.id, nome, telefone)
+        : await criarClienteAction(nome, telefone);
+
+      if (result?.error) setError(result.error);
+    });
   }
 
   return (
@@ -53,8 +43,8 @@ export function ClienteForm({ cliente }: { cliente?: Cliente }) {
 
       <div className="flex gap-2">
         <button type="button" onClick={() => router.back()} className="btn-secondary flex-1">Cancelar</button>
-        <button type="submit" disabled={loading} className="btn-primary flex-1">
-          {loading ? "Salvando..." : isEdit ? "Salvar" : "Criar"}
+        <button type="submit" disabled={isPending} className="btn-primary flex-1">
+          {isPending ? "Salvando..." : isEdit ? "Salvar" : "Criar"}
         </button>
       </div>
     </form>

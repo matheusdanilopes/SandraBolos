@@ -1,27 +1,32 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { useState, useTransition } from "react";
+import { salvarEntregaAction } from "./actions";
 import { formatCurrency } from "@/lib/utils";
 import type { Pedido } from "@/types/database";
 
 export function EntregaForm({ pedido, valorFinal }: { pedido: Pedido; valorFinal: number | null }) {
-  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [valorCobrado, setValorCobrado] = useState(
     pedido.valor_cobrado?.toString() ?? valorFinal?.toString() ?? ""
   );
-  const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
 
-  async function handleSave() {
-    setLoading(true);
-    await supabase.from("pedidos").update({
-      valor_cobrado: valorCobrado ? parseFloat(valorCobrado) : null,
-    }).eq("id", pedido.id);
-    setSaved(true);
-    setLoading(false);
-    router.refresh();
+  function handleSave() {
+    setSaved(false);
+    setError("");
+    startTransition(async () => {
+      const result = await salvarEntregaAction(
+        pedido.id,
+        valorCobrado ? parseFloat(valorCobrado) : null
+      );
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setSaved(true);
+      }
+    });
   }
 
   return (
@@ -46,8 +51,10 @@ export function EntregaForm({ pedido, valorFinal }: { pedido: Pedido; valorFinal
         />
       </div>
 
-      <button onClick={handleSave} disabled={loading} className="btn-primary w-full">
-        {loading ? "Salvando..." : saved ? "Salvo!" : "Salvar"}
+      {error && <p className="text-sm text-red-600">{error}</p>}
+
+      <button onClick={handleSave} disabled={isPending} className="btn-primary w-full">
+        {isPending ? "Salvando..." : saved ? "Salvo!" : "Salvar"}
       </button>
     </div>
   );
