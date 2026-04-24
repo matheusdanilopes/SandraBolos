@@ -106,10 +106,8 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
         <EntregaForm pedido={pedidoTyped} valorFinal={valorFinal} />
       )}
 
-      {/* Avançar Status */}
-      {proximoStatus && (
-        <StatusActions pedidoId={pedidoTyped.id} currentStatus={pedidoTyped.status} proximoStatus={proximoStatus} />
-      )}
+      {/* Status */}
+      <StatusActions pedidoId={pedidoTyped.id} currentStatus={pedidoTyped.status} proximoStatus={proximoStatus} />
     </div>
   );
 }

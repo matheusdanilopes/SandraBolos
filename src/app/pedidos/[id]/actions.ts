@@ -21,6 +21,24 @@ export async function avancarStatusAction(
   return {};
 }
 
+export async function voltarStatusAction(
+  pedidoId: string,
+  statusAnterior: string
+): Promise<{ error?: string }> {
+  const supabase = createServerSupabaseClient();
+  const { error } = await supabase
+    .from("pedidos")
+    .update({ status: statusAnterior })
+    .eq("id", pedidoId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath(`/pedidos/${pedidoId}`);
+  revalidatePath("/pedidos");
+  revalidatePath("/");
+  return {};
+}
+
 export async function salvarPrecificacaoAction(
   pedidoId: string,
   precoPorKg: number | null,
