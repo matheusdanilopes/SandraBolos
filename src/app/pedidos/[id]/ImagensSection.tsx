@@ -1,50 +1,51 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import type { ImagemPedido } from "@/types/database";
-import { ImageIcon, Plus, Trash2, ExternalLink } from "lucide-react";
+import { ImageIcon, Plus, Trash2, ExternalLink, Upload } from "lucide-react";
 
 const MAX_IMAGENS = 5;
 
 interface Props {
   pedidoId: string;
   imagens: ImagemPedido[];
+  driveFolderId?: string | null;
 }
 
-export function ImagensSection({ pedidoId, imagens: initialImagens }: Props) {
+export function ImagensSection({ pedidoId, imagens: initialImagens, driveFolderId }: Props) {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [imagens, setImagens] = useState(initialImagens);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [showUrlForm, setShowUrlForm] = useState(false);
-  const [url, setUrl] = useState("");
-  const [nomeArquivo, setNomeArquivo] = useState("");
 
   const canAdd = imagens.length < MAX_IMAGENS;
 
-  async function addImagem() {
-    if (!url || !nomeArquivo) { setError("Preencha URL e nome do arquivo"); return; }
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
     setLoading(true);
     setError("");
 
-    const { data, error: dbError } = await supabase
-      .from("imagens_pedido")
-      .insert({ pedido_id: pedidoId, file_id: url, url, nome_arquivo: nomeArquivo })
-      .select()
-      .single();
+    const form = new FormData();
+    form.append("file", file);
+    form.append("pedido_id", pedidoId);
 
-    if (dbError) {
-      setError(dbError.message);
+    const res = await fetch("/api/upload-imagem", { method: "POST", body: form });
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(data.error ?? "Erro ao enviar imagem");
     } else {
       setImagens((prev) => [...prev, data]);
-      setUrl("");
-      setNomeArquivo("");
-      setShowUrlForm(false);
       router.refresh();
     }
+
     setLoading(false);
+    // Reset input so the same file can be re-selected if needed
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   async function removeImagem(id: string) {
@@ -60,37 +61,32 @@ export function ImagensSection({ pedidoId, imagens: initialImagens }: Props) {
         <h2 className="font-semibold text-sm text-gray-700">
           Imagens de Referência ({imagens.length}/{MAX_IMAGENS})
         </h2>
-        {canAdd && (
+        {canAdd && driveFolderId && (
           <button
-            onClick={() => setShowUrlForm((v) => !v)}
-            className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={loading}
+            className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium disabled:opacity-50"
           >
-            <Plus size={14} /> Adicionar
+            {loading ? <Upload size={14} className="animate-bounce" /> : <Plus size={14} />}
+            {loading ? "Enviando..." : "Adicionar"}
           </button>
+        )}
+        {canAdd && !driveFolderId && (
+          <span className="text-xs text-gray-400 italic">Drive não configurado</span>
         )}
       </div>
 
-      {showUrlForm && (
-        <div className="space-y-2 bg-gray-50 rounded-lg p-3">
-          <div>
-            <label className="label text-xs">Nome do arquivo</label>
-            <input className="input text-sm" value={nomeArquivo} onChange={(e) => setNomeArquivo(e.target.value)} placeholder="Ex: referencia-bolo.jpg" />
-          </div>
-          <div>
-            <label className="label text-xs">URL (Google Drive ou outro)</label>
-            <input className="input text-sm" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://drive.google.com/..." />
-          </div>
-          {error && <p className="text-xs text-red-600">{error}</p>}
-          <div className="flex gap-2">
-            <button onClick={() => setShowUrlForm(false)} className="btn-secondary flex-1 text-sm py-1.5">Cancelar</button>
-            <button onClick={addImagem} disabled={loading} className="btn-primary flex-1 text-sm py-1.5">
-              {loading ? "Salvando..." : "Adicionar"}
-            </button>
-          </div>
-        </div>
-      )}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        className="hidden"
+        onChange={handleFileChange}
+      />
 
-      {imagens.length === 0 && !showUrlForm ? (
+      {error && <p className="text-xs text-red-600">{error}</p>}
+
+      {imagens.length === 0 ? (
         <div className="text-center py-4 text-gray-400">
           <ImageIcon size={28} className="mx-auto mb-1 opacity-40" />
           <p className="text-xs">Nenhuma imagem adicionada</p>
@@ -101,10 +97,18 @@ export function ImagensSection({ pedidoId, imagens: initialImagens }: Props) {
             <div key={img.id} className="flex items-center gap-2 bg-gray-50 rounded-lg p-2">
               <ImageIcon size={14} className="text-gray-400 flex-shrink-0" />
               <span className="text-xs text-gray-700 flex-1 truncate">{img.nome_arquivo}</span>
-              <a href={img.url} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:text-brand-700 flex-shrink-0">
+              <a
+                href={img.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-brand-600 hover:text-brand-700 flex-shrink-0"
+              >
                 <ExternalLink size={14} />
               </a>
-              <button onClick={() => removeImagem(img.id)} className="text-red-400 hover:text-red-600 flex-shrink-0">
+              <button
+                onClick={() => removeImagem(img.id)}
+                className="text-red-400 hover:text-red-600 flex-shrink-0"
+              >
                 <Trash2 size={14} />
               </button>
             </div>
