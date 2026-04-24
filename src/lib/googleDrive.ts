@@ -3,13 +3,22 @@ import type { drive_v3 } from "googleapis";
 import { Readable } from "stream";
 
 function getDriveClient(): drive_v3.Drive {
-  // GoogleAuth with credentials object avoids the OpenSSL 3.x
-  // "DECODER routines::unsupported" error that occurs with JWT + raw key.
+  // Prefer a single JSON credentials blob (avoids OpenSSL 3.x newline issues
+  // that occur when the private key is split across env vars in Vercel).
+  // Fallback: build credentials from individual env vars.
+  let credentials: { client_email: string; private_key: string };
+
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+    credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+  } else {
+    credentials = {
+      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
+      private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, "\n"),
+    };
+  }
+
   const auth = new google.auth.GoogleAuth({
-    credentials: {
-      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    },
+    credentials,
     scopes: ["https://www.googleapis.com/auth/drive"],
   });
   return google.drive({ version: "v3", auth });

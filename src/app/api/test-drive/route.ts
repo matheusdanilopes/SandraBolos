@@ -1,37 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 
-// Diagnostic endpoint for validating Google Drive configuration.
-// Protected by TEST_DRIVE_SECRET env var — set it in Vercel and pass as:
-//   GET /api/test-drive?secret=<TEST_DRIVE_SECRET>
+// Diagnostic endpoint — gate with TEST_DRIVE_SECRET env var.
+// Usage: GET /api/test-drive?secret=<TEST_DRIVE_SECRET>
 export async function GET(req: NextRequest) {
   const secret = process.env.TEST_DRIVE_SECRET;
   if (!secret || req.nextUrl.searchParams.get("secret") !== secret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const rawKey = process.env.GOOGLE_PRIVATE_KEY;
   const rootFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID;
+  const hasJson = !!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+  const hasEmail = !!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  const hasKey = !!process.env.GOOGLE_PRIVATE_KEY;
 
   const envCheck = {
-    GOOGLE_SERVICE_ACCOUNT_EMAIL: email ? `${email.slice(0, 20)}…` : "MISSING",
-    GOOGLE_PRIVATE_KEY: rawKey
-      ? `present (${rawKey.length} chars, newline=${rawKey.includes("\n")}, literal_n=${rawKey.includes("\\n")})`
-      : "MISSING",
+    using: hasJson ? "GOOGLE_APPLICATION_CREDENTIALS_JSON" : "separate vars",
+    GOOGLE_APPLICATION_CREDENTIALS_JSON: hasJson ? "present" : "MISSING",
+    GOOGLE_SERVICE_ACCOUNT_EMAIL: hasEmail ? "present" : "MISSING",
+    GOOGLE_PRIVATE_KEY: hasKey ? "present" : "MISSING",
     GOOGLE_DRIVE_ROOT_FOLDER_ID: rootFolderId ?? "MISSING",
   };
 
-  if (!email || !rawKey || !rootFolderId) {
+  if (!rootFolderId || (!hasJson && (!hasEmail || !hasKey))) {
     return NextResponse.json({ ok: false, envCheck, error: "Variáveis de ambiente faltando" });
   }
 
   try {
+    let credentials: { client_email: string; private_key: string };
+    if (hasJson) {
+      credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON!);
+    } else {
+      credentials = {
+        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
+        private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, "\n"),
+      };
+    }
+
     const auth = new google.auth.GoogleAuth({
-      credentials: {
-        client_email: email,
-        private_key: rawKey.replace(/\\n/g, "\n"),
-      },
+      credentials,
       scopes: ["https://www.googleapis.com/auth/drive"],
     });
 
