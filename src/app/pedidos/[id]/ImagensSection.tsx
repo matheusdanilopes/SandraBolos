@@ -29,23 +29,26 @@ export function ImagensSection({ pedidoId, imagens: initialImagens }: Props) {
     setLoading(true);
     setError("");
 
-    const form = new FormData();
-    form.append("file", file);
-    form.append("pedido_id", pedidoId);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("pedido_id", pedidoId);
 
-    const res = await fetch("/api/upload-imagem", { method: "POST", body: form });
-    const data = await res.json();
+      const res = await fetch("/api/upload-imagem", { method: "POST", body: form });
+      const data = await res.json();
 
-    if (!res.ok) {
-      setError(data.error ?? "Erro ao enviar imagem");
-    } else {
-      setImagens((prev) => [...prev, data]);
-      router.refresh();
+      if (!res.ok) {
+        setError(data.error ?? "Erro ao enviar imagem");
+      } else {
+        setImagens((prev) => [...prev, data]);
+        router.refresh();
+      }
+    } catch {
+      setError("Erro de conexão ao enviar imagem");
+    } finally {
+      setLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
-
-    setLoading(false);
-    // Reset input so the same file can be re-selected if needed
-    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   async function removeImagem(id: string) {

@@ -1,9 +1,15 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 
-// Diagnostic endpoint — remove after debugging is complete.
-// GET /api/test-drive
-export async function GET() {
+// Diagnostic endpoint for validating Google Drive configuration.
+// Protected by TEST_DRIVE_SECRET env var — set it in Vercel and pass as:
+//   GET /api/test-drive?secret=<TEST_DRIVE_SECRET>
+export async function GET(req: NextRequest) {
+  const secret = process.env.TEST_DRIVE_SECRET;
+  if (!secret || req.nextUrl.searchParams.get("secret") !== secret) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const rawKey = process.env.GOOGLE_PRIVATE_KEY;
   const rootFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID;
@@ -11,7 +17,7 @@ export async function GET() {
   const envCheck = {
     GOOGLE_SERVICE_ACCOUNT_EMAIL: email ? `${email.slice(0, 20)}…` : "MISSING",
     GOOGLE_PRIVATE_KEY: rawKey
-      ? `${rawKey.slice(0, 30)}… (${rawKey.length} chars, contains_newline=${rawKey.includes("\n")}, contains_literal_n=${rawKey.includes("\\n")})`
+      ? `present (${rawKey.length} chars, newline=${rawKey.includes("\n")}, literal_n=${rawKey.includes("\\n")})`
       : "MISSING",
     GOOGLE_DRIVE_ROOT_FOLDER_ID: rootFolderId ?? "MISSING",
   };
@@ -30,11 +36,7 @@ export async function GET() {
     });
 
     const drive = google.drive({ version: "v3", auth });
-
-    const res = await drive.files.get({
-      fileId: rootFolderId,
-      fields: "id,name,mimeType",
-    });
+    const res = await drive.files.get({ fileId: rootFolderId, fields: "id,name,mimeType" });
 
     return NextResponse.json({ ok: true, envCheck, rootFolder: res.data });
   } catch (err: unknown) {

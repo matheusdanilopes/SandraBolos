@@ -32,7 +32,10 @@ export async function POST(req: NextRequest) {
 
   if (pedidoError) {
     console.error("[upload-imagem] pedido fetch error:", pedidoError);
-    return NextResponse.json({ error: pedidoError.message }, { status: 500 });
+    // PGRST116 = no rows returned by .single()
+    const status = pedidoError.code === "PGRST116" ? 404 : 500;
+    const message = status === 404 ? "Pedido não encontrado" : pedidoError.message;
+    return NextResponse.json({ error: message }, { status });
   }
   if (!pedido) {
     return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 });
