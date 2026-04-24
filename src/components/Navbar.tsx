@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ShoppingBag, Users, Settings } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Users, TrendingUp, ChefHat, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const links = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/", label: "Início", icon: LayoutDashboard },
   { href: "/pedidos", label: "Pedidos", icon: ShoppingBag },
   { href: "/clientes", label: "Clientes", icon: Users },
+  { href: "/financeiro", label: "Finanças", icon: TrendingUp },
+  { href: "/sabores", label: "Sabores", icon: ChefHat },
 ];
 
 export function Navbar() {
@@ -42,11 +44,13 @@ export function Navbar() {
                 key={href}
                 href={href}
                 className={cn(
-                  "flex-1 flex flex-col items-center gap-0.5 py-2 text-xs font-medium transition-colors",
-                  active ? "text-brand-600 border-b-2 border-brand-600" : "text-gray-500 hover:text-gray-700"
+                  "flex-1 flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition-colors",
+                  active
+                    ? "text-brand-600 border-b-2 border-brand-600"
+                    : "text-gray-500 hover:text-gray-700"
                 )}
               >
-                <Icon size={18} />
+                <Icon size={17} />
                 {label}
               </Link>
             );

@@ -33,6 +33,22 @@ export interface PedidoComCliente extends Pedido {
   clientes?: { nome: string; telefone: string } | null;
 }
 
+export type TipoSabor = "bolo" | "doce" | "ambos";
+
+export interface Sabor {
+  id: string;
+  nome: string;
+  tipo: TipoSabor;
+  ativo: boolean;
+  created_at: string;
+}
+
+export const TIPO_SABOR_LABELS: Record<TipoSabor, string> = {
+  bolo: "Bolo",
+  doce: "Doce",
+  ambos: "Bolo e Doce",
+};
+
 export interface Configuracoes {
   id: number;
   limite_peso_extra_kg: number;
@@ -139,6 +155,30 @@ export type Database = {
             referencedColumns: ["id"]
           }
         ]
+      }
+      sabores: {
+        Row: {
+          id: string
+          nome: string
+          tipo: string
+          ativo: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          nome: string
+          tipo?: string
+          ativo?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          nome?: string
+          tipo?: string
+          ativo?: boolean
+          created_at?: string
+        }
+        Relationships: []
       }
       configuracoes: {
         Row: {

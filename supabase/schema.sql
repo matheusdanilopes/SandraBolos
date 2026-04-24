@@ -40,6 +40,15 @@ alter table pedidos add column if not exists valor_cobrado numeric;
 alter table pedidos add column if not exists drive_folder_id text;
 alter table pedidos add column if not exists nome_cliente text;
 
+-- Tabela sabores
+create table if not exists sabores (
+  id uuid primary key default uuid_generate_v4(),
+  nome text not null,
+  tipo text not null default 'bolo' check (tipo in ('bolo', 'doce', 'ambos')),
+  ativo boolean not null default true,
+  created_at timestamp with time zone default now()
+);
+
 -- Tabela configuracoes (linha única, id = 1)
 create table if not exists configuracoes (
   id integer primary key default 1,
@@ -71,17 +80,20 @@ create index if not exists idx_imagens_pedido_id on imagens_pedido(pedido_id);
 alter table clientes enable row level security;
 alter table pedidos enable row level security;
 alter table imagens_pedido enable row level security;
+alter table sabores enable row level security;
 alter table configuracoes enable row level security;
 
 -- Policies (drop and recreate para evitar duplicatas)
 drop policy if exists "allow_all_clientes" on clientes;
 drop policy if exists "allow_all_pedidos" on pedidos;
 drop policy if exists "allow_all_imagens" on imagens_pedido;
+drop policy if exists "allow_all_sabores" on sabores;
 drop policy if exists "allow_all_configuracoes" on configuracoes;
 
 create policy "allow_all_clientes" on clientes for all using (true) with check (true);
 create policy "allow_all_pedidos" on pedidos for all using (true) with check (true);
 create policy "allow_all_imagens" on imagens_pedido for all using (true) with check (true);
+create policy "allow_all_sabores" on sabores for all using (true) with check (true);
 create policy "allow_all_configuracoes" on configuracoes for all using (true) with check (true);
 
 -- Recarrega o schema cache do PostgREST
