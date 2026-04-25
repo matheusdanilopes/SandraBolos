@@ -26,6 +26,8 @@ export interface Pedido {
   valor_calculado: number | null;
   preco_corrigido: number | null;
   valor_cobrado: number | null;
+  hora_entrega: string | null;
+  hora_retirada: string | null;
   created_at: string;
 }
 
@@ -86,6 +88,8 @@ export type Database = {
           valor_calculado: number | null
           preco_corrigido: number | null
           valor_cobrado: number | null
+          hora_entrega: string | null
+          hora_retirada: string | null
           created_at: string
         }
         Insert: {
@@ -104,6 +108,8 @@ export type Database = {
           valor_calculado?: number | null
           preco_corrigido?: number | null
           valor_cobrado?: number | null
+          hora_entrega?: string | null
+          hora_retirada?: string | null
           created_at?: string
         }
         Update: {
@@ -122,6 +128,8 @@ export type Database = {
           valor_calculado?: number | null
           preco_corrigido?: number | null
           valor_cobrado?: number | null
+          hora_entrega?: string | null
+          hora_retirada?: string | null
           created_at?: string
         }
         Relationships: [

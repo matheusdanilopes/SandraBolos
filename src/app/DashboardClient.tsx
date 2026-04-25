@@ -25,7 +25,11 @@ export function DashboardClient({ pedidos }: { pedidos: PedidoComCliente[] }) {
     hoje: pedidos.filter((p) => isEntregaHoje(p.data_entrega)),
     produzindo: pedidos.filter((p) => p.status === "produzindo"),
     feito: pedidos.filter((p) => p.status === "feito"),
-    atrasados: pedidos.filter((p) => pedidoAlerta(p.data_entrega) === "atrasado"),
+    atrasados: pedidos.filter(
+      (p) =>
+        pedidoAlerta(p.data_entrega, p.hora_entrega, p.hora_retirada) === "atrasado" &&
+        p.status !== "entregue"
+    ),
   };
 
   const filtrados =
@@ -127,7 +131,12 @@ export function DashboardClient({ pedidos }: { pedidos: PedidoComCliente[] }) {
                     {pedido.clientes?.nome ?? "Sem cliente"}
                   </span>
                   <StatusBadge status={pedido.status} />
-                  <AlertaBadge dataEntrega={pedido.data_entrega} status={pedido.status} />
+                  <AlertaBadge
+                    dataEntrega={pedido.data_entrega}
+                    status={pedido.status}
+                    horaEntrega={pedido.hora_entrega}
+                    horaRetirada={pedido.hora_retirada}
+                  />
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-xs text-gray-500">{TIPO_LABELS[pedido.tipo]}</span>

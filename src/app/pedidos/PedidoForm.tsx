@@ -4,11 +4,21 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { criarPedidoAction, editarPedidoAction } from "./actions";
 import { type Cliente, type Pedido, type TipoPedido, type Topper } from "@/types/database";
-import { ChevronDown } from "lucide-react";
+import { AlertTriangle, ChevronDown } from "lucide-react";
+import { parseISO, isPast, isToday } from "date-fns";
 
 interface Props {
   clientes: Pick<Cliente, "id" | "nome" | "telefone">[];
   pedido?: Pedido;
+}
+
+function isDataPassada(data: string): boolean {
+  try {
+    const d = parseISO(data);
+    return isPast(d) && !isToday(d);
+  } catch {
+    return false;
+  }
 }
 
 export function PedidoForm({ clientes, pedido }: Props) {
@@ -23,6 +33,8 @@ export function PedidoForm({ clientes, pedido }: Props) {
 
   const [tipo, setTipo] = useState<TipoPedido>(pedido?.tipo ?? "bolo");
   const [dataEntrega, setDataEntrega] = useState(pedido?.data_entrega ?? "");
+  const [horaEntrega, setHoraEntrega] = useState(pedido?.hora_entrega ?? "");
+  const [horaRetirada, setHoraRetirada] = useState(pedido?.hora_retirada ?? "");
   const [descricao, setDescricao] = useState(pedido?.descricao ?? "");
   const [topper, setTopper] = useState<Topper>(pedido?.topper ?? "nao");
   const [peso, setPeso] = useState(pedido?.peso?.toString() ?? "");
@@ -51,6 +63,8 @@ export function PedidoForm({ clientes, pedido }: Props) {
         result = await editarPedidoAction(pedido.id, {
           tipo,
           dataEntrega,
+          horaEntrega: horaEntrega || null,
+          horaRetirada: horaRetirada || null,
           descricao,
           topper,
           peso: needsPeso && peso ? parseFloat(peso) : null,
@@ -63,6 +77,8 @@ export function PedidoForm({ clientes, pedido }: Props) {
           novoClienteTelefone: telefoneCliente || undefined,
           tipo,
           dataEntrega,
+          horaEntrega: horaEntrega || null,
+          horaRetirada: horaRetirada || null,
           descricao,
           topper,
           peso: needsPeso && peso ? parseFloat(peso) : null,
@@ -152,6 +168,33 @@ export function PedidoForm({ clientes, pedido }: Props) {
         <div>
           <label className="label">Data de Entrega *</label>
           <input className="input" type="date" value={dataEntrega} onChange={(e) => setDataEntrega(e.target.value)} />
+          {dataEntrega && isDataPassada(dataEntrega) && (
+            <div className="mt-1.5 flex items-center gap-1.5 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-700">
+              <AlertTriangle size={12} className="shrink-0" />
+              Data de entrega está no passado
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">Hora de Entrega</label>
+            <input
+              className="input"
+              type="time"
+              value={horaEntrega}
+              onChange={(e) => setHoraEntrega(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="label">Hora de Retirada</label>
+            <input
+              className="input"
+              type="time"
+              value={horaRetirada}
+              onChange={(e) => setHoraRetirada(e.target.value)}
+            />
+          </div>
         </div>
 
         {needsPeso && (

@@ -11,6 +11,8 @@ interface PedidoPayload {
   novoClienteTelefone?: string;
   tipo: TipoPedido;
   dataEntrega: string;
+  horaEntrega?: string | null;
+  horaRetirada?: string | null;
   descricao?: string;
   topper: Topper;
   peso?: number | null;
@@ -39,6 +41,8 @@ export async function criarPedidoAction(
     .insert({
       cliente_id: resolvedClienteId,
       data_entrega: data.dataEntrega,
+      hora_entrega: data.horaEntrega ?? null,
+      hora_retirada: data.horaRetirada ?? null,
       tipo: data.tipo,
       descricao: data.descricao || null,
       topper: data.topper,
@@ -58,13 +62,15 @@ export async function criarPedidoAction(
 
 export async function editarPedidoAction(
   pedidoId: string,
-  data: Pick<PedidoPayload, "tipo" | "dataEntrega" | "descricao" | "topper" | "peso" | "quantidade">
+  data: Pick<PedidoPayload, "tipo" | "dataEntrega" | "horaEntrega" | "horaRetirada" | "descricao" | "topper" | "peso" | "quantidade">
 ): Promise<{ error?: string }> {
   const supabase = createServerSupabaseClient();
   const { error } = await supabase
     .from("pedidos")
     .update({
       data_entrega: data.dataEntrega,
+      hora_entrega: data.horaEntrega ?? null,
+      hora_retirada: data.horaRetirada ?? null,
       tipo: data.tipo,
       descricao: data.descricao || null,
       topper: data.topper,
