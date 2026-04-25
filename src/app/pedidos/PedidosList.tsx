@@ -32,7 +32,11 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
     switch (filtro) {
       case "hoje": return isEntregaHoje(p.data_entrega);
       case "semana": return isEntregaSemana(p.data_entrega);
-      case "atrasados": return pedidoAlerta(p.data_entrega) === "atrasado" && p.status !== "entregue";
+      case "atrasados":
+        return (
+          pedidoAlerta(p.data_entrega, p.hora_entrega, p.hora_retirada) === "atrasado" &&
+          p.status !== "entregue"
+        );
       case "todos": return true;
       default: return p.status === filtro;
     }
@@ -90,7 +94,12 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
                       {pedido.clientes?.nome ?? "Sem cliente"}
                     </span>
                     <StatusBadge status={pedido.status} />
-                    <AlertaBadge dataEntrega={pedido.data_entrega} status={pedido.status} />
+                    <AlertaBadge
+                      dataEntrega={pedido.data_entrega}
+                      status={pedido.status}
+                      horaEntrega={pedido.hora_entrega}
+                      horaRetirada={pedido.hora_retirada}
+                    />
                   </div>
                   <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
                     <span>{TIPO_LABELS[pedido.tipo]}</span>

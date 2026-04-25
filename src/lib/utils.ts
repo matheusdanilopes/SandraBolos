@@ -1,4 +1,4 @@
-import { format, isToday, isTomorrow, isPast, parseISO, startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
+import { format, isToday, isTomorrow, isPast, parseISO, startOfWeek, endOfWeek, isWithinInterval, set } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { clsx, type ClassValue } from "clsx";
 
@@ -8,6 +8,11 @@ export function cn(...inputs: ClassValue[]) {
 
 export function formatDate(date: string) {
   return format(parseISO(date), "dd/MM/yyyy", { locale: ptBR });
+}
+
+export function formatTime(time: string): string {
+  const [hours, minutes] = time.split(":");
+  return `${hours}h${minutes}`;
 }
 
 export function formatCurrency(value: number | null | undefined) {
@@ -22,9 +27,31 @@ export function formatPhone(phone: string) {
   return phone;
 }
 
-export function pedidoAlerta(dataEntrega: string): "atrasado" | "vence_amanha" | null {
+function buildDeliveryDatetime(dataEntrega: string, hora: string): Date {
+  const base = parseISO(dataEntrega);
+  const [h, m] = hora.split(":").map(Number);
+  return set(base, { hours: h, minutes: m, seconds: 0, milliseconds: 0 });
+}
+
+export function pedidoAlerta(
+  dataEntrega: string,
+  horaEntrega?: string | null,
+  horaRetirada?: string | null
+): "atrasado" | "vence_amanha" | "entrega_hoje" | null {
+  const hora = horaEntrega || horaRetirada || null;
   const date = parseISO(dataEntrega);
+
+  if (hora) {
+    const datetime = buildDeliveryDatetime(dataEntrega, hora);
+    const now = new Date();
+    if (datetime < now) return "atrasado";
+    if (isToday(date)) return "entrega_hoje";
+    if (isTomorrow(date)) return "vence_amanha";
+    return null;
+  }
+
   if (isPast(date) && !isToday(date)) return "atrasado";
+  if (isToday(date)) return "entrega_hoje";
   if (isTomorrow(date)) return "vence_amanha";
   return null;
 }
