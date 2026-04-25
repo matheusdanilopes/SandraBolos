@@ -51,12 +51,6 @@ create table if not exists custos (
   created_at timestamp with time zone default now()
 );
 
-alter table custos add column if not exists pedido_id uuid references pedidos(id) on delete set null;
-alter table custos add column if not exists tipo text not null default 'outros';
-alter table custos add column if not exists descricao text not null default '';
-alter table custos add column if not exists valor numeric not null default 0;
-alter table custos add column if not exists data date not null default current_date;
-
 -- Tabela imagens_pedido
 create table if not exists imagens_pedido (
   id uuid primary key default uuid_generate_v4(),

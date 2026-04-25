@@ -184,6 +184,44 @@ export type Database = {
           }
         ]
       }
+      custos: {
+        Row: {
+          id: string
+          pedido_id: string | null
+          tipo: string
+          descricao: string
+          valor: number
+          data: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          pedido_id?: string | null
+          tipo?: string
+          descricao: string
+          valor: number
+          data: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          pedido_id?: string | null
+          tipo?: string
+          descricao?: string
+          valor?: number
+          data?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custos_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
