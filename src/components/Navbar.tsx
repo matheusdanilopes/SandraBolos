@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ShoppingBag, Users } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Users, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/pedidos", label: "Pedidos", icon: ShoppingBag },
   { href: "/clientes", label: "Clientes", icon: Users },
+  { href: "/financeiro", label: "Financeiro", icon: TrendingUp },
 ];
 
 export function Navbar() {

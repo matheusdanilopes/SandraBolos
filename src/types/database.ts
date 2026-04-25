@@ -2,6 +2,7 @@
 export type TipoPedido = "bolo" | "doce" | "kit";
 export type StatusPedido = "novo" | "produzindo" | "feito" | "entregue";
 export type Topper = "sim" | "nao" | "brinde";
+export type TipoCusto = "ingrediente" | "embalagem" | "mao_de_obra" | "custo_fixo" | "outros";
 
 export interface Cliente {
   id: string;
@@ -31,6 +32,20 @@ export interface Pedido {
 
 export interface PedidoComCliente extends Pedido {
   clientes?: { nome: string; telefone: string } | null;
+}
+
+export interface Custo {
+  id: string;
+  pedido_id: string | null;
+  tipo: TipoCusto;
+  descricao: string;
+  valor: number;
+  data: string;
+  created_at: string;
+}
+
+export interface CustoComPedido extends Custo {
+  pedidos?: { nome_cliente: string | null; descricao: string | null } | null;
 }
 
 export interface ImagemPedido {
@@ -216,4 +231,20 @@ export const TOPPER_LABELS: Record<Topper, string> = {
   sim: "Sim",
   nao: "Não",
   brinde: "Brinde",
+};
+
+export const TIPO_CUSTO_LABELS: Record<TipoCusto, string> = {
+  ingrediente: "Ingrediente",
+  embalagem: "Embalagem",
+  mao_de_obra: "Mão de obra",
+  custo_fixo: "Custo fixo",
+  outros: "Outros",
+};
+
+export const TIPO_CUSTO_COLORS: Record<TipoCusto, string> = {
+  ingrediente: "bg-amber-100 text-amber-800",
+  embalagem: "bg-blue-100 text-blue-800",
+  mao_de_obra: "bg-purple-100 text-purple-800",
+  custo_fixo: "bg-gray-100 text-gray-700",
+  outros: "bg-slate-100 text-slate-700",
 };

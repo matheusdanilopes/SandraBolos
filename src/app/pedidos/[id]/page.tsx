@@ -4,12 +4,13 @@ import { supabase } from "@/lib/supabase";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AlertaBadge } from "@/components/AlertaBadge";
 import { formatDate, formatPhone, calcularValorFinal } from "@/lib/utils";
-import { TIPO_LABELS, TOPPER_LABELS, STATUS_FLOW, type PedidoComCliente } from "@/types/database";
+import { TIPO_LABELS, TOPPER_LABELS, STATUS_FLOW, type PedidoComCliente, type CustoComPedido } from "@/types/database";
 import { Edit } from "lucide-react";
 import { StatusActions } from "./StatusActions";
 import { PrecificacaoForm } from "./PrecificacaoForm";
 import { EntregaForm } from "./EntregaForm";
 import { ImagensSection } from "./ImagensSection";
+import { CustosSection } from "./CustosSection";
 
 export const dynamic = "force-dynamic";
 
@@ -24,11 +25,18 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
 
   const pedidoTyped = pedido as unknown as PedidoComCliente;
 
-  const { data: imagens } = await supabase
-    .from("imagens_pedido")
-    .select("*")
-    .eq("pedido_id", params.id)
-    .order("created_at");
+  const [{ data: imagens }, { data: custos }] = await Promise.all([
+    supabase
+      .from("imagens_pedido")
+      .select("*")
+      .eq("pedido_id", params.id)
+      .order("created_at"),
+    supabase
+      .from("custos")
+      .select("*")
+      .eq("pedido_id", params.id)
+      .order("data", { ascending: false }),
+  ]);
 
   const cliente = pedidoTyped.clientes ?? null;
   const valorFinal = calcularValorFinal(pedidoTyped);
@@ -105,6 +113,12 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
       {pedidoTyped.status === "entregue" && (
         <EntregaForm pedido={pedidoTyped} valorFinal={valorFinal} />
       )}
+
+      {/* Custos do pedido */}
+      <CustosSection
+        pedidoId={pedidoTyped.id}
+        custos={(custos ?? []) as unknown as CustoComPedido[]}
+      />
 
       {/* Status */}
       <StatusActions pedidoId={pedidoTyped.id} currentStatus={pedidoTyped.status} proximoStatus={proximoStatus} />
