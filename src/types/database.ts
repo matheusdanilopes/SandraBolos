@@ -44,6 +44,36 @@ export interface ImagemPedido {
   created_at: string;
 }
 
+export interface TopperPedido {
+  id: string;
+  pedido_id: string;
+  fornecedor: string | null;
+  valor: number;
+  frete: number;
+  solicitado: boolean;
+  recebido: boolean;
+  pago_fornecedor: boolean;
+  data_pagamento: string | null;
+  observacoes: string | null;
+  created_at: string;
+}
+
+export interface TopperPedidoComPedido extends TopperPedido {
+  pedidos: {
+    id: string;
+    nome_cliente: string | null;
+    data_entrega: string;
+    topper: string;
+    status: string;
+    clientes: { nome: string; telefone: string } | null;
+  };
+}
+
+export interface PedidoComTopper extends Pedido {
+  clientes?: { nome: string; telefone: string } | null;
+  toppers_pedido?: TopperPedido | null;
+}
+
 // Database type matching Supabase codegen output exactly.
 // Row/Insert/Update use plain string for DB enum columns (tipo, topper, status)
 // to avoid assignability issues with union types vs Record<string, unknown>.
@@ -172,6 +202,56 @@ export type Database = {
             foreignKeyName: "imagens_pedido_pedido_id_fkey"
             columns: ["pedido_id"]
             isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      toppers_pedido: {
+        Row: {
+          id: string
+          pedido_id: string
+          fornecedor: string | null
+          valor: number
+          frete: number
+          solicitado: boolean
+          recebido: boolean
+          pago_fornecedor: boolean
+          data_pagamento: string | null
+          observacoes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          pedido_id: string
+          fornecedor?: string | null
+          valor?: number
+          frete?: number
+          solicitado?: boolean
+          recebido?: boolean
+          pago_fornecedor?: boolean
+          data_pagamento?: string | null
+          observacoes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          pedido_id?: string
+          fornecedor?: string | null
+          valor?: number
+          frete?: number
+          solicitado?: boolean
+          recebido?: boolean
+          pago_fornecedor?: boolean
+          data_pagamento?: string | null
+          observacoes?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "toppers_pedido_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: true
             referencedRelation: "pedidos"
             referencedColumns: ["id"]
           }
