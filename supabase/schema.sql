@@ -72,5 +72,26 @@ create policy "allow_all_clientes" on clientes for all using (true) with check (
 create policy "allow_all_pedidos" on pedidos for all using (true) with check (true);
 create policy "allow_all_imagens" on imagens_pedido for all using (true) with check (true);
 
+-- Tabela toppers_pedido
+create table if not exists toppers_pedido (
+  id uuid primary key default uuid_generate_v4(),
+  pedido_id uuid not null references pedidos(id) on delete cascade,
+  fornecedor text,
+  valor numeric(10,2) not null default 0,
+  frete numeric(10,2) not null default 0,
+  solicitado boolean not null default false,
+  recebido boolean not null default false,
+  pago_fornecedor boolean not null default false,
+  observacoes text,
+  created_at timestamp with time zone default now(),
+  unique(pedido_id)
+);
+
+create index if not exists idx_toppers_pedido_id on toppers_pedido(pedido_id);
+
+alter table toppers_pedido enable row level security;
+drop policy if exists "allow_all_toppers_pedido" on toppers_pedido;
+create policy "allow_all_toppers_pedido" on toppers_pedido for all using (true) with check (true);
+
 -- Recarrega o schema cache do PostgREST
 notify pgrst, 'reload schema';
