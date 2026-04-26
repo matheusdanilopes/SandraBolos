@@ -28,6 +28,10 @@ async function getOrCreateFolder(
   name: string,
   parentId: string
 ): Promise<string> {
+  if (!parentId || parentId.length < 2) {
+    throw new Error(`ID da pasta pai inválido ao buscar '${name}': "${parentId}"`);
+  }
+
   const res = await drive.files.list({
     q: `name='${name}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
     fields: "files(id)",
@@ -36,7 +40,9 @@ async function getOrCreateFolder(
     includeItemsFromAllDrives: true,
     supportsAllDrives: true,
   });
-  if (res.data.files?.length) return res.data.files[0].id!;
+
+  const existingId = res.data.files?.[0]?.id;
+  if (existingId) return existingId;
 
   const folder = await drive.files.create({
     requestBody: {
@@ -47,7 +53,10 @@ async function getOrCreateFolder(
     fields: "id",
     supportsAllDrives: true,
   });
-  return folder.data.id!;
+
+  const newId = folder.data.id;
+  if (!newId) throw new Error(`Drive não retornou ID para a pasta '${name}'`);
+  return newId;
 }
 
 export async function createPedidoFolder(
@@ -55,7 +64,14 @@ export async function createPedidoFolder(
   nomeCliente: string
 ): Promise<string> {
   const drive = getDriveClient();
-  const rootId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID!;
+  const rootId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID?.trim();
+  if (!rootId || (rootId !== "root" && rootId.length < 10)) {
+    throw new Error(
+      `GOOGLE_DRIVE_ROOT_FOLDER_ID inválido ou não configurado: "${rootId ?? ""}". ` +
+        "Configure o ID correto da pasta raiz no Google Drive."
+    );
+  }
+
   const now = new Date();
   const ano = now.getFullYear().toString();
   const mes = String(now.getMonth() + 1).padStart(2, "0");
@@ -63,7 +79,7 @@ export async function createPedidoFolder(
   const anoId = await getOrCreateFolder(drive, ano, rootId);
   const mesId = await getOrCreateFolder(drive, mes, anoId);
 
-  const safeName = nomeCliente.replace(/[^a-zA-Z0-9À-ÿ\s\-]/g, "").trim();
+  const safeName = nomeCliente.replace(/[^a-zA-Z0-9À-ÿ\s\-]/g, "").trim() || "pedido";
   const folderName = `${safeName}-${pedidoId.slice(0, 8)}`;
 
   const folder = await drive.files.create({
@@ -76,7 +92,9 @@ export async function createPedidoFolder(
     supportsAllDrives: true,
   });
 
-  const folderId = folder.data.id!;
+  const folderId = folder.data.id;
+  if (!folderId) throw new Error("Drive não retornou ID da pasta do pedido");
+
   await drive.permissions.create({
     fileId: folderId,
     requestBody: { role: "reader", type: "anyone" },
@@ -92,6 +110,7 @@ export async function uploadFileToDrive(
   fileName: string,
   mimeType: string
 ): Promise<{ fileId: string; url: string }> {
+  if (!folderId) throw new Error("folderId inválido para upload no Drive");
   const drive = getDriveClient();
 
   const body = new PassThrough();
