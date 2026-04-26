@@ -28,7 +28,9 @@ async function getOrCreateFolder(
   name: string,
   parentId: string
 ): Promise<string> {
-  if (!parentId) throw new Error(`ID da pasta pai inválido ao buscar '${name}'`);
+  if (!parentId || parentId.length < 2) {
+    throw new Error(`ID da pasta pai inválido ao buscar '${name}': "${parentId}"`);
+  }
 
   const res = await drive.files.list({
     q: `name='${name}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
@@ -62,8 +64,13 @@ export async function createPedidoFolder(
   nomeCliente: string
 ): Promise<string> {
   const drive = getDriveClient();
-  const rootId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID;
-  if (!rootId) throw new Error("GOOGLE_DRIVE_ROOT_FOLDER_ID não está configurado");
+  const rootId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID?.trim();
+  if (!rootId || (rootId !== "root" && rootId.length < 10)) {
+    throw new Error(
+      `GOOGLE_DRIVE_ROOT_FOLDER_ID inválido ou não configurado: "${rootId ?? ""}". ` +
+        "Configure o ID correto da pasta raiz no Google Drive."
+    );
+  }
 
   const now = new Date();
   const ano = now.getFullYear().toString();
