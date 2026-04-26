@@ -39,6 +39,8 @@ alter table pedidos add column if not exists preco_corrigido numeric;
 alter table pedidos add column if not exists valor_cobrado numeric;
 alter table pedidos add column if not exists drive_folder_id text;
 alter table pedidos add column if not exists nome_cliente text;
+alter table pedidos add column if not exists hora_entrega time;
+alter table pedidos add column if not exists hora_retirada time;
 
 -- Tabela imagens_pedido
 create table if not exists imagens_pedido (

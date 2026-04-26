@@ -3,7 +3,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AlertaBadge } from "@/components/AlertaBadge";
-import { formatDate, formatPhone, calcularValorFinal, formatCurrency, pedidoNumero } from "@/lib/utils";
+import { formatDate, formatTime, formatPhone, calcularValorFinal, formatCurrency, pedidoNumero } from "@/lib/utils";
 import { TIPO_LABELS, TOPPER_LABELS, STATUS_FLOW, type PedidoComCliente } from "@/types/database";
 import { Edit, CheckCircle, AlertCircle, MessageCircle, Phone } from "lucide-react";
 import { StatusActions } from "./StatusActions";
@@ -41,6 +41,12 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
   const isPago = pedidoTyped.status === "entregue" && pedidoTyped.valor_cobrado != null;
   const isEntregeSemValor = pedidoTyped.status === "entregue" && pedidoTyped.valor_cobrado == null;
 
+  const horaLabel = pedidoTyped.hora_entrega
+    ? `Entrega: ${formatDate(pedidoTyped.data_entrega)} às ${formatTime(pedidoTyped.hora_entrega)}`
+    : pedidoTyped.hora_retirada
+    ? `Retirada: ${formatDate(pedidoTyped.data_entrega)} às ${formatTime(pedidoTyped.hora_retirada)}`
+    : `Entrega: ${formatDate(pedidoTyped.data_entrega)}`;
+
   return (
     <div className="py-4 space-y-4">
       {/* Header */}
@@ -50,11 +56,14 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-xl font-bold text-gray-900">{cliente?.nome ?? "Sem cliente"}</h1>
             <StatusBadge status={pedidoTyped.status} />
-            <AlertaBadge dataEntrega={pedidoTyped.data_entrega} status={pedidoTyped.status} />
+            <AlertaBadge
+              dataEntrega={pedidoTyped.data_entrega}
+              status={pedidoTyped.status}
+              horaEntrega={pedidoTyped.hora_entrega}
+              horaRetirada={pedidoTyped.hora_retirada}
+            />
           </div>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {TIPO_LABELS[pedidoTyped.tipo]} · Entrega: {formatDate(pedidoTyped.data_entrega)}
-          </p>
+          <p className="text-sm text-gray-500 mt-0.5">{TIPO_LABELS[pedidoTyped.tipo]} • {horaLabel}</p>
         </div>
         <Link href={`/pedidos/${pedidoTyped.id}/editar`} className="btn-secondary flex items-center gap-1 text-sm px-3 py-1.5">
           <Edit size={14} /> Editar
@@ -128,6 +137,18 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
             <div>
               <dt className="text-xs text-gray-500">Quantidade</dt>
               <dd className="font-medium">{pedidoTyped.quantidade} un.</dd>
+            </div>
+          )}
+          {pedidoTyped.hora_entrega && (
+            <div>
+              <dt className="text-xs text-gray-500">Hora de Entrega</dt>
+              <dd className="font-medium">{formatTime(pedidoTyped.hora_entrega)}</dd>
+            </div>
+          )}
+          {pedidoTyped.hora_retirada && (
+            <div>
+              <dt className="text-xs text-gray-500">Hora de Retirada</dt>
+              <dd className="font-medium">{formatTime(pedidoTyped.hora_retirada)}</dd>
             </div>
           )}
           {valorFinal != null && (
