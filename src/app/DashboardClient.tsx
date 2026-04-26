@@ -2,23 +2,75 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { formatDate, isEntregaHoje, pedidoAlerta } from "@/lib/utils";
+import {
+  format,
+  isToday,
+  isTomorrow,
+  isPast,
+  parseISO,
+} from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { formatDate, isEntregaHoje, pedidoAlerta, formatCurrency, calcularValorFinal, pedidoNumero } from "@/lib/utils";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AlertaBadge } from "@/components/AlertaBadge";
-import { TIPO_LABELS, type PedidoComCliente } from "@/types/database";
-import { Package, Loader, CheckCircle, AlertTriangle, X } from "lucide-react";
+import {
+  TIPO_LABELS,
+  STATUS_LABELS,
+  type PedidoComCliente,
+  type StatusPedido,
+} from "@/types/database";
+import {
+  Package,
+  Loader,
+  CheckCircle,
+  AlertTriangle,
+  X,
+  Plus,
+  TrendingUp,
+  Banknote,
+} from "lucide-react";
 
 type Filtro = "todos" | "hoje" | "produzindo" | "feito" | "atrasados";
 
 const FILTRO_LABELS: Record<Filtro, string> = {
-  todos: "Pedidos Ativos",
+  todos: "Todos os Pedidos Ativos",
   hoje: "Entregas de Hoje",
   produzindo: "Em Produção",
   feito: "Prontos para Entregar",
   atrasados: "Atrasados",
 };
 
-export function DashboardClient({ pedidos }: { pedidos: PedidoComCliente[] }) {
+const STATUS_ORDER: StatusPedido[] = ["novo", "produzindo", "feito", "entregue"];
+
+const STATUS_DOT: Record<StatusPedido, string> = {
+  novo: "bg-blue-400",
+  produzindo: "bg-yellow-400",
+  feito: "bg-green-400",
+  entregue: "bg-gray-300",
+};
+
+interface Props {
+  pedidos: PedidoComCliente[];
+  receitaMes: number;
+  aReceber: number;
+}
+
+function getDayLabel(dateStr: string): { label: string; variant: "atrasado" | "hoje" | "amanha" | "normal" } {
+  const date = parseISO(dateStr);
+  if (isPast(date) && !isToday(date)) return { label: `Atrasado — ${format(date, "dd/MM", { locale: ptBR })}`, variant: "atrasado" };
+  if (isToday(date)) return { label: `Hoje — ${format(date, "dd/MM", { locale: ptBR })}`, variant: "hoje" };
+  if (isTomorrow(date)) return { label: `Amanhã — ${format(date, "dd/MM", { locale: ptBR })}`, variant: "amanha" };
+  return { label: format(date, "EEEE, dd/MM", { locale: ptBR }), variant: "normal" };
+}
+
+const DAY_VARIANT_CLASSES = {
+  atrasado: "text-red-700 bg-red-50 border border-red-200",
+  hoje: "text-brand-700 bg-brand-50 border border-brand-200",
+  amanha: "text-orange-700 bg-orange-50 border border-orange-200",
+  normal: "text-gray-600 bg-gray-100 border border-gray-200",
+};
+
+export function DashboardClient({ pedidos, receitaMes, aReceber }: Props) {
   const [filtro, setFiltro] = useState<Filtro>("todos");
 
   const grupos = {
@@ -35,13 +87,26 @@ export function DashboardClient({ pedidos }: { pedidos: PedidoComCliente[] }) {
     : filtro === "atrasados" ? grupos.atrasados
     : pedidos;
 
+  // Group by delivery date
+  const porDia = filtrados.reduce((acc, p) => {
+    const dia = p.data_entrega;
+    if (!acc[dia]) acc[dia] = [];
+    acc[dia].push(p);
+    return acc;
+  }, {} as Record<string, PedidoComCliente[]>);
+
+  const diasOrdenados = Object.keys(porDia).sort();
+
+  // Within each day, group by status in workflow order
+  const isFiltroStatus = filtro === "produzindo" || filtro === "feito";
+
   function toggleFiltro(f: Filtro) {
     setFiltro((prev) => (prev === f ? "todos" : f));
   }
 
   return (
     <div className="space-y-4">
-      {/* Stat cards — each is a filter toggle */}
+      {/* Stat cards */}
       <div className="grid grid-cols-2 gap-3">
         <button
           onClick={() => toggleFiltro("hoje")}
@@ -92,6 +157,28 @@ export function DashboardClient({ pedidos }: { pedidos: PedidoComCliente[] }) {
         </button>
       </div>
 
+      {/* Financial summary */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="card p-3">
+          <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
+            <TrendingUp size={11} className="text-emerald-500" />
+            Receita do Mês
+          </div>
+          <div className="text-base font-bold text-emerald-600 leading-tight">
+            {formatCurrency(receitaMes)}
+          </div>
+        </div>
+        <div className="card p-3">
+          <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
+            <Banknote size={11} className="text-blue-500" />
+            A Receber
+          </div>
+          <div className="text-base font-bold text-blue-600 leading-tight">
+            {aReceber > 0 ? formatCurrency(aReceber) : <span className="text-gray-400">—</span>}
+          </div>
+        </div>
+      </div>
+
       {/* Filtered list */}
       <div>
         <div className="flex items-center justify-between mb-2">
@@ -110,35 +197,121 @@ export function DashboardClient({ pedidos }: { pedidos: PedidoComCliente[] }) {
         </div>
 
         {filtrados.length === 0 ? (
-          <div className="card p-8 text-center text-gray-400">
-            <CheckCircle size={32} className="mx-auto mb-2 opacity-40" />
-            <p className="text-sm">Nenhum pedido</p>
+          <div className="card p-8 text-center space-y-3">
+            <span className="text-4xl block">🎂</span>
+            <p className="text-sm text-gray-400">
+              {filtro === "todos"
+                ? "Nenhum pedido ativo no momento"
+                : `Nenhum pedido em "${FILTRO_LABELS[filtro].toLowerCase()}"`}
+            </p>
+            {filtro === "todos" && (
+              <Link
+                href="/pedidos/novo"
+                className="btn-primary inline-flex items-center gap-1 text-sm"
+              >
+                <Plus size={14} /> Criar Pedido
+              </Link>
+            )}
           </div>
         ) : (
-          <div className="space-y-2">
-            {filtrados.map((pedido) => (
-              <Link
-                key={pedido.id}
-                href={`/pedidos/${pedido.id}`}
-                className="card p-3 block hover:shadow-md transition-shadow active:bg-gray-50"
-              >
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium text-sm text-gray-900 truncate">
-                    {pedido.clientes?.nome ?? "Sem cliente"}
-                  </span>
-                  <StatusBadge status={pedido.status} />
-                  <AlertaBadge dataEntrega={pedido.data_entrega} status={pedido.status} />
+          <div className="space-y-4">
+            {diasOrdenados.map((dia) => {
+              const { label, variant } = getDayLabel(dia);
+              const pedidosDoDia = porDia[dia];
+
+              // Sub-group by status when showing "todos" or "hoje"/"atrasados"
+              const mostrarSubgrupos = !isFiltroStatus;
+
+              if (mostrarSubgrupos) {
+                const porStatus = STATUS_ORDER.reduce((acc, s) => {
+                  const grupo = pedidosDoDia.filter((p) => p.status === s);
+                  if (grupo.length > 0) acc[s] = grupo;
+                  return acc;
+                }, {} as Partial<Record<StatusPedido, PedidoComCliente[]>>);
+
+                return (
+                  <div key={dia}>
+                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold mb-2 capitalize ${DAY_VARIANT_CLASSES[variant]}`}>
+                      {variant === "atrasado" && <AlertTriangle size={10} />}
+                      {label}
+                    </div>
+                    <div className="space-y-3">
+                      {(Object.entries(porStatus) as [StatusPedido, PedidoComCliente[]][]).map(([status, lista]) => (
+                        <div key={status}>
+                          <div className="flex items-center gap-1.5 mb-1.5 px-1">
+                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[status]}`} />
+                            <span className="text-xs font-medium text-gray-500">
+                              {STATUS_LABELS[status]} ({lista.length})
+                            </span>
+                          </div>
+                          <div className="space-y-1.5">
+                            {lista.map((pedido) => (
+                              <PedidoCard key={pedido.id} pedido={pedido} />
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div key={dia}>
+                  <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold mb-2 capitalize ${DAY_VARIANT_CLASSES[variant]}`}>
+                    {variant === "atrasado" && <AlertTriangle size={10} />}
+                    {label}
+                  </div>
+                  <div className="space-y-1.5">
+                    {pedidosDoDia.map((pedido) => (
+                      <PedidoCard key={pedido.id} pedido={pedido} />
+                    ))}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs text-gray-500">{TIPO_LABELS[pedido.tipo]}</span>
-                  <span className="text-gray-300">·</span>
-                  <span className="text-xs text-gray-500">Entrega: {formatDate(pedido.data_entrega)}</span>
-                </div>
-              </Link>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+function PedidoCard({ pedido }: { pedido: PedidoComCliente }) {
+  const valor = calcularValorFinal(pedido);
+  const numero = pedidoNumero(pedido.created_at, pedido.id);
+
+  return (
+    <Link
+      href={`/pedidos/${pedido.id}`}
+      className="card p-3 block hover:shadow-md transition-shadow active:bg-gray-50"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-medium text-sm text-gray-900 truncate">
+              {pedido.clientes?.nome ?? "Sem cliente"}
+            </span>
+            <AlertaBadge dataEntrega={pedido.data_entrega} status={pedido.status} />
+          </div>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            <span className="text-xs text-gray-500">{TIPO_LABELS[pedido.tipo]}</span>
+            {pedido.peso && (
+              <span className="text-xs text-gray-400">{pedido.peso} kg</span>
+            )}
+            {pedido.quantidade && (
+              <span className="text-xs text-gray-400">{pedido.quantidade} un.</span>
+            )}
+            <span className="text-gray-300">·</span>
+            <span className="text-[10px] text-gray-400">{numero}</span>
+          </div>
+        </div>
+        {valor != null && (
+          <span className="text-sm font-semibold text-emerald-600 flex-shrink-0">
+            {formatCurrency(valor)}
+          </span>
+        )}
+      </div>
+    </Link>
   );
 }
