@@ -54,9 +54,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Lazy folder creation: create Drive folder now if not yet created
+  // Lazy folder creation: create Drive folder now if not yet created.
+  // Treat falsy values AND suspiciously short strings (e.g. ".") as absent —
+  // real Drive folder IDs are always 25+ chars.
   let folderId = pedido.drive_folder_id;
-  if (!folderId) {
+  if (!folderId || folderId.length < 10) {
+    if (folderId && folderId.length < 10) {
+      // Bad ID stored in DB from a previous buggy run — clear it so it gets replaced.
+      await supabase.from("pedidos").update({ drive_folder_id: null }).eq("id", pedido.id);
+      folderId = null;
+    }
     const clienteNome =
       (pedido.clientes as { nome: string } | null)?.nome ??
       pedido.nome_cliente ??

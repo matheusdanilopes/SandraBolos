@@ -110,7 +110,9 @@ export async function uploadFileToDrive(
   fileName: string,
   mimeType: string
 ): Promise<{ fileId: string; url: string }> {
-  if (!folderId) throw new Error("folderId inválido para upload no Drive");
+  if (!folderId || folderId.length < 10)
+    throw new Error(`folderId inválido para upload no Drive: "${folderId}"`);
+
   const drive = getDriveClient();
 
   const body = new PassThrough();
