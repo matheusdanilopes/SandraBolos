@@ -87,6 +87,8 @@ create table if not exists toppers_pedido (
   unique(pedido_id)
 );
 
+alter table toppers_pedido add column if not exists data_pagamento date;
+
 create index if not exists idx_toppers_pedido_id on toppers_pedido(pedido_id);
 
 alter table toppers_pedido enable row level security;

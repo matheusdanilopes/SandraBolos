@@ -53,6 +53,7 @@ export interface TopperPedido {
   solicitado: boolean;
   recebido: boolean;
   pago_fornecedor: boolean;
+  data_pagamento: string | null;
   observacoes: string | null;
   created_at: string;
 }
@@ -216,6 +217,7 @@ export type Database = {
           solicitado: boolean
           recebido: boolean
           pago_fornecedor: boolean
+          data_pagamento: string | null
           observacoes: string | null
           created_at: string
         }
@@ -228,6 +230,7 @@ export type Database = {
           solicitado?: boolean
           recebido?: boolean
           pago_fornecedor?: boolean
+          data_pagamento?: string | null
           observacoes?: string | null
           created_at?: string
         }
@@ -240,6 +243,7 @@ export type Database = {
           solicitado?: boolean
           recebido?: boolean
           pago_fornecedor?: boolean
+          data_pagamento?: string | null
           observacoes?: string | null
           created_at?: string
         }

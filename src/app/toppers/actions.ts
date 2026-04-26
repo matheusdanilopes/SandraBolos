@@ -28,7 +28,6 @@ export async function salvarTopperAction(data: TopperPayload): Promise<{ error?:
     );
 
   if (error) return { error: error.message };
-
   revalidatePath("/toppers");
   return {};
 }
@@ -91,9 +90,9 @@ export async function toggleRecebidoAction(
   return {};
 }
 
-export async function togglePagoFornecedorAction(
+export async function registrarPagamentoAction(
   pedidoId: string,
-  pago_fornecedor: boolean
+  dataPagamento: string
 ): Promise<{ error?: string }> {
   const supabase = createServerSupabaseClient();
 
@@ -106,16 +105,54 @@ export async function togglePagoFornecedorAction(
   if (!existing) {
     const { error } = await supabase
       .from("toppers_pedido")
-      .insert({ pedido_id: pedidoId, pago_fornecedor, valor: 0, frete: 0 });
+      .insert({
+        pedido_id: pedidoId,
+        pago_fornecedor: true,
+        data_pagamento: dataPagamento,
+        valor: 0,
+        frete: 0,
+      });
     if (error) return { error: error.message };
   } else {
     const { error } = await supabase
       .from("toppers_pedido")
-      .update({ pago_fornecedor })
+      .update({ pago_fornecedor: true, data_pagamento: dataPagamento })
       .eq("pedido_id", pedidoId);
     if (error) return { error: error.message };
   }
 
+  revalidatePath("/toppers");
+  return {};
+}
+
+export async function desfazerPagamentoAction(
+  pedidoId: string
+): Promise<{ error?: string }> {
+  const supabase = createServerSupabaseClient();
+
+  const { error } = await supabase
+    .from("toppers_pedido")
+    .update({ pago_fornecedor: false, data_pagamento: null })
+    .eq("pedido_id", pedidoId);
+
+  if (error) return { error: error.message };
+  revalidatePath("/toppers");
+  return {};
+}
+
+export async function registrarPagamentoLoteAction(
+  pedidoIds: string[],
+  dataPagamento: string
+): Promise<{ error?: string }> {
+  if (pedidoIds.length === 0) return {};
+  const supabase = createServerSupabaseClient();
+
+  const { error } = await supabase
+    .from("toppers_pedido")
+    .update({ pago_fornecedor: true, data_pagamento: dataPagamento })
+    .in("pedido_id", pedidoIds);
+
+  if (error) return { error: error.message };
   revalidatePath("/toppers");
   return {};
 }
