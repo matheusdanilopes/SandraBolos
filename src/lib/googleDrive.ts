@@ -125,7 +125,8 @@ export async function uploadFileToDrive(
     supportsAllDrives: true,
   });
 
-  const fileId = res.data.id!;
+  const fileId = res.data.id;
+  if (!fileId) throw new Error("Drive não retornou ID do arquivo enviado");
   await drive.permissions.create({
     fileId,
     requestBody: { role: "reader", type: "anyone" },
