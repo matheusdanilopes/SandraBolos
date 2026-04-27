@@ -1,10 +1,11 @@
 import { supabase } from "@/lib/supabase";
 import { formatCurrency, calcularValorFinal, formatDate } from "@/lib/utils";
-import { format, startOfMonth, subMonths, parseISO } from "date-fns";
+import { format, startOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { TIPO_LABELS, type PedidoComCliente } from "@/types/database";
-import { TrendingUp, Banknote, AlertCircle, CheckCircle } from "lucide-react";
+import { TIPO_LABELS, type PedidoComCliente, type CustoComCategoria, type CategoriaCusto } from "@/types/database";
+import { TrendingUp, Banknote, AlertCircle, CheckCircle, TrendingDown, Tag, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { CustosSection } from "./CustosSection";
 
 export const dynamic = "force-dynamic";
 
@@ -18,25 +19,45 @@ interface MesResumo {
 export default async function FinanceiroPage() {
   const hoje = new Date();
   const inicioMes = startOfMonth(hoje).toISOString().split("T")[0];
+  const mesCurrent = format(hoje, "yyyy-MM");
   const seisAtras = subMonths(startOfMonth(hoje), 5).toISOString().split("T")[0];
 
-  const [entreguesResult, feitosResult] = await Promise.all([
-    supabase
-      .from("pedidos")
-      .select("data_entrega, valor_cobrado, valor_calculado, preco_corrigido, tipo, id, created_at, clientes(nome)")
-      .eq("status", "entregue")
-      .gte("data_entrega", seisAtras)
-      .order("data_entrega", { ascending: false }),
+  const [entreguesResult, feitosResult, custosResult, categoriasResult, toppersResult] =
+    await Promise.all([
+      supabase
+        .from("pedidos")
+        .select("data_entrega, valor_cobrado, valor_calculado, preco_corrigido, tipo, id, created_at, clientes(nome)")
+        .eq("status", "entregue")
+        .gte("data_entrega", seisAtras)
+        .order("data_entrega", { ascending: false }),
 
-    supabase
-      .from("pedidos")
-      .select("id, data_entrega, valor_calculado, preco_corrigido, tipo, created_at, clientes(nome)")
-      .eq("status", "feito")
-      .order("data_entrega", { ascending: true }),
-  ]);
+      supabase
+        .from("pedidos")
+        .select("id, data_entrega, valor_calculado, preco_corrigido, tipo, created_at, clientes(nome)")
+        .eq("status", "feito")
+        .order("data_entrega", { ascending: true }),
+
+      supabase
+        .from("custos")
+        .select("*, categorias_custo(nome)")
+        .gte("data", inicioMes)
+        .order("data", { ascending: false }),
+
+      supabase
+        .from("categorias_custo")
+        .select("*")
+        .order("nome"),
+
+      supabase
+        .from("toppers_pedido")
+        .select("valor, frete, pago_fornecedor, data_pagamento"),
+    ]);
 
   const entregues = (entreguesResult.data ?? []) as unknown as PedidoComCliente[];
   const feitos = (feitosResult.data ?? []) as unknown as PedidoComCliente[];
+  const custos = (custosResult.data ?? []) as unknown as CustoComCategoria[];
+  const categorias = (categoriasResult.data ?? []) as CategoriaCusto[];
+  const toppers = toppersResult.data ?? [];
 
   // Receita e ticket do mês atual
   const doMes = entregues.filter((p) => p.data_entrega >= inicioMes);
@@ -44,11 +65,24 @@ export default async function FinanceiroPage() {
   const ticketMedio = doMes.length > 0 ? receitaMes / doMes.length : null;
   const semValorMes = doMes.filter((p) => !p.valor_cobrado).length;
 
-  // A receber (feitos com valor estimado)
+  // A receber
   const aReceber = feitos.reduce(
     (acc, p) => acc + (p.preco_corrigido ?? p.valor_calculado ?? 0),
     0
   );
+
+  // Custos manuais do mês
+  const totalCustosMes = custos.reduce((acc, c) => acc + c.valor, 0);
+  const lucroEstimado = receitaMes - totalCustosMes;
+
+  // Toppers
+  const totalToppersAPagar = toppers
+    .filter((t) => !t.pago_fornecedor && (t.valor + t.frete) > 0)
+    .reduce((acc, t) => acc + t.valor + t.frete, 0);
+  const totalToppersPagosMes = toppers
+    .filter((t) => t.pago_fornecedor && t.data_pagamento?.startsWith(mesCurrent))
+    .reduce((acc, t) => acc + t.valor + t.frete, 0);
+  const mostrarToppers = totalToppersAPagar > 0 || totalToppersPagosMes > 0;
 
   // Resumo por mês (últimos 6)
   const mesesResumo: MesResumo[] = [];
@@ -56,20 +90,17 @@ export default async function FinanceiroPage() {
     const inicio = startOfMonth(subMonths(hoje, i));
     const chave = format(inicio, "yyyy-MM");
     const label = format(inicio, "MMMM yyyy", { locale: ptBR });
-
     const pedidosMes = entregues.filter((p) => p.data_entrega.startsWith(chave));
     const receita = pedidosMes.reduce((acc, p) => acc + (p.valor_cobrado ?? 0), 0);
-
     mesesResumo.push({ label, chave, receita, quantidade: pedidosMes.length });
   }
-
   const maxReceita = Math.max(...mesesResumo.map((m) => m.receita), 1);
 
   return (
     <div className="py-4 space-y-5">
       <h1 className="text-xl font-bold text-gray-900">Financeiro</h1>
 
-      {/* Cards do mês */}
+      {/* Cards 2x2 */}
       <div className="grid grid-cols-2 gap-3">
         <div className="card p-4">
           <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2">
@@ -79,15 +110,40 @@ export default async function FinanceiroPage() {
           <p className="text-xl font-bold text-emerald-600">{formatCurrency(receitaMes)}</p>
           <p className="text-xs text-gray-400 mt-0.5">{doMes.length} pedidos entregues</p>
         </div>
+
         <div className="card p-4">
           <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2">
-            <Banknote size={12} className="text-blue-500" />
+            <TrendingDown size={12} className="text-rose-500" />
+            Custos do Mês
+          </div>
+          <p className="text-xl font-bold text-rose-600">{formatCurrency(totalCustosMes)}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{custos.length} lançamento{custos.length !== 1 ? "s" : ""}</p>
+        </div>
+
+        <div className="card p-4">
+          <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2">
+            <Tag size={12} className={lucroEstimado >= 0 ? "text-blue-500" : "text-red-500"} />
+            Lucro Estimado
+          </div>
+          <p className={`text-xl font-bold ${lucroEstimado >= 0 ? "text-blue-600" : "text-red-600"}`}>
+            {formatCurrency(lucroEstimado)}
+          </p>
+          {totalCustosMes === 0 ? (
+            <p className="text-xs text-gray-400 mt-0.5">Adicione custos para ver</p>
+          ) : (
+            <p className="text-xs text-gray-400 mt-0.5">receita − custos</p>
+          )}
+        </div>
+
+        <div className="card p-4">
+          <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2">
+            <Banknote size={12} className="text-gray-400" />
             Ticket Médio
           </div>
-          <p className="text-xl font-bold text-blue-600">
+          <p className="text-xl font-bold text-gray-700">
             {ticketMedio != null ? formatCurrency(ticketMedio) : <span className="text-gray-300">—</span>}
           </p>
-          <p className="text-xs text-gray-400 mt-0.5">
+          <p className="text-xs text-gray-400 mt-0.5 capitalize">
             {format(hoje, "MMMM", { locale: ptBR })}
           </p>
         </div>
@@ -139,6 +195,38 @@ export default async function FinanceiroPage() {
         </div>
       )}
 
+      {/* Toppers — resumo compacto */}
+      {mostrarToppers && (
+        <div className="card p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-sm text-gray-700">Custos com Toppers</h2>
+            <Link
+              href="/toppers"
+              className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium transition-colors"
+            >
+              Gerenciar <ArrowRight size={12} />
+            </Link>
+          </div>
+          <div className="space-y-2">
+            {totalToppersAPagar > 0 && (
+              <div className="flex items-center justify-between py-1.5 border-b border-gray-100">
+                <span className="text-sm text-gray-600">A pagar fornecedores</span>
+                <span className="text-sm font-semibold text-red-600">{formatCurrency(totalToppersAPagar)}</span>
+              </div>
+            )}
+            {totalToppersPagosMes > 0 && (
+              <div className="flex items-center justify-between py-1.5">
+                <span className="text-sm text-gray-600">Pago este mês</span>
+                <span className="text-sm font-semibold text-gray-500">{formatCurrency(totalToppersPagosMes)}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Custos do Mês */}
+      <CustosSection custos={custos} categorias={categorias} />
+
       {/* Histórico mensal */}
       <div className="card p-4 space-y-4">
         <h2 className="font-semibold text-sm text-gray-700">Últimos 6 Meses</h2>
@@ -176,12 +264,10 @@ export default async function FinanceiroPage() {
         </div>
       </div>
 
-      {/* Pedidos entregues do mês com status de pagamento */}
+      {/* Entregas do mês */}
       {doMes.length > 0 && (
         <div className="card p-4 space-y-3">
-          <h2 className="font-semibold text-sm text-gray-700">
-            Entregas do Mês
-          </h2>
+          <h2 className="font-semibold text-sm text-gray-700">Entregas do Mês</h2>
           <div className="space-y-2">
             {doMes.map((p) => (
               <Link
