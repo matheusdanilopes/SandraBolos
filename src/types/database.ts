@@ -74,6 +74,25 @@ export interface PedidoComTopper extends Pedido {
   toppers_pedido?: TopperPedido | null;
 }
 
+export interface CategoriaCusto {
+  id: string;
+  nome: string;
+  created_at: string;
+}
+
+export interface Custo {
+  id: string;
+  descricao: string;
+  valor: number;
+  data: string;
+  categoria_id: string | null;
+  created_at: string;
+}
+
+export interface CustoComCategoria extends Custo {
+  categorias_custo?: { nome: string } | null;
+}
+
 // Database type matching Supabase codegen output exactly.
 // Row/Insert/Update use plain string for DB enum columns (tipo, topper, status)
 // to avoid assignability issues with union types vs Record<string, unknown>.
@@ -253,6 +272,59 @@ export type Database = {
             columns: ["pedido_id"]
             isOneToOne: true
             referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      categorias_custo: {
+        Row: {
+          id: string
+          nome: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          nome: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          nome?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      custos: {
+        Row: {
+          id: string
+          descricao: string
+          valor: number
+          data: string
+          categoria_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          descricao: string
+          valor: number
+          data?: string
+          categoria_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          descricao?: string
+          valor?: number
+          data?: string
+          categoria_id?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custos_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias_custo"
             referencedColumns: ["id"]
           }
         ]
