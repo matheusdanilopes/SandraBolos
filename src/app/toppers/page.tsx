@@ -13,8 +13,11 @@ export default async function ToppersPage() {
 
   return (
     <div className="py-4 space-y-4">
-      <div className="flex items-center justify-between">
+      <div>
         <h1 className="text-xl font-bold text-gray-900">Toppers</h1>
+        <p className="text-sm text-gray-500 mt-0.5">
+          Toppers de fornecedores para pedidos com decoração
+        </p>
       </div>
       <ToppersList pedidos={(pedidos ?? []) as unknown as PedidoComTopper[]} />
     </div>
