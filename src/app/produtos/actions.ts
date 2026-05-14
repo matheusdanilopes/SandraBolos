@@ -8,6 +8,7 @@ interface ProdutoPayload {
   nome: string;
   unidade_medida: UnidadeMedida;
   preco_padrao: number;
+  categoria_id?: string | null;
 }
 
 export async function criarProdutoAction(
@@ -21,6 +22,7 @@ export async function criarProdutoAction(
     nome: data.nome.trim(),
     unidade_medida: data.unidade_medida,
     preco_padrao: data.preco_padrao,
+    categoria_id: data.categoria_id ?? null,
     ativo: true,
   });
 
@@ -43,6 +45,7 @@ export async function editarProdutoAction(
       nome: data.nome.trim(),
       unidade_medida: data.unidade_medida,
       preco_padrao: data.preco_padrao,
+      categoria_id: data.categoria_id ?? null,
       ativo: data.ativo,
     })
     .eq("id", id);
