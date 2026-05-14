@@ -69,12 +69,7 @@ export default async function FinanceiroPage() {
     0
   );
 
-  const totalCustosMes = custos.reduce((acc, c) => acc + c.valor, 0);
-  const lucroEstimado = receitaMes - totalCustosMes;
-  const margemPct =
-    receitaMes > 0 && totalCustosMes > 0
-      ? Math.round((lucroEstimado / receitaMes) * 100)
-      : null;
+  const totalCustosLancados = custos.reduce((acc, c) => acc + c.valor, 0);
 
   const totalToppersAPagar = toppers
     .filter((t) => !t.pago_fornecedor && t.valor + t.frete > 0)
@@ -83,6 +78,13 @@ export default async function FinanceiroPage() {
     .filter((t) => t.pago_fornecedor && t.data_pagamento?.startsWith(mesCurrent))
     .reduce((acc, t) => acc + t.valor + t.frete, 0);
   const mostrarToppers = totalToppersAPagar > 0 || totalToppersPagosMes > 0;
+
+  const totalCustosMes = totalCustosLancados + totalToppersPagosMes;
+  const lucroEstimado = receitaMes - totalCustosMes;
+  const margemPct =
+    receitaMes > 0 && totalCustosMes > 0
+      ? Math.round((lucroEstimado / receitaMes) * 100)
+      : null;
 
   const mesesResumo: MesResumo[] = [];
   for (let i = 0; i <= 5; i++) {
@@ -118,9 +120,9 @@ export default async function FinanceiroPage() {
             Custos do Mês
           </div>
           <p className="text-xl font-bold text-rose-600">{formatCurrency(totalCustosMes)}</p>
-          {totalToppersAPagar > 0 ? (
-            <p className="text-xs text-orange-500 mt-0.5">
-              + {formatCurrency(totalToppersAPagar)} toppers
+          {totalToppersPagosMes > 0 ? (
+            <p className="text-xs text-gray-400 mt-0.5">
+              inclui {formatCurrency(totalToppersPagosMes)} em toppers
             </p>
           ) : (
             <p className="text-xs text-gray-400 mt-0.5">
