@@ -84,6 +84,18 @@ export interface Produto {
   created_at: string;
 }
 
+export interface CardapioConfig {
+  id: string;
+  background_url: string | null;
+  background_type: string;
+  opacity: number;
+  titulo: string;
+  subtitulo: string | null;
+  cor_texto: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ItemPedido {
   id: string;
   pedido_id: string;
@@ -375,6 +387,42 @@ export type Database = {
             referencedColumns: ["id"]
           }
         ]
+      }
+      cardapio_config: {
+        Row: {
+          id: string
+          background_url: string | null
+          background_type: string
+          opacity: number
+          titulo: string
+          subtitulo: string | null
+          cor_texto: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          background_url?: string | null
+          background_type?: string
+          opacity?: number
+          titulo?: string
+          subtitulo?: string | null
+          cor_texto?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          background_url?: string | null
+          background_type?: string
+          opacity?: number
+          titulo?: string
+          subtitulo?: string | null
+          cor_texto?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       categorias_custo: {
         Row: {

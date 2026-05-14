@@ -3,14 +3,16 @@
 import { useState, useTransition } from "react";
 import { ChevronDown, Plus, Pencil, Check, X, ToggleLeft, ToggleRight } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import type { Produto, UnidadeMedida } from "@/types/database";
+import type { Produto, UnidadeMedida, CardapioConfig } from "@/types/database";
 import { UNIDADE_LABELS } from "@/types/database";
 import { criarProdutoAction, editarProdutoAction, toggleAtivoAction } from "./actions";
+import { CardapioVisual } from "./CardapioVisual";
 
 const UNIDADES: UnidadeMedida[] = ["peso_kg", "cento", "unidade"];
 
 interface Props {
   produtos: Produto[];
+  configCardapio: CardapioConfig | null;
 }
 
 interface EditState {
@@ -243,7 +245,7 @@ function NovoProdutoForm() {
   );
 }
 
-export function ProdutosClient({ produtos }: Props) {
+export function ProdutosClient({ produtos, configCardapio }: Props) {
   const ativos = produtos.filter((p) => p.ativo);
   const inativos = produtos.filter((p) => !p.ativo);
 
@@ -271,6 +273,17 @@ export function ProdutosClient({ produtos }: Props) {
           <p className="text-xs mt-1">Crie produtos para usar no cálculo de itens.</p>
         </div>
       )}
+
+      {/* Cardápio Visual */}
+      <div className="border-t border-gray-100 pt-4 space-y-2">
+        <div>
+          <h2 className="text-base font-semibold text-gray-800">Cardápio Visual</h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Personalize e exporte seu cardápio como imagem PNG para compartilhar.
+          </p>
+        </div>
+        <CardapioVisual produtos={produtos} configInicial={configCardapio} />
+      </div>
     </div>
   );
 }
