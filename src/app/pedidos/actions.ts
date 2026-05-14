@@ -5,6 +5,15 @@ import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import type { TipoPedido, Topper } from "@/types/database";
 
+interface ItemPayload {
+  produtoId: string;
+  nomeProduto: string;
+  unidadeMedida: string;
+  precoUnitario: number;
+  quantidade: number;
+  valorTotal: number;
+}
+
 interface PedidoPayload {
   clienteId?: string;
   novoClienteNome?: string;
@@ -17,6 +26,7 @@ interface PedidoPayload {
   topper: Topper;
   peso?: number | null;
   quantidade?: number | null;
+  itens?: ItemPayload[];
 }
 
 export async function criarPedidoAction(
@@ -54,6 +64,20 @@ export async function criarPedidoAction(
     .single();
 
   if (error) return { error: error.message };
+
+  if (data.itens && data.itens.length > 0) {
+    await supabase.from("itens_pedido").insert(
+      data.itens.map((item) => ({
+        pedido_id: novoPedido.id,
+        produto_id: item.produtoId,
+        nome_produto: item.nomeProduto,
+        unidade_medida: item.unidadeMedida,
+        preco_unitario: item.precoUnitario,
+        quantidade: item.quantidade,
+        valor_total: Math.round(item.valorTotal * 100) / 100,
+      }))
+    );
+  }
 
   revalidatePath("/pedidos");
   revalidatePath("/");
