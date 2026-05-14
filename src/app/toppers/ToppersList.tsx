@@ -17,6 +17,7 @@ import {
   RotateCcw,
   Square,
   CheckSquare,
+  ListChecks,
 } from "lucide-react";
 import { formatDate, formatCurrency, pedidoNumero } from "@/lib/utils";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -127,24 +128,35 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
   return (
     <div
       className={cn(
-        "card overflow-hidden transition-opacity",
+        "card overflow-hidden transition-all duration-150",
         getStatusBorder(topper),
         isPending && "opacity-60",
-        batchMode && selected && "ring-2 ring-brand-400 ring-offset-1"
+        batchMode && selected && "ring-2 ring-brand-400 ring-offset-1",
+        // Em modo lote, cards não elegíveis ficam opacos para reduzir ruído
+        batchMode && !pagavel && !selected && "opacity-40"
       )}
     >
       <div className="p-4">
         {/* Cabeçalho */}
         <div className="flex items-start gap-3">
-          {batchMode && pagavel && (
-            <button
-              onClick={onToggleSelect}
-              className="mt-0.5 flex-shrink-0 text-brand-600"
-              aria-label={selected ? "Desmarcar" : "Selecionar"}
-            >
-              {selected ? <CheckSquare size={18} /> : <Square size={18} className="text-gray-400" />}
-            </button>
-          )}
+          {batchMode ? (
+            pagavel ? (
+              <button
+                onClick={onToggleSelect}
+                className="mt-0.5 flex-shrink-0 text-brand-600 active:scale-90 transition-transform"
+                aria-label={selected ? "Desmarcar" : "Selecionar para pagamento"}
+              >
+                {selected ? (
+                  <CheckSquare size={20} className="text-brand-600" />
+                ) : (
+                  <Square size={20} className="text-gray-300" />
+                )}
+              </button>
+            ) : (
+              // Placeholder para manter o alinhamento
+              <div className="mt-0.5 flex-shrink-0 w-5 h-5" />
+            )
+          ) : null}
 
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 flex-wrap mb-1">
@@ -220,8 +232,8 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
           </div>
         )}
 
-        {/* Bloco de pagamento */}
-        {totalFornecedor > 0 && (
+        {/* Bloco de pagamento (oculto em modo lote para reduzir distração) */}
+        {totalFornecedor > 0 && !batchMode && (
           <div className="mt-2.5">
             {topper?.pago_fornecedor ? (
               <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
@@ -293,6 +305,14 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
                 Registrar pagamento ao fornecedor
               </button>
             )}
+          </div>
+        )}
+
+        {/* Badge "pago" minimalista no modo lote */}
+        {batchMode && topper?.pago_fornecedor && (
+          <div className="mt-2.5 flex items-center gap-1.5 text-xs text-emerald-600">
+            <CheckCircle2 size={13} />
+            <span>Já pago{topper.data_pagamento ? ` em ${formatDate(topper.data_pagamento)}` : ""}</span>
           </div>
         )}
 
@@ -404,12 +424,13 @@ export function ToppersList({ pedidos }: Props) {
 
   const [batchMode, setBatchMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [showBatchPanel, setShowBatchPanel] = useState(false);
+  const [showReview, setShowReview] = useState(false);
   const [batchDate, setBatchDate] = useState(todayISO());
   const [isBatchPending, startBatchTransition] = useTransition();
   const [batchErro, setBatchErro] = useState<string | null>(null);
 
-  const pagaveisFiltrados = pedidos.filter((p) => {
+  // Todos os pedidos elegíveis para pagamento (sem filtro de view)
+  const pagaveisTodos = pedidos.filter((p) => {
     const t = p.toppers_pedido as TopperPedido | null;
     return t && !t.pago_fornecedor && (t.valor + t.frete) > 0;
   });
@@ -418,7 +439,7 @@ export function ToppersList({ pedidos }: Props) {
   const totalAReceber = pedidos.filter(
     (p) => !(p.toppers_pedido as TopperPedido | null)?.recebido
   ).length;
-  const totalAPagar = pagaveisFiltrados.reduce((acc, p) => {
+  const totalAPagar = pagaveisTodos.reduce((acc, p) => {
     const t = p.toppers_pedido as TopperPedido;
     return acc + t.valor + t.frete;
   }, 0);
@@ -462,7 +483,7 @@ export function ToppersList({ pedidos }: Props) {
     {
       key: "a_pagar",
       label: "A pagar",
-      count: pagaveisFiltrados.length,
+      count: pagaveisTodos.length,
     },
     {
       key: "pagos",
@@ -471,16 +492,73 @@ export function ToppersList({ pedidos }: Props) {
     },
   ];
 
+  // Elegíveis visíveis na view atual
   const pagaveisVisiveis = pedidosFiltrados.filter((p) => {
     const t = p.toppers_pedido as TopperPedido | null;
     return t && !t.pago_fornecedor && (t.valor + t.frete) > 0;
   });
-  const todosVissiveisSelecionados =
+  const todosVisiveis =
     pagaveisVisiveis.length > 0 &&
     pagaveisVisiveis.every((p) => selectedIds.has(p.id));
 
+  // Dados enriquecidos dos itens selecionados (para o painel de revisão)
+  const selectedItems = Array.from(selectedIds)
+    .map((id) => {
+      const pedido = pedidos.find((p) => p.id === id);
+      if (!pedido) return null;
+      const t = pedido.toppers_pedido as TopperPedido | null;
+      return {
+        id,
+        cliente: pedido.clientes?.nome ?? pedido.nome_cliente ?? "Sem cliente",
+        fornecedor: t?.fornecedor ?? null,
+        valor: t?.valor ?? 0,
+        frete: t?.frete ?? 0,
+        total: (t?.valor ?? 0) + (t?.frete ?? 0),
+        dataEntrega: pedido.data_entrega,
+      };
+    })
+    .filter(Boolean) as {
+      id: string;
+      cliente: string;
+      fornecedor: string | null;
+      valor: number;
+      frete: number;
+      total: number;
+      dataEntrega: string;
+    }[];
+
+  // Agrupados por fornecedor: fornecedores nomeados primeiro, "Sem fornecedor" no final
+  const gruposFornecedor = selectedItems.reduce(
+    (acc, item) => {
+      const key = item.fornecedor ?? "\x00sem";
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(item);
+      return acc;
+    },
+    {} as Record<string, typeof selectedItems>
+  );
+  const gruposOrdenados = Object.entries(gruposFornecedor).sort(([a], [b]) => {
+    if (a === "\x00sem") return 1;
+    if (b === "\x00sem") return -1;
+    return a.localeCompare(b);
+  });
+
+  const totalSelecionado = selectedItems.reduce((acc, i) => acc + i.total, 0);
+
+  function enterBatchMode() {
+    setFiltro("a_pagar");
+    setBatchMode(true);
+  }
+
+  function exitBatchMode() {
+    setBatchMode(false);
+    setSelectedIds(new Set());
+    setShowReview(false);
+    setBatchErro(null);
+  }
+
   function toggleSelectAll() {
-    if (todosVissiveisSelecionados) {
+    if (todosVisiveis) {
       setSelectedIds((prev) => {
         const next = new Set(prev);
         pagaveisVisiveis.forEach((p) => next.delete(p.id));
@@ -503,18 +581,6 @@ export function ToppersList({ pedidos }: Props) {
     });
   }
 
-  function exitBatchMode() {
-    setBatchMode(false);
-    setSelectedIds(new Set());
-    setShowBatchPanel(false);
-  }
-
-  const totalSelecionado = Array.from(selectedIds).reduce((acc, id) => {
-    const pedido = pedidos.find((p) => p.id === id);
-    const t = pedido?.toppers_pedido as TopperPedido | null;
-    return acc + (t ? t.valor + t.frete : 0);
-  }, 0);
-
   function handlePagarLote() {
     setBatchErro(null);
     startBatchTransition(async () => {
@@ -522,7 +588,7 @@ export function ToppersList({ pedidos }: Props) {
       if (res.error) {
         setBatchErro(res.error);
       } else {
-        setShowBatchPanel(false);
+        setShowReview(false);
         setSelectedIds(new Set());
         setBatchMode(false);
       }
@@ -601,41 +667,57 @@ export function ToppersList({ pedidos }: Props) {
           ))}
         </div>
 
-        {pagaveisFiltrados.length > 0 && (
+        {pagaveisTodos.length > 0 && (
           <button
-            onClick={() => (batchMode ? exitBatchMode() : setBatchMode(true))}
+            onClick={() => (batchMode ? exitBatchMode() : enterBatchMode())}
             className={cn(
-              "flex-shrink-0 flex items-center gap-1 text-xs px-3 py-1.5 rounded-full border font-medium transition-colors",
+              "flex-shrink-0 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border font-medium transition-colors whitespace-nowrap",
               batchMode
                 ? "bg-brand-600 text-white border-brand-600"
                 : "bg-white text-gray-600 border-gray-300 hover:border-brand-400"
             )}
           >
-            <Layers size={13} />
-            {batchMode ? "Sair" : "Pagar em lote"}
+            <ListChecks size={13} />
+            {batchMode ? "Cancelar" : `Pagar em lote (${pagaveisTodos.length})`}
           </button>
         )}
       </div>
 
       {/* Barra de seleção de lote */}
-      {batchMode && pagaveisVisiveis.length > 0 && (
-        <div className="flex items-center gap-2 bg-brand-50 border border-brand-200 rounded-xl px-4 py-2.5">
-          <button
-            onClick={toggleSelectAll}
-            className="flex items-center gap-1.5 text-xs text-brand-700 font-medium"
-          >
-            {todosVissiveisSelecionados ? (
-              <CheckSquare size={15} />
+      {batchMode && (
+        <div className="bg-brand-50 border border-brand-200 rounded-xl px-4 py-2.5">
+          <div className="flex items-center gap-2">
+            {pagaveisVisiveis.length > 0 ? (
+              <button
+                onClick={toggleSelectAll}
+                className="flex items-center gap-1.5 text-xs text-brand-700 font-medium"
+              >
+                {todosVisiveis ? (
+                  <CheckSquare size={15} />
+                ) : (
+                  <Square size={15} className="text-brand-400" />
+                )}
+                {todosVisiveis ? "Desmarcar visíveis" : "Selecionar visíveis"}
+              </button>
             ) : (
-              <Square size={15} className="text-brand-400" />
+              <p className="text-xs text-brand-600">
+                Nenhum item elegível neste filtro
+              </p>
             )}
-            {todosVissiveisSelecionados ? "Desmarcar todos" : "Selecionar todos"}
-          </button>
-          {selectedIds.size > 0 && (
-            <span className="ml-auto text-xs text-brand-700 font-semibold">
-              {selectedIds.size} selecionado{selectedIds.size > 1 ? "s" : ""} •{" "}
-              {formatCurrency(totalSelecionado)}
-            </span>
+
+            {selectedIds.size > 0 && (
+              <span className="ml-auto text-xs text-brand-700 font-semibold">
+                {selectedIds.size} selecionado{selectedIds.size > 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+
+          {/* Aviso quando há selecionados fora da view atual */}
+          {selectedIds.size > 0 && pagaveisVisiveis.filter((p) => selectedIds.has(p.id)).length < selectedIds.size && (
+            <p className="text-[10px] text-brand-600 mt-1.5 flex items-center gap-1">
+              <CheckCircle2 size={11} />
+              {selectedIds.size - pagaveisVisiveis.filter((p) => selectedIds.has(p.id)).length} selecionado(s) em outros filtros
+            </p>
           )}
         </div>
       )}
@@ -665,67 +747,136 @@ export function ToppersList({ pedidos }: Props) {
         </div>
       )}
 
-      {/* ── Barra flutuante de pagamento em lote (acima da nav) ── */}
+      {/* ── Barra flutuante de lote (acima da nav) ── */}
       {batchMode && selectedIds.size > 0 && (
         <div
           className="fixed left-0 right-0 z-50"
           style={{ bottom: "calc(52px + env(safe-area-inset-bottom, 0px))" }}
         >
-          {showBatchPanel && (
-            <div className="bg-white border-t border-gray-200 shadow-lg px-4 py-4 space-y-3 max-w-2xl mx-auto">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-gray-800">
-                  Pagamento em lote — {selectedIds.size} topper{selectedIds.size > 1 ? "s" : ""}
-                </p>
+          {/* ── Painel de revisão ── */}
+          {showReview && (
+            <div className="bg-white border-t border-gray-100 shadow-2xl max-w-2xl mx-auto">
+              {/* Cabeçalho do painel */}
+              <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-100">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+                    <ListChecks size={15} className="text-brand-600" />
+                    Revisar pagamento em lote
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {selectedIds.size} topper{selectedIds.size > 1 ? "s" : ""} · {formatCurrency(totalSelecionado)}
+                  </p>
+                </div>
                 <button
-                  onClick={() => setShowBatchPanel(false)}
+                  onClick={() => setShowReview(false)}
                   className="text-gray-400 hover:text-gray-600 p-1 rounded"
                 >
                   <X size={18} />
                 </button>
               </div>
-              <div>
-                <label className="label text-xs">Data do pagamento</label>
-                <input
-                  type="date"
-                  className="input text-sm"
-                  value={batchDate}
-                  onChange={(e) => setBatchDate(e.target.value)}
-                />
+
+              {/* Lista de itens agrupados por fornecedor */}
+              <div className="max-h-52 overflow-y-auto">
+                {gruposOrdenados.map(([key, itens], groupIdx) => {
+                  const nomeFornecedor = key === "\x00sem" ? "Sem fornecedor" : key;
+                  const subtotal = itens.reduce((s, i) => s + i.total, 0);
+                  return (
+                    <div
+                      key={key}
+                      className={cn("px-4 py-3", groupIdx > 0 && "border-t border-gray-100")}
+                    >
+                      {/* Label do grupo */}
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                          <Package size={10} />
+                          {nomeFornecedor}
+                        </p>
+                        {itens.length > 1 && (
+                          <p className="text-[10px] font-semibold text-gray-500">
+                            {formatCurrency(subtotal)}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Itens do grupo */}
+                      <div className="space-y-2">
+                        {itens.map((item) => (
+                          <div key={item.id} className="flex items-center gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-medium text-gray-800 truncate">
+                                {item.cliente}
+                              </p>
+                              <p className="text-[10px] text-gray-400">
+                                Entrega {formatDate(item.dataEntrega)}
+                                {item.frete > 0 && (
+                                  <> · Frete {formatCurrency(item.frete)}</>
+                                )}
+                              </p>
+                            </div>
+                            <span className="text-xs font-semibold text-gray-700 flex-shrink-0">
+                              {formatCurrency(item.total)}
+                            </span>
+                            <button
+                              onClick={() => toggleSelect(item.id)}
+                              className="flex-shrink-0 text-gray-300 hover:text-red-400 transition-colors p-0.5"
+                              title="Remover da seleção"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Total a registrar:</span>
-                <span className="font-bold text-brand-700">{formatCurrency(totalSelecionado)}</span>
+
+              {/* Data + Total + Confirmar */}
+              <div className="px-4 pt-3 pb-4 space-y-3 border-t border-gray-100 bg-gray-50">
+                <div>
+                  <label className="text-[10px] text-gray-500 block mb-1">Data do pagamento</label>
+                  <input
+                    type="date"
+                    className="input text-sm"
+                    value={batchDate}
+                    onChange={(e) => setBatchDate(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Total a registrar</span>
+                  <span className="text-base font-bold text-brand-700">{formatCurrency(totalSelecionado)}</span>
+                </div>
+                {batchErro && (
+                  <p className="text-xs text-red-600 bg-red-50 rounded-lg p-2">{batchErro}</p>
+                )}
+                <button
+                  onClick={handlePagarLote}
+                  disabled={isBatchPending}
+                  className="btn-primary w-full flex items-center justify-center gap-2"
+                >
+                  <Banknote size={16} />
+                  {isBatchPending
+                    ? "Registrando…"
+                    : `Confirmar ${selectedIds.size} pagamento${selectedIds.size > 1 ? "s" : ""}`}
+                </button>
               </div>
-              {batchErro && (
-                <p className="text-xs text-red-600 bg-red-50 rounded-lg p-2">{batchErro}</p>
-              )}
-              <button
-                onClick={handlePagarLote}
-                disabled={isBatchPending}
-                className="btn-primary w-full flex items-center justify-center gap-2"
-              >
-                <Banknote size={16} />
-                {isBatchPending
-                  ? "Registrando…"
-                  : `Confirmar pagamento de ${selectedIds.size} topper${selectedIds.size > 1 ? "s" : ""}`}
-              </button>
             </div>
           )}
 
+          {/* Barra inferior sempre visível quando há seleção */}
           <div className="bg-brand-600 text-white px-4 py-3 flex items-center justify-between gap-3 max-w-2xl mx-auto">
             <div>
               <p className="text-sm font-semibold">
-                {selectedIds.size} topper{selectedIds.size > 1 ? "s" : ""} selecionado{selectedIds.size > 1 ? "s" : ""}
+                {selectedIds.size} selecionado{selectedIds.size > 1 ? "s" : ""}
               </p>
               <p className="text-xs text-brand-200">{formatCurrency(totalSelecionado)}</p>
             </div>
             <button
-              onClick={() => setShowBatchPanel((v) => !v)}
+              onClick={() => setShowReview((v) => !v)}
               className="bg-white text-brand-700 font-semibold text-sm px-4 py-2 rounded-lg flex items-center gap-1.5 hover:bg-brand-50 transition-colors"
             >
-              <Banknote size={15} />
-              {showBatchPanel ? "Fechar" : "Registrar pagamento"}
+              <ListChecks size={15} />
+              {showReview ? "Fechar revisão" : "Revisar e pagar"}
             </button>
           </div>
         </div>
