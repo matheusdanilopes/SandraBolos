@@ -1,26 +1,23 @@
+import { cookies } from "next/headers";
 import { supabase } from "@/lib/supabase";
 import { formatCurrency, calcularValorFinal, formatDate } from "@/lib/utils";
-import { format, startOfMonth, subMonths } from "date-fns";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { TIPO_LABELS, type PedidoComCliente, type CustoComCategoria, type CategoriaCusto } from "@/types/database";
 import { TrendingUp, Banknote, AlertCircle, CheckCircle, TrendingDown, Tag, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { CustosSection } from "./CustosSection";
+import { getPeriodoRange, getMesesNoPeriodo, isValidPreset } from "@/lib/periodo";
 
 export const dynamic = "force-dynamic";
 
-interface MesResumo {
-  label: string;
-  chave: string;
-  receita: number;
-  quantidade: number;
-}
-
 export default async function FinanceiroPage() {
-  const hoje = new Date();
-  const inicioMes = startOfMonth(hoje).toISOString().split("T")[0];
-  const mesCurrent = format(hoje, "yyyy-MM");
-  const seisAtras = subMonths(startOfMonth(hoje), 5).toISOString().split("T")[0];
+  const cookieStore = cookies();
+  const presetRaw = cookieStore.get("sb_periodo")?.value ?? "mes_atual";
+  const preset = isValidPreset(presetRaw) ? presetRaw : "mes_atual";
+  const de = cookieStore.get("sb_periodo_de")?.value;
+  const ate = cookieStore.get("sb_periodo_ate")?.value;
+  const periodo = getPeriodoRange(preset, de, ate);
 
   const [entreguesResult, feitosResult, custosResult, categoriasResult, toppersResult] =
     await Promise.all([
@@ -28,7 +25,8 @@ export default async function FinanceiroPage() {
         .from("pedidos")
         .select("data_entrega, valor_cobrado, valor_calculado, preco_corrigido, tipo, id, created_at, clientes(nome)")
         .eq("status", "entregue")
-        .gte("data_entrega", seisAtras)
+        .gte("data_entrega", periodo.inicio)
+        .lte("data_entrega", periodo.fim)
         .order("data_entrega", { ascending: false }),
 
       supabase
@@ -40,7 +38,8 @@ export default async function FinanceiroPage() {
       supabase
         .from("custos")
         .select("*, categorias_custo(nome)")
-        .gte("data", inicioMes)
+        .gte("data", periodo.inicio)
+        .lte("data", periodo.fim)
         .order("data", { ascending: false }),
 
       supabase
@@ -59,10 +58,10 @@ export default async function FinanceiroPage() {
   const categorias = (categoriasResult.data ?? []) as CategoriaCusto[];
   const toppers = toppersResult.data ?? [];
 
-  const doMes = entregues.filter((p) => p.data_entrega >= inicioMes);
-  const receitaMes = doMes.reduce((acc, p) => acc + (p.valor_cobrado ?? 0), 0);
-  const ticketMedio = doMes.length > 0 ? receitaMes / doMes.length : null;
-  const semValorMes = doMes.filter((p) => !p.valor_cobrado).length;
+  // KPIs do período selecionado
+  const receitaPeriodo = entregues.reduce((acc, p) => acc + (p.valor_cobrado ?? 0), 0);
+  const ticketMedio = entregues.length > 0 ? receitaPeriodo / entregues.length : null;
+  const semValor = entregues.filter((p) => !p.valor_cobrado).length;
 
   const aReceber = feitos.reduce(
     (acc, p) => acc + (p.preco_corrigido ?? p.valor_calculado ?? 0),
@@ -71,58 +70,68 @@ export default async function FinanceiroPage() {
 
   const totalCustosLancados = custos.reduce((acc, c) => acc + c.valor, 0);
 
+  // Toppers: a pagar (sem filtro de período — operacional) e pagos no período
   const totalToppersAPagar = toppers
     .filter((t) => !t.pago_fornecedor && t.valor + t.frete > 0)
     .reduce((acc, t) => acc + t.valor + t.frete, 0);
-  const totalToppersPagosMes = toppers
-    .filter((t) => t.pago_fornecedor && t.data_pagamento?.startsWith(mesCurrent))
+  const totalToppersPagosPeriodo = toppers
+    .filter(
+      (t) =>
+        t.pago_fornecedor &&
+        t.data_pagamento &&
+        t.data_pagamento >= periodo.inicio &&
+        t.data_pagamento <= periodo.fim
+    )
     .reduce((acc, t) => acc + t.valor + t.frete, 0);
-  const mostrarToppers = totalToppersAPagar > 0 || totalToppersPagosMes > 0;
+  const mostrarToppers = totalToppersAPagar > 0 || totalToppersPagosPeriodo > 0;
 
-  const totalCustosMes = totalCustosLancados + totalToppersPagosMes;
-  const lucroEstimado = receitaMes - totalCustosMes;
+  const totalCustosPeriodo = totalCustosLancados + totalToppersPagosPeriodo;
+  const lucroEstimado = receitaPeriodo - totalCustosPeriodo;
   const margemPct =
-    receitaMes > 0 && totalCustosMes > 0
-      ? Math.round((lucroEstimado / receitaMes) * 100)
+    receitaPeriodo > 0 && totalCustosPeriodo > 0
+      ? Math.round((lucroEstimado / receitaPeriodo) * 100)
       : null;
 
-  const mesesResumo: MesResumo[] = [];
-  for (let i = 0; i <= 5; i++) {
-    const inicio = startOfMonth(subMonths(hoje, i));
-    const chave = format(inicio, "yyyy-MM");
-    const label = format(inicio, "MMMM yyyy", { locale: ptBR });
-    const pedidosMes = entregues.filter((p) => p.data_entrega.startsWith(chave));
+  // Histórico mensal adaptado ao período selecionado
+  const meses = getMesesNoPeriodo(periodo.inicio, periodo.fim);
+  const mesAtualChave = format(new Date(), "yyyy-MM");
+
+  const mesesResumo = meses.map((mes) => {
+    const pedidosMes = entregues.filter((p) => p.data_entrega.startsWith(mes.chave));
     const receita = pedidosMes.reduce((acc, p) => acc + (p.valor_cobrado ?? 0), 0);
-    mesesResumo.push({ label, chave, receita, quantidade: pedidosMes.length });
-  }
+    return { ...mes, receita, quantidade: pedidosMes.length };
+  });
   const maxReceita = Math.max(...mesesResumo.map((m) => m.receita), 1);
 
   return (
     <div className="py-4 space-y-5">
-      <h1 className="text-2xl font-bold text-gray-900">Financeiro</h1>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Financeiro</h1>
+        <p className="text-sm text-gray-400 capitalize mt-0.5">{periodo.label}</p>
+      </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3">
         <div className="card p-4">
           <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2">
             <TrendingUp size={12} className="text-emerald-500" />
-            Receita do Mês
+            Receita do Período
           </div>
-          <p className="text-xl font-bold text-emerald-600">{formatCurrency(receitaMes)}</p>
+          <p className="text-xl font-bold text-emerald-600">{formatCurrency(receitaPeriodo)}</p>
           <p className="text-xs text-gray-400 mt-0.5">
-            {doMes.length} pedido{doMes.length !== 1 ? "s" : ""} entregue{doMes.length !== 1 ? "s" : ""}
+            {entregues.length} pedido{entregues.length !== 1 ? "s" : ""} entregue{entregues.length !== 1 ? "s" : ""}
           </p>
         </div>
 
         <div className="card p-4">
           <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2">
             <TrendingDown size={12} className="text-rose-500" />
-            Custos do Mês
+            Custos do Período
           </div>
-          <p className="text-xl font-bold text-rose-600">{formatCurrency(totalCustosMes)}</p>
-          {totalToppersPagosMes > 0 ? (
+          <p className="text-xl font-bold text-rose-600">{formatCurrency(totalCustosPeriodo)}</p>
+          {totalToppersPagosPeriodo > 0 ? (
             <p className="text-xs text-gray-400 mt-0.5">
-              inclui {formatCurrency(totalToppersPagosMes)} em toppers
+              inclui {formatCurrency(totalToppersPagosPeriodo)} em toppers
             </p>
           ) : (
             <p className="text-xs text-gray-400 mt-0.5">
@@ -160,21 +169,21 @@ export default async function FinanceiroPage() {
         </div>
       </div>
 
-      {/* Lançamentos de Custos — ação operacional principal */}
+      {/* Lançamentos de Custos */}
       <CustosSection custos={custos} categorias={categorias} />
 
       {/* Aviso pedidos sem valor */}
-      {semValorMes > 0 && (
+      {semValor > 0 && (
         <div className="flex items-start gap-2 bg-orange-50 border border-orange-200 rounded-xl p-3">
           <AlertCircle size={14} className="text-orange-500 mt-0.5 flex-shrink-0" />
           <p className="text-xs text-orange-700">
-            {semValorMes} pedido{semValorMes > 1 ? "s" : ""} entregue{semValorMes > 1 ? "s" : ""} este mês sem valor registrado.
+            {semValor} pedido{semValor > 1 ? "s" : ""} entregue{semValor > 1 ? "s" : ""} no período sem valor registrado.
           </p>
         </div>
       )}
 
-      {/* Pedidos — A Receber e Entregas do Mês unificados */}
-      {(feitos.length > 0 || doMes.length > 0) && (
+      {/* A Receber e Entregas do Período */}
+      {(feitos.length > 0 || entregues.length > 0) && (
         <div className="card p-4 space-y-4">
           {feitos.length > 0 && (
             <div className="space-y-2">
@@ -211,13 +220,15 @@ export default async function FinanceiroPage() {
             </div>
           )}
 
-          {feitos.length > 0 && doMes.length > 0 && <hr className="border-gray-100" />}
+          {feitos.length > 0 && entregues.length > 0 && <hr className="border-gray-100" />}
 
-          {doMes.length > 0 && (
+          {entregues.length > 0 && (
             <div className="space-y-2">
-              <h2 className="font-semibold text-sm text-gray-700">Entregas do Mês</h2>
+              <h2 className="font-semibold text-sm text-gray-700 capitalize">
+                Entregas — {periodo.label}
+              </h2>
               <div className="space-y-1">
-                {doMes.map((p) => (
+                {entregues.map((p) => (
                   <Link
                     key={p.id}
                     href={`/pedidos/${p.id}`}
@@ -253,7 +264,7 @@ export default async function FinanceiroPage() {
         </div>
       )}
 
-      {/* Toppers — sempre visível para garantir acesso à tela */}
+      {/* Toppers */}
       <div className="card p-4 space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-sm text-gray-700">Custos com Toppers</h2>
@@ -272,60 +283,64 @@ export default async function FinanceiroPage() {
                 <span className="text-sm font-semibold text-red-600">{formatCurrency(totalToppersAPagar)}</span>
               </div>
             )}
-            {totalToppersPagosMes > 0 && (
+            {totalToppersPagosPeriodo > 0 && (
               <div className="flex items-center justify-between py-1.5">
-                <span className="text-sm text-gray-600">Pago este mês</span>
-                <span className="text-sm font-semibold text-gray-500">{formatCurrency(totalToppersPagosMes)}</span>
+                <span className="text-sm text-gray-600 capitalize">Pago — {periodo.label}</span>
+                <span className="text-sm font-semibold text-gray-500">{formatCurrency(totalToppersPagosPeriodo)}</span>
               </div>
             )}
           </div>
         ) : (
-          <p className="text-xs text-gray-400">Nenhum custo com toppers este mês.</p>
+          <p className="text-xs text-gray-400">Nenhum custo com toppers no período.</p>
         )}
       </div>
 
-      {/* Histórico mensal */}
-      <div className="card p-4 space-y-4">
-        <h2 className="font-semibold text-sm text-gray-700">Últimos 6 Meses</h2>
-        <div className="space-y-3">
-          {mesesResumo.map((mes, i) => {
-            const isMesAtual = i === 0;
-            const barWidth = mes.receita > 0 ? Math.round((mes.receita / maxReceita) * 100) : 0;
-            return (
-              <div key={mes.chave} className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className={`text-xs capitalize ${isMesAtual ? "font-semibold text-gray-800" : "text-gray-500"}`}>
-                    {mes.label}
-                    {isMesAtual && (
-                      <span className="ml-1.5 text-[10px] bg-brand-100 text-brand-700 px-1.5 py-0.5 rounded-full font-medium">
-                        atual
-                      </span>
-                    )}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-gray-400">{mes.quantidade} ped.</span>
-                    <span className={`text-sm font-bold ${isMesAtual ? "text-emerald-600" : "text-gray-600"}`}>
-                      {mes.receita > 0 ? formatCurrency(mes.receita) : <span className="text-gray-300">—</span>}
+      {/* Histórico mensal adaptado ao período */}
+      {mesesResumo.length > 0 && (
+        <div className="card p-4 space-y-4">
+          <h2 className="font-semibold text-sm text-gray-700 capitalize">
+            {mesesResumo.length === 1 ? "Resumo do Período" : `Evolução — ${periodo.label}`}
+          </h2>
+          <div className="space-y-3">
+            {mesesResumo.map((mes) => {
+              const isMesAtual = mes.chave === mesAtualChave;
+              const barWidth = mes.receita > 0 ? Math.round((mes.receita / maxReceita) * 100) : 0;
+              return (
+                <div key={mes.chave} className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className={`text-xs capitalize ${isMesAtual ? "font-semibold text-gray-800" : "text-gray-500"}`}>
+                      {mes.label}
+                      {isMesAtual && (
+                        <span className="ml-1.5 text-[10px] bg-brand-100 text-brand-700 px-1.5 py-0.5 rounded-full font-medium">
+                          atual
+                        </span>
+                      )}
                     </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-gray-400">{mes.quantidade} ped.</span>
+                      <span className={`text-sm font-bold ${isMesAtual ? "text-emerald-600" : "text-gray-600"}`}>
+                        {mes.receita > 0 ? formatCurrency(mes.receita) : <span className="text-gray-300">—</span>}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${isMesAtual ? "bg-emerald-400" : "bg-gray-300"}`}
+                      style={{ width: `${barWidth}%` }}
+                    />
                   </div>
                 </div>
-                <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all duration-500 ${isMesAtual ? "bg-emerald-400" : "bg-gray-300"}`}
-                    style={{ width: `${barWidth}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {entregues.length === 0 && feitos.length === 0 && (
         <div className="card p-8 text-center space-y-2">
           <span className="text-3xl block">📊</span>
           <p className="text-sm text-gray-400">
-            Nenhum dado financeiro ainda. Conclua e registre o valor dos seus pedidos!
+            Nenhum dado financeiro para o período selecionado.
           </p>
         </div>
       )}

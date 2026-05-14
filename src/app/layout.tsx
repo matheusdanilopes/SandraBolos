@@ -2,6 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
+import { PeriodoBar } from "@/components/PeriodoBar";
+import { cookies } from "next/headers";
+import { isValidPreset } from "@/lib/periodo";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -25,11 +28,18 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const cookieStore = cookies();
+  const presetRaw = cookieStore.get("sb_periodo")?.value ?? "mes_atual";
+  const preset = isValidPreset(presetRaw) ? presetRaw : "mes_atual";
+  const de = cookieStore.get("sb_periodo_de")?.value;
+  const ate = cookieStore.get("sb_periodo_ate")?.value;
+
   return (
     <html lang="pt-BR">
       <body className={inter.className}>
         <div className="min-h-screen flex flex-col">
           <Navbar />
+          <PeriodoBar preset={preset} de={de} ate={ate} />
           <main className="flex-1 max-w-2xl mx-auto w-full px-4 pb-28">
             {children}
           </main>

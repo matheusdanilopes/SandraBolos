@@ -1,15 +1,22 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { supabase } from "@/lib/supabase";
 import { type PedidoComCliente } from "@/types/database";
 import { Plus } from "lucide-react";
 import { DashboardClient } from "./DashboardClient";
-import { startOfMonth, format } from "date-fns";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { getPeriodoRange, isValidPreset } from "@/lib/periodo";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const inicioMes = startOfMonth(new Date()).toISOString().split("T")[0];
+  const cookieStore = cookies();
+  const presetRaw = cookieStore.get("sb_periodo")?.value ?? "mes_atual";
+  const preset = isValidPreset(presetRaw) ? presetRaw : "mes_atual";
+  const de = cookieStore.get("sb_periodo_de")?.value;
+  const ate = cookieStore.get("sb_periodo_ate")?.value;
+  const periodo = getPeriodoRange(preset, de, ate);
 
   const [pedidosResult, receitaResult, feitosResult] = await Promise.all([
     supabase
@@ -22,7 +29,8 @@ export default async function DashboardPage() {
       .from("pedidos")
       .select("valor_cobrado")
       .eq("status", "entregue")
-      .gte("data_entrega", inicioMes),
+      .gte("data_entrega", periodo.inicio)
+      .lte("data_entrega", periodo.fim),
 
     supabase
       .from("pedidos")
@@ -30,7 +38,7 @@ export default async function DashboardPage() {
       .eq("status", "feito"),
   ]);
 
-  const receitaMes =
+  const receitaPeriodo =
     receitaResult.data?.reduce((acc, p) => acc + (p.valor_cobrado ?? 0), 0) ?? 0;
 
   const aReceber =
@@ -56,7 +64,8 @@ export default async function DashboardPage() {
 
       <DashboardClient
         pedidos={(pedidosResult.data ?? []) as unknown as PedidoComCliente[]}
-        receitaMes={receitaMes}
+        receitaPeriodo={receitaPeriodo}
+        periodoLabel={periodo.label}
         aReceber={aReceber}
       />
     </div>
