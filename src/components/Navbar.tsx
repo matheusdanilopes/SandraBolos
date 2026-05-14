@@ -2,20 +2,49 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ShoppingBag, Users, TrendingUp, Settings, Package, Sparkles } from "lucide-react";
+import { LayoutDashboard, Briefcase, TrendingUp, MoreHorizontal, Settings, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { FabPedido } from "./FabPedido";
 
-const links = [
+const COMERCIAL_PATHS = ["/pedidos", "/clientes", "/produtos", "/toppers"];
+
+const NAV_LEFT = [
   { href: "/", label: "Início", icon: LayoutDashboard },
-  { href: "/pedidos", label: "Pedidos", icon: ShoppingBag },
-  { href: "/toppers", label: "Toppers", icon: Sparkles },
-  { href: "/produtos", label: "Produtos", icon: Package },
-  { href: "/clientes", label: "Clientes", icon: Users },
-  { href: "/financeiro", label: "Finanças", icon: TrendingUp },
+  { href: "/pedidos", label: "Comercial", icon: Briefcase },
 ];
+
+const NAV_RIGHT = [
+  { href: "/financeiro", label: "Financeiro", icon: TrendingUp },
+  { href: "/configuracoes", label: "Extras", icon: MoreHorizontal },
+];
+
+function isNavActive(pathname: string, href: string): boolean {
+  if (href === "/") return pathname === "/";
+  if (href === "/pedidos") {
+    return COMERCIAL_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
+  }
+  return pathname === href || pathname.startsWith(href + "/");
+}
 
 export function Navbar() {
   const pathname = usePathname();
+
+  const renderLink = ({ href, label, icon: Icon }: { href: string; label: string; icon: LucideIcon }) => {
+    const active = isNavActive(pathname, href);
+    return (
+      <Link
+        key={href}
+        href={href}
+        className={cn(
+          "flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-[10px] font-medium transition-colors min-h-[52px]",
+          active ? "text-brand-600" : "text-gray-400 hover:text-gray-600"
+        )}
+      >
+        <Icon size={20} strokeWidth={active ? 2.5 : 1.75} />
+        <span>{label}</span>
+      </Link>
+    );
+  };
 
   return (
     <>
@@ -41,24 +70,14 @@ export function Navbar() {
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
         <div className="max-w-2xl mx-auto flex">
-          {links.map(({ href, label, icon: Icon }) => {
-            const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={cn(
-                  "flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-[10px] font-medium transition-colors min-h-[52px]",
-                  active ? "text-brand-600" : "text-gray-400 hover:text-gray-600"
-                )}
-              >
-                <Icon size={20} strokeWidth={active ? 2.5 : 1.75} />
-                <span>{label}</span>
-              </Link>
-            );
-          })}
+          {NAV_LEFT.map(renderLink)}
+          {/* Center spacer — FAB floats above this slot via FabPedido */}
+          <div className="flex-1 min-h-[52px]" aria-hidden="true" />
+          {NAV_RIGHT.map(renderLink)}
         </div>
       </nav>
+
+      <FabPedido />
     </>
   );
 }
