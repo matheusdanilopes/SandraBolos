@@ -12,6 +12,11 @@ interface ConfigPayload {
   titulo?: string;
   subtitulo?: string | null;
   cor_texto?: string;
+  cor_titulo?: string;
+  cor_descricao?: string;
+  cor_preco?: string;
+  alinhamento?: string;
+  observacoes?: string | null;
   font_family?: string;
 }
 
