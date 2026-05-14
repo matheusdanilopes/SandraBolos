@@ -81,6 +81,19 @@ export interface Produto {
   unidade_medida: UnidadeMedida;
   preco_padrao: number;
   ativo: boolean;
+  categoria_id: string | null;
+  created_at: string;
+}
+
+export interface ProdutoComCategoria extends Produto {
+  categorias_produto?: { nome: string; ordem: number } | null;
+}
+
+export interface CategoriaProduto {
+  id: string;
+  nome: string;
+  ordem: number;
+  ativo: boolean;
   created_at: string;
 }
 
@@ -311,6 +324,30 @@ export type Database = {
           }
         ]
       }
+      categorias_produto: {
+        Row: {
+          id: string
+          nome: string
+          ordem: number
+          ativo: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          nome: string
+          ordem?: number
+          ativo?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          nome?: string
+          ordem?: number
+          ativo?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
       produtos: {
         Row: {
           id: string
@@ -318,6 +355,7 @@ export type Database = {
           unidade_medida: string
           preco_padrao: number
           ativo: boolean
+          categoria_id: string | null
           created_at: string
         }
         Insert: {
@@ -326,6 +364,7 @@ export type Database = {
           unidade_medida: string
           preco_padrao?: number
           ativo?: boolean
+          categoria_id?: string | null
           created_at?: string
         }
         Update: {
@@ -334,9 +373,18 @@ export type Database = {
           unidade_medida?: string
           preco_padrao?: number
           ativo?: boolean
+          categoria_id?: string | null
           created_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "produtos_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias_produto"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       itens_pedido: {
         Row: {

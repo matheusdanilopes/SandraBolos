@@ -1,26 +1,25 @@
 import { supabase } from "@/lib/supabase";
-import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { ProdutosClient } from "./ProdutosClient";
-import type { Produto, CardapioConfig } from "@/types/database";
+import type { ProdutoComCategoria, CategoriaProduto } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProdutosPage() {
-  const [{ data: produtosData }, { data: configData }] = await Promise.all([
+  const [{ data: produtosData }, { data: categoriasData }] = await Promise.all([
     supabase
       .from("produtos")
-      .select("*")
+      .select("*, categorias_produto(nome, ordem)")
       .order("ativo", { ascending: false })
       .order("nome"),
-    createServerSupabaseClient()
-      .from("cardapio_config")
+    supabase
+      .from("categorias_produto")
       .select("*")
-      .eq("id", "00000000-0000-0000-0000-000000000001")
-      .single(),
+      .order("ordem")
+      .order("nome"),
   ]);
 
-  const produtos = (produtosData ?? []) as Produto[];
-  const configCardapio = (configData ?? null) as CardapioConfig | null;
+  const produtos = (produtosData ?? []) as ProdutoComCategoria[];
+  const categorias = (categoriasData ?? []) as CategoriaProduto[];
 
   return (
     <div className="py-4 space-y-4">
@@ -28,7 +27,7 @@ export default async function ProdutosPage() {
       <p className="text-xs text-gray-500 -mt-2">
         Gerencie o catálogo de produtos. Alterações de preço não afetam pedidos já criados.
       </p>
-      <ProdutosClient produtos={produtos} configCardapio={configCardapio} />
+      <ProdutosClient produtos={produtos} categorias={categorias} />
     </div>
   );
 }

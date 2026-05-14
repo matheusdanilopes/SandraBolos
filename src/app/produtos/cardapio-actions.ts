@@ -26,5 +26,6 @@ export async function salvarConfigCardapio(
 
   if (error) return { error: error.message };
   revalidatePath("/produtos");
+  revalidatePath("/configuracoes");
   return {};
 }

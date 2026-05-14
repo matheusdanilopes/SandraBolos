@@ -1,45 +1,29 @@
 "use client";
 
 import { useState, useRef, useTransition, useEffect, type CSSProperties } from "react";
-import {
-  Download,
-  Settings,
-  Upload,
-  Check,
-  Image as ImageIcon,
-} from "lucide-react";
+import { Download, Settings, Upload, Check, Image as ImageIcon } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import type { Produto, CardapioConfig } from "@/types/database";
+import type { ProdutoComCategoria, CategoriaProduto, CardapioConfig } from "@/types/database";
 import { salvarConfigCardapio } from "./cardapio-actions";
 
 // ─── Font library ─────────────────────────────────────────────────────────────
 
-const FONTS: Record<
-  string,
-  { label: string; stack: string; googleUrl: string | null }
-> = {
-  georgia: {
-    label: "Georgia",
-    stack: "Georgia, serif",
-    googleUrl: null,
-  },
+const FONTS: Record<string, { label: string; stack: string; googleUrl: string | null }> = {
+  georgia: { label: "Georgia", stack: "Georgia, serif", googleUrl: null },
   playfair: {
     label: "Playfair Display",
     stack: "'Playfair Display', serif",
-    googleUrl:
-      "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap",
+    googleUrl: "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap",
   },
   dancing: {
     label: "Dancing Script",
     stack: "'Dancing Script', cursive",
-    googleUrl:
-      "https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;700&display=swap",
+    googleUrl: "https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;700&display=swap",
   },
   montserrat: {
     label: "Montserrat",
     stack: "'Montserrat', sans-serif",
-    googleUrl:
-      "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap",
+    googleUrl: "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap",
   },
 };
 
@@ -62,9 +46,7 @@ async function ensureFontReady(fontId: string) {
   try {
     await document.fonts.load(`bold 80px "${name}"`);
     await document.fonts.load(`400 44px "${name}"`);
-  } catch {
-    // fallback silently
-  }
+  } catch { /* fallback silently */ }
 }
 
 // ─── Background library ───────────────────────────────────────────────────────
@@ -101,6 +83,34 @@ interface ConfigState {
   fontFamily: string;
 }
 
+// ─── Grouping helper ──────────────────────────────────────────────────────────
+
+interface Grupo {
+  id: string | null;
+  nome: string;
+  ordem: number;
+  produtos: ProdutoComCategoria[];
+}
+
+function buildGrupos(ativos: ProdutoComCategoria[], categorias: CategoriaProduto[]): Grupo[] {
+  const catMap = new Map(categorias.map((c) => [c.id, c]));
+  const grupoMap = new Map<string | null, Grupo>();
+
+  for (const cat of categorias) {
+    grupoMap.set(cat.id, { id: cat.id, nome: cat.nome, ordem: cat.ordem, produtos: [] });
+  }
+  grupoMap.set(null, { id: null, nome: "Outros", ordem: 9999, produtos: [] });
+
+  for (const p of ativos) {
+    const key = p.categoria_id && catMap.has(p.categoria_id) ? p.categoria_id : null;
+    grupoMap.get(key)!.produtos.push(p);
+  }
+
+  return Array.from(grupoMap.values())
+    .filter((g) => g.produtos.length > 0)
+    .sort((a, b) => a.ordem - b.ordem);
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getBgStyle(cfg: ConfigState): CSSProperties {
@@ -110,17 +120,12 @@ function getBgStyle(cfg: ConfigState): CSSProperties {
   return { background: LIBRARY[cfg.bgType]?.css ?? LIBRARY.rosa_pastel.css };
 }
 
-function priceLabel(p: Produto): string {
+function priceLabel(p: ProdutoComCategoria): string {
   const s = p.unidade_medida === "peso_kg" ? "/kg" : p.unidade_medida === "cento" ? "/cento" : "/un.";
   return `${formatCurrency(p.preco_padrao)}${s}`;
 }
 
-function drawGradient(
-  ctx: CanvasRenderingContext2D,
-  w: number,
-  h: number,
-  stops: { offset: number; color: string }[]
-) {
+function drawGradient(ctx: CanvasRenderingContext2D, w: number, h: number, stops: { offset: number; color: string }[]) {
   const g = ctx.createLinearGradient(0, 0, w, h);
   stops.forEach((s) => g.addColorStop(s.offset, s.color));
   ctx.fillStyle = g;
@@ -136,7 +141,13 @@ function truncateText(ctx: CanvasRenderingContext2D, text: string, maxW: number)
 
 // ─── CSS Preview ──────────────────────────────────────────────────────────────
 
-function MenuPreview({ cfg, produtos }: { cfg: ConfigState; produtos: Produto[] }) {
+function MenuPreview({
+  cfg,
+  grupos,
+}: {
+  cfg: ConfigState;
+  grupos: Grupo[];
+}) {
   const font = FONTS[cfg.fontFamily] ?? FONTS.georgia;
   const bg = getBgStyle(cfg);
   const overlay = `rgba(255,255,255,${cfg.opacity})`;
@@ -153,50 +164,45 @@ function MenuPreview({ cfg, produtos }: { cfg: ConfigState; produtos: Produto[] 
       >
         {/* Header */}
         <div className="text-center mb-3 shrink-0">
-          <h2 className="text-2xl font-bold leading-tight">
-            {cfg.titulo || "Cardápio"}
-          </h2>
+          <h2 className="text-2xl font-bold leading-tight">{cfg.titulo || "Cardápio"}</h2>
           {cfg.subtitulo && (
-            <p className="text-sm mt-0.5 italic" style={{ opacity: 0.75 }}>
-              {cfg.subtitulo}
-            </p>
+            <p className="text-sm mt-0.5 italic" style={{ opacity: 0.75 }}>{cfg.subtitulo}</p>
           )}
         </div>
+        <div className="w-16 h-px mx-auto mb-3 shrink-0" style={{ background: cfg.corTexto, opacity: 0.35 }} />
 
-        {/* Divider */}
-        <div
-          className="w-16 h-px mx-auto mb-3 shrink-0"
-          style={{ background: cfg.corTexto, opacity: 0.35 }}
-        />
-
-        {/* Products */}
-        <div className="flex-1 space-y-2 overflow-hidden">
-          {produtos.length === 0 ? (
-            <p className="text-center text-xs" style={{ opacity: 0.4 }}>
-              Nenhum produto ativo
-            </p>
+        {/* Grouped products */}
+        <div className="flex-1 space-y-3 overflow-hidden">
+          {grupos.length === 0 ? (
+            <p className="text-center text-xs" style={{ opacity: 0.4 }}>Nenhum produto ativo</p>
           ) : (
-            produtos.map((p) => (
-              <div key={p.id} className="flex items-baseline gap-2">
-                <span className="text-sm font-medium min-w-0 truncate shrink leading-tight">
-                  {p.nome}
-                </span>
-                <span
-                  className="flex-1 border-b shrink-0"
-                  style={{ borderColor: cfg.corTexto, opacity: 0.2 }}
+            grupos.map((g) => (
+              <div key={g.id ?? "outros"}>
+                <p
+                  className="text-[9px] font-bold uppercase tracking-widest mb-1"
+                  style={{ opacity: 0.55 }}
+                >
+                  {g.nome}
+                </p>
+                <div
+                  className="h-px mb-1.5"
+                  style={{ background: cfg.corTexto, opacity: 0.1 }}
                 />
-                <span className="text-sm font-bold shrink-0 whitespace-nowrap">
-                  {priceLabel(p)}
-                </span>
+                <div className="space-y-1.5">
+                  {g.produtos.map((p) => (
+                    <div key={p.id} className="flex items-baseline gap-2">
+                      <span className="text-sm font-medium min-w-0 truncate shrink leading-tight">{p.nome}</span>
+                      <span className="flex-1 border-b shrink-0" style={{ borderColor: cfg.corTexto, opacity: 0.2 }} />
+                      <span className="text-sm font-bold shrink-0 whitespace-nowrap">{priceLabel(p)}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             ))
           )}
         </div>
 
-        {/* Footer */}
-        <p className="text-center text-[10px] mt-3 shrink-0" style={{ opacity: 0.4 }}>
-          Sandra Bolos
-        </p>
+        <p className="text-center text-[10px] mt-3 shrink-0" style={{ opacity: 0.4 }}>Sandra Bolos</p>
       </div>
     </div>
   );
@@ -205,11 +211,12 @@ function MenuPreview({ cfg, produtos }: { cfg: ConfigState; produtos: Produto[] 
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface Props {
-  produtos: Produto[];
+  produtos: ProdutoComCategoria[];
+  categorias: CategoriaProduto[];
   configInicial: CardapioConfig | null;
 }
 
-export function CardapioVisual({ produtos, configInicial }: Props) {
+export function CardapioVisual({ produtos, categorias, configInicial }: Props) {
   const [tab, setTab] = useState<"preview" | "config">("preview");
   const [cfg, setCfg] = useState<ConfigState>({
     bgType: (configInicial?.background_type as BgType) ?? "rosa_pastel",
@@ -227,19 +234,15 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const ativos = produtos.filter((p) => p.ativo);
+  const grupos = buildGrupos(ativos, categorias);
 
-  // Pre-load all Google Fonts so the selector previews render correctly
   useEffect(() => {
-    Object.values(FONTS).forEach((f) => {
-      if (f.googleUrl) injectGoogleFont(f.googleUrl);
-    });
+    Object.values(FONTS).forEach((f) => { if (f.googleUrl) injectGoogleFont(f.googleUrl); });
   }, []);
 
   function upd<K extends keyof ConfigState>(key: K, val: ConfigState[K]) {
     setCfg((prev) => ({ ...prev, [key]: val }));
   }
-
-  // ── Upload ──────────────────────────────────────────────────────────────────
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -257,8 +260,6 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
     }
   }
 
-  // ── Save ────────────────────────────────────────────────────────────────────
-
   function handleSave() {
     startTransition(async () => {
       await salvarConfigCardapio({
@@ -274,8 +275,6 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
       setTimeout(() => setSaveOk(false), 2000);
     });
   }
-
-  // ── Canvas export ───────────────────────────────────────────────────────────
 
   async function handleExport() {
     setExporting(true);
@@ -296,16 +295,10 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
       if (cfg.bgType === "upload" && cfg.bgUrl) {
         const img = new Image();
         img.crossOrigin = "anonymous";
-        await new Promise<void>((resolve) => {
-          img.onload = () => resolve();
-          img.onerror = () => resolve();
-          img.src = cfg.bgUrl!;
-        });
+        await new Promise<void>((resolve) => { img.onload = () => resolve(); img.onerror = () => resolve(); img.src = cfg.bgUrl!; });
         if (img.width > 0) {
           const scale = Math.max(W / img.width, H / img.height);
-          const dw = img.width * scale;
-          const dh = img.height * scale;
-          ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+          ctx.drawImage(img, (W - img.width * scale) / 2, (H - img.height * scale) / 2, img.width * scale, img.height * scale);
         } else {
           drawGradient(ctx, W, H, LIBRARY.rosa_pastel.stops);
         }
@@ -328,7 +321,6 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
       ctx.fillText(cfg.titulo || "Cardápio", W / 2, y);
       y += 90;
 
-      // Subtitle
       if (cfg.subtitulo) {
         ctx.save();
         ctx.globalAlpha = 0.75;
@@ -348,44 +340,68 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
       ctx.lineTo(W / 2 + 80, y);
       ctx.stroke();
       ctx.restore();
-      y += 60;
+      y += 56;
 
-      // Products
-      const ITEM_H = 72;
-      for (const p of ativos) {
-        if (y + ITEM_H > H - PAD - 80) break;
+      // Grouped products
+      const ITEM_H = 64;
+      const CAT_H = 52;
 
-        const pl = priceLabel(p);
+      outer: for (const grupo of grupos) {
+        if (y + CAT_H > H - PAD - 80) break;
 
-        ctx.font = `bold 44px "${fontName}", sans-serif`;
-        const priceW = ctx.measureText(pl).width;
-
-        ctx.font = `400 44px "${fontName}", sans-serif`;
-        const maxNW = W - PAD * 2 - priceW - 60;
-        const nameTxt = truncateText(ctx, p.nome, maxNW);
-        const nameW = ctx.measureText(nameTxt).width;
-
-        ctx.fillStyle = cfg.corTexto;
-        ctx.textAlign = "left";
-        ctx.fillText(nameTxt, PAD, y);
-
-        ctx.font = `bold 44px "${fontName}", sans-serif`;
-        ctx.textAlign = "right";
-        ctx.fillText(pl, W - PAD, y);
-
-        // Dotted connector
+        // Category heading
         ctx.save();
-        ctx.globalAlpha = 0.2;
+        ctx.globalAlpha = 0.55;
+        ctx.font = `bold 30px "${fontName}", sans-serif`;
+        ctx.textAlign = "left";
+        ctx.fillStyle = cfg.corTexto;
+        ctx.fillText(grupo.nome.toUpperCase(), PAD, y);
+        ctx.globalAlpha = 0.12;
         ctx.strokeStyle = cfg.corTexto;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 8]);
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(PAD + nameW + 20, y - 14);
-        ctx.lineTo(W - PAD - priceW - 20, y - 14);
+        ctx.moveTo(PAD, y + 8);
+        ctx.lineTo(W - PAD, y + 8);
         ctx.stroke();
         ctx.restore();
+        y += 44;
 
-        y += ITEM_H;
+        for (const p of grupo.produtos) {
+          if (y + ITEM_H > H - PAD - 80) break outer;
+
+          const pl = priceLabel(p);
+
+          ctx.font = `bold 40px "${fontName}", sans-serif`;
+          const priceW = ctx.measureText(pl).width;
+
+          ctx.font = `400 40px "${fontName}", sans-serif`;
+          const nameTxt = truncateText(ctx, p.nome, W - PAD * 2 - priceW - 60);
+          const nameW = ctx.measureText(nameTxt).width;
+
+          ctx.fillStyle = cfg.corTexto;
+          ctx.textAlign = "left";
+          ctx.fillText(nameTxt, PAD, y);
+
+          ctx.font = `bold 40px "${fontName}", sans-serif`;
+          ctx.textAlign = "right";
+          ctx.fillText(pl, W - PAD, y);
+
+          // Dotted connector
+          ctx.save();
+          ctx.globalAlpha = 0.2;
+          ctx.strokeStyle = cfg.corTexto;
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([3, 7]);
+          ctx.beginPath();
+          ctx.moveTo(PAD + nameW + 16, y - 12);
+          ctx.lineTo(W - PAD - priceW - 16, y - 12);
+          ctx.stroke();
+          ctx.restore();
+
+          y += ITEM_H;
+        }
+
+        y += 20; // gap between groups
       }
 
       // Footer
@@ -406,11 +422,11 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
     }
   }
 
-  // ─── Render ─────────────────────────────────────────────────────────────────
+  // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-3">
-      {/* Tab selector */}
+      {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
         {(["preview", "config"] as const).map((t) => (
           <button
@@ -418,24 +434,18 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
             type="button"
             onClick={() => setTab(t)}
             className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-medium rounded-lg py-1.5 transition-colors ${
-              tab === t
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
+              tab === t ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
             }`}
           >
-            {t === "preview" ? (
-              <><ImageIcon size={12} /> Visualizar</>
-            ) : (
-              <><Settings size={12} /> Personalizar</>
-            )}
+            {t === "preview" ? <><ImageIcon size={12} /> Visualizar</> : <><Settings size={12} /> Personalizar</>}
           </button>
         ))}
       </div>
 
-      {/* ── Preview tab ────────────────────────────────────────────────────── */}
+      {/* ── Preview ── */}
       {tab === "preview" && (
         <div className="space-y-3">
-          <MenuPreview cfg={cfg} produtos={ativos} />
+          <MenuPreview cfg={cfg} grupos={grupos} />
           <button
             type="button"
             onClick={handleExport}
@@ -448,30 +458,19 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
         </div>
       )}
 
-      {/* ── Config tab ─────────────────────────────────────────────────────── */}
+      {/* ── Config ── */}
       {tab === "config" && (
         <div className="space-y-3">
-
           {/* Text */}
           <div className="card p-4 space-y-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Texto</p>
             <div>
               <label className="label">Título</label>
-              <input
-                className="input"
-                value={cfg.titulo}
-                onChange={(e) => upd("titulo", e.target.value)}
-                placeholder="Cardápio"
-              />
+              <input className="input" value={cfg.titulo} onChange={(e) => upd("titulo", e.target.value)} placeholder="Cardápio" />
             </div>
             <div>
               <label className="label">Subtítulo (opcional)</label>
-              <input
-                className="input"
-                value={cfg.subtitulo}
-                onChange={(e) => upd("subtitulo", e.target.value)}
-                placeholder="Ex: Especialidades artesanais"
-              />
+              <input className="input" value={cfg.subtitulo} onChange={(e) => upd("subtitulo", e.target.value)} placeholder="Ex: Especialidades artesanais" />
             </div>
             <div>
               <label className="label">Cor do texto</label>
@@ -487,7 +486,7 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
             </div>
           </div>
 
-          {/* Font selector */}
+          {/* Font */}
           <div className="card p-4 space-y-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Fonte</p>
             <div className="grid grid-cols-2 gap-2">
@@ -497,23 +496,12 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
                   type="button"
                   onClick={() => upd("fontFamily", id)}
                   className={`p-3 rounded-xl border text-left transition-all ${
-                    cfg.fontFamily === id
-                      ? "border-brand-500 bg-brand-50"
-                      : "border-gray-200 hover:border-gray-300"
+                    cfg.fontFamily === id ? "border-brand-500 bg-brand-50" : "border-gray-200 hover:border-gray-300"
                   }`}
                 >
-                  <p
-                    className="text-xl leading-tight"
-                    style={{ fontFamily: font.stack }}
-                  >
-                    Abc
-                  </p>
-                  <p className="text-[10px] text-gray-500 mt-1 leading-tight">
-                    {font.label}
-                  </p>
-                  {cfg.fontFamily === id && (
-                    <span className="text-[9px] text-brand-600 font-semibold">✓ ativa</span>
-                  )}
+                  <p className="text-xl leading-tight" style={{ fontFamily: font.stack }}>Abc</p>
+                  <p className="text-[10px] text-gray-500 mt-1 leading-tight">{font.label}</p>
+                  {cfg.fontFamily === id && <span className="text-[9px] text-brand-600 font-semibold">✓ ativa</span>}
                 </button>
               ))}
             </div>
@@ -529,9 +517,7 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
                   type="button"
                   onClick={() => upd("bgType", id as BgType)}
                   className={`relative rounded-xl overflow-hidden transition-all ${
-                    cfg.bgType === id
-                      ? "ring-2 ring-brand-500 ring-offset-1"
-                      : "ring-1 ring-gray-200 hover:ring-gray-300"
+                    cfg.bgType === id ? "ring-2 ring-brand-500 ring-offset-1" : "ring-1 ring-gray-200 hover:ring-gray-300"
                   }`}
                   style={{ aspectRatio: "1/1" }}
                 >
@@ -547,27 +533,15 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
                 </button>
               ))}
             </div>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/jpeg,image/png"
-              onChange={handleUpload}
-              className="hidden"
-            />
+            <input ref={fileRef} type="file" accept="image/jpeg,image/png" onChange={handleUpload} className="hidden" />
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
-              className={`btn-secondary w-full flex items-center justify-center gap-2 text-sm ${
-                cfg.bgType === "upload" && cfg.bgUrl ? "ring-2 ring-brand-500" : ""
-              }`}
+              className={`btn-secondary w-full flex items-center justify-center gap-2 text-sm ${cfg.bgType === "upload" && cfg.bgUrl ? "ring-2 ring-brand-500" : ""}`}
             >
               <Upload size={14} />
-              {uploading
-                ? "Enviando…"
-                : cfg.bgType === "upload" && cfg.bgUrl
-                ? "Trocar imagem"
-                : "Upload personalizado (JPG/PNG)"}
+              {uploading ? "Enviando…" : cfg.bgType === "upload" && cfg.bgUrl ? "Trocar imagem" : "Upload personalizado (JPG/PNG)"}
             </button>
             {cfg.bgType === "upload" && cfg.bgUrl && (
               <p className="text-xs text-brand-600 text-center flex items-center justify-center gap-1">
@@ -576,50 +550,29 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
             )}
           </div>
 
-          {/* Overlay opacity */}
+          {/* Overlay */}
           <div className="card p-4 space-y-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              Overlay de legibilidade
-            </p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Overlay de legibilidade</p>
             <div>
               <div className="flex justify-between text-xs mb-2">
                 <span className="text-gray-600">Opacidade do overlay (branco)</span>
-                <span className="font-semibold text-gray-800">
-                  {Math.round(cfg.opacity * 100)}%
-                </span>
+                <span className="font-semibold text-gray-800">{Math.round(cfg.opacity * 100)}%</span>
               </div>
               <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
+                type="range" min="0" max="1" step="0.01"
                 value={cfg.opacity}
                 onChange={(e) => upd("opacity", parseFloat(e.target.value))}
                 className="w-full"
                 style={{ accentColor: "#db2777" }}
               />
               <div className="flex justify-between text-[10px] text-gray-400 mt-1">
-                <span>0% — sem overlay</span>
-                <span>100% — branco total</span>
+                <span>0% — sem overlay</span><span>100% — branco total</span>
               </div>
             </div>
-            {/* Opacity mini-preview */}
-            <div
-              className="relative rounded-lg overflow-hidden h-16"
-              style={getBgStyle(cfg)}
-            >
-              <div
-                className="absolute inset-0"
-                style={{ background: `rgba(255,255,255,${cfg.opacity})` }}
-              />
+            <div className="relative rounded-lg overflow-hidden h-16" style={getBgStyle(cfg)}>
+              <div className="absolute inset-0" style={{ background: `rgba(255,255,255,${cfg.opacity})` }} />
               <div className="relative z-10 h-full flex items-center justify-center">
-                <span
-                  className="text-xs font-semibold"
-                  style={{
-                    color: cfg.corTexto,
-                    fontFamily: (FONTS[cfg.fontFamily] ?? FONTS.georgia).stack,
-                  }}
-                >
+                <span className="text-xs font-semibold" style={{ color: cfg.corTexto, fontFamily: (FONTS[cfg.fontFamily] ?? FONTS.georgia).stack }}>
                   Texto de exemplo
                 </span>
               </div>
@@ -627,19 +580,8 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
           </div>
 
           {/* Save */}
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={isPending}
-            className="btn-primary w-full flex items-center justify-center gap-2"
-          >
-            {saveOk ? (
-              <><Check size={15} /> Salvo!</>
-            ) : isPending ? (
-              "Salvando…"
-            ) : (
-              "Salvar configurações"
-            )}
+          <button type="button" onClick={handleSave} disabled={isPending} className="btn-primary w-full flex items-center justify-center gap-2">
+            {saveOk ? <><Check size={15} /> Salvo!</> : isPending ? "Salvando…" : "Salvar configurações"}
           </button>
         </div>
       )}
