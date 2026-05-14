@@ -12,7 +12,18 @@ interface ConfigPayload {
   titulo?: string;
   subtitulo?: string | null;
   cor_texto?: string;
+  cor_titulo?: string;
+  cor_descricao?: string;
+  cor_preco?: string;
+  alinhamento?: string;
+  observacoes?: string | null;
   font_family?: string;
+  layout_type?: string;
+  overlay_anchor?: string;
+  position_x?: number;
+  position_y?: number;
+  panel_opacity?: number;
+  panel_color?: string;
 }
 
 export async function salvarConfigCardapio(

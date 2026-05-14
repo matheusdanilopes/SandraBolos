@@ -78,6 +78,7 @@ export interface PedidoComTopper extends Pedido {
 export interface Produto {
   id: string;
   nome: string;
+  descricao: string | null;
   unidade_medida: UnidadeMedida;
   preco_padrao: number;
   ativo: boolean;
@@ -105,7 +106,18 @@ export interface CardapioConfig {
   titulo: string;
   subtitulo: string | null;
   cor_texto: string;
+  cor_titulo: string;
+  cor_descricao: string;
+  cor_preco: string;
+  alinhamento: string;
+  observacoes: string | null;
   font_family: string;
+  layout_type: string;
+  overlay_anchor: string;
+  position_x: number;
+  position_y: number;
+  panel_opacity: number;
+  panel_color: string;
   created_at: string;
   updated_at: string;
 }
@@ -352,6 +364,7 @@ export type Database = {
         Row: {
           id: string
           nome: string
+          descricao: string | null
           unidade_medida: string
           preco_padrao: number
           ativo: boolean
@@ -361,6 +374,7 @@ export type Database = {
         Insert: {
           id?: string
           nome: string
+          descricao?: string | null
           unidade_medida: string
           preco_padrao?: number
           ativo?: boolean
@@ -370,6 +384,7 @@ export type Database = {
         Update: {
           id?: string
           nome?: string
+          descricao?: string | null
           unidade_medida?: string
           preco_padrao?: number
           ativo?: boolean
@@ -446,7 +461,18 @@ export type Database = {
           titulo: string
           subtitulo: string | null
           cor_texto: string
+          cor_titulo: string
+          cor_descricao: string
+          cor_preco: string
+          alinhamento: string
+          observacoes: string | null
           font_family: string
+          layout_type: string
+          overlay_anchor: string
+          position_x: number
+          position_y: number
+          panel_opacity: number
+          panel_color: string
           created_at: string
           updated_at: string
         }
@@ -458,7 +484,18 @@ export type Database = {
           titulo?: string
           subtitulo?: string | null
           cor_texto?: string
+          cor_titulo?: string
+          cor_descricao?: string
+          cor_preco?: string
+          alinhamento?: string
+          observacoes?: string | null
           font_family?: string
+          layout_type?: string
+          overlay_anchor?: string
+          position_x?: number
+          position_y?: number
+          panel_opacity?: number
+          panel_color?: string
           created_at?: string
           updated_at?: string
         }
@@ -470,7 +507,18 @@ export type Database = {
           titulo?: string
           subtitulo?: string | null
           cor_texto?: string
+          cor_titulo?: string
+          cor_descricao?: string
+          cor_preco?: string
+          alinhamento?: string
+          observacoes?: string | null
           font_family?: string
+          layout_type?: string
+          overlay_anchor?: string
+          position_x?: number
+          position_y?: number
+          panel_opacity?: number
+          panel_color?: string
           created_at?: string
           updated_at?: string
         }

@@ -6,6 +6,7 @@ import type { UnidadeMedida } from "@/types/database";
 
 interface ProdutoPayload {
   nome: string;
+  descricao?: string | null;
   unidade_medida: UnidadeMedida;
   preco_padrao: number;
   categoria_id?: string | null;
@@ -20,6 +21,7 @@ export async function criarProdutoAction(
   const supabase = createServerSupabaseClient();
   const { error } = await supabase.from("produtos").insert({
     nome: data.nome.trim(),
+    descricao: data.descricao?.trim() || null,
     unidade_medida: data.unidade_medida,
     preco_padrao: data.preco_padrao,
     categoria_id: data.categoria_id ?? null,
@@ -43,6 +45,7 @@ export async function editarProdutoAction(
     .from("produtos")
     .update({
       nome: data.nome.trim(),
+      descricao: data.descricao?.trim() || null,
       unidade_medida: data.unidade_medida,
       preco_padrao: data.preco_padrao,
       categoria_id: data.categoria_id ?? null,

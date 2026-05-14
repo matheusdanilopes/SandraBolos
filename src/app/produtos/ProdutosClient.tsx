@@ -19,6 +19,7 @@ interface Props {
 
 interface EditState {
   nome: string;
+  descricao: string;
   unidade_medida: UnidadeMedida;
   preco_padrao: string;
   categoria_id: string;
@@ -65,6 +66,7 @@ function ProdutoRow({
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<EditState>({
     nome: produto.nome,
+    descricao: produto.descricao ?? "",
     unidade_medida: produto.unidade_medida,
     preco_padrao: produto.preco_padrao.toString(),
     categoria_id: produto.categoria_id ?? "",
@@ -81,6 +83,7 @@ function ProdutoRow({
     startTransition(async () => {
       const result = await editarProdutoAction(produto.id, {
         nome: form.nome,
+        descricao: form.descricao || null,
         unidade_medida: form.unidade_medida,
         preco_padrao: preco,
         categoria_id: form.categoria_id || null,
@@ -104,6 +107,13 @@ function ProdutoRow({
             value={form.nome}
             onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
             placeholder="Nome do produto"
+          />
+          <textarea
+            className="input resize-none text-sm"
+            rows={2}
+            value={form.descricao}
+            onChange={(e) => setForm((f) => ({ ...f, descricao: e.target.value }))}
+            placeholder="Descrição curta (opcional)"
           />
           <div className="grid grid-cols-2 gap-2">
             <div className="relative">
@@ -168,6 +178,9 @@ function ProdutoRow({
     <div className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 transition-colors ${produto.ativo ? "border-gray-100 bg-white" : "border-gray-100 bg-gray-50 opacity-60"}`}>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-gray-800 truncate">{produto.nome}</p>
+        {produto.descricao && (
+          <p className="text-[11px] text-gray-400 italic truncate">{produto.descricao}</p>
+        )}
         <p className="text-[11px] text-gray-500">
           {UNIDADE_LABELS[produto.unidade_medida]} · {formatCurrency(produto.preco_padrao)}
           {produto.unidade_medida === "peso_kg" && "/kg"}
@@ -202,6 +215,7 @@ function NovoProdutoForm({ categorias }: { categorias: CategoriaProduto[] }) {
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [nome, setNome] = useState("");
+  const [descricao, setDescricao] = useState("");
   const [unidade, setUnidade] = useState<UnidadeMedida>("unidade");
   const [preco, setPreco] = useState("");
   const [categoriaId, setCategoriaId] = useState("");
@@ -218,12 +232,13 @@ function NovoProdutoForm({ categorias }: { categorias: CategoriaProduto[] }) {
     startTransition(async () => {
       const result = await criarProdutoAction({
         nome,
+        descricao: descricao || null,
         unidade_medida: unidade,
         preco_padrao: precoNum,
         categoria_id: categoriaId || null,
       });
       if (result.error) { setError(result.error); return; }
-      setNome(""); setPreco(""); setUnidade("unidade"); setCategoriaId(""); setOpen(false);
+      setNome(""); setDescricao(""); setPreco(""); setUnidade("unidade"); setCategoriaId(""); setOpen(false);
     });
   }
 
@@ -248,6 +263,13 @@ function NovoProdutoForm({ categorias }: { categorias: CategoriaProduto[] }) {
         onChange={(e) => setNome(e.target.value)}
         placeholder="Nome do produto"
         autoFocus
+      />
+      <textarea
+        className="input resize-none text-sm"
+        rows={2}
+        value={descricao}
+        onChange={(e) => setDescricao(e.target.value)}
+        placeholder="Descrição curta (opcional)"
       />
       <div className="grid grid-cols-2 gap-3">
         <div className="relative">
