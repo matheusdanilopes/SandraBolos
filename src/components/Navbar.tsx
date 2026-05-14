@@ -2,15 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ShoppingBag, Users, TrendingUp, Settings, Package } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Users, TrendingUp, Settings, Package, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const links = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/", label: "Início", icon: LayoutDashboard },
   { href: "/pedidos", label: "Pedidos", icon: ShoppingBag },
+  { href: "/toppers", label: "Toppers", icon: Sparkles },
   { href: "/produtos", label: "Produtos", icon: Package },
   { href: "/clientes", label: "Clientes", icon: Users },
-  { href: "/financeiro", label: "Financeiro", icon: TrendingUp },
+  { href: "/financeiro", label: "Finanças", icon: TrendingUp },
 ];
 
 export function Navbar() {
@@ -47,11 +48,11 @@ export function Navbar() {
                 key={href}
                 href={href}
                 className={cn(
-                  "flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[11px] font-medium transition-colors min-h-[56px]",
+                  "flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-[10px] font-medium transition-colors min-h-[52px]",
                   active ? "text-brand-600" : "text-gray-400 hover:text-gray-600"
                 )}
               >
-                <Icon size={22} strokeWidth={active ? 2.5 : 1.75} />
+                <Icon size={20} strokeWidth={active ? 2.5 : 1.75} />
                 <span>{label}</span>
               </Link>
             );
