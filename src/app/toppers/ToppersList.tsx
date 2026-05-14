@@ -29,6 +29,7 @@ import {
   desfazerPagamentoAction,
   registrarPagamentoLoteAction,
 } from "./actions";
+import { cn } from "@/lib/utils";
 
 interface Props {
   pedidos: PedidoComTopper[];
@@ -38,6 +39,13 @@ type Filtro = "todos" | "pendentes" | "solicitados" | "recebidos" | "a_pagar" | 
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function getStatusBorder(topper: TopperPedido | null | undefined): string {
+  if (topper?.pago_fornecedor) return "border-l-4 border-l-emerald-400";
+  if (topper?.recebido) return "border-l-4 border-l-green-400";
+  if (topper?.solicitado) return "border-l-4 border-l-blue-400";
+  return "border-l-4 border-l-gray-200";
 }
 
 // ─── Card individual ────────────────────────────────────────────────────────
@@ -54,7 +62,6 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
   const [expanded, setExpanded] = useState(!topper);
   const [isPending, startTransition] = useTransition();
 
-  // Formulário de detalhes
   const [fornecedor, setFornecedor] = useState(topper?.fornecedor ?? "");
   const [valor, setValor] = useState(topper?.valor?.toString() ?? "0");
   const [frete, setFrete] = useState(topper?.frete?.toString() ?? "0");
@@ -62,7 +69,6 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
   const [erroDetalhes, setErroDetalhes] = useState<string | null>(null);
   const [salvoOk, setSalvoOk] = useState(false);
 
-  // Formulário de pagamento individual
   const [showPagamento, setShowPagamento] = useState(false);
   const [dataPagamento, setDataPagamento] = useState(todayISO());
   const [erroPagamento, setErroPagamento] = useState<string | null>(null);
@@ -120,14 +126,16 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
 
   return (
     <div
-      className={`card overflow-hidden transition-opacity ${isPending ? "opacity-60" : ""} ${
-        batchMode && selected ? "ring-2 ring-brand-400" : ""
-      }`}
+      className={cn(
+        "card overflow-hidden transition-opacity",
+        getStatusBorder(topper),
+        isPending && "opacity-60",
+        batchMode && selected && "ring-2 ring-brand-400 ring-offset-1"
+      )}
     >
       <div className="p-4">
-        {/* Linha de cabeçalho */}
+        {/* Cabeçalho */}
         <div className="flex items-start gap-3">
-          {/* Checkbox de lote — só para pagáveis */}
           {batchMode && pagavel && (
             <button
               onClick={onToggleSelect}
@@ -139,7 +147,7 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
           )}
 
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap mb-0.5">
+            <div className="flex items-center gap-1.5 flex-wrap mb-1">
               <span className="text-[10px] text-gray-400 font-mono">{numero}</span>
               <StatusBadge status={pedido.status} />
               <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">
@@ -147,30 +155,37 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
               </span>
             </div>
             <p className="font-semibold text-gray-900 truncate">{nomeCliente}</p>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Entrega: {formatDate(pedido.data_entrega)}
-            </p>
+            <div className="flex items-center gap-3 mt-0.5">
+              <p className="text-xs text-gray-500">Entrega: {formatDate(pedido.data_entrega)}</p>
+              {topper?.fornecedor && (
+                <p className="text-xs text-gray-400 flex items-center gap-1 truncate">
+                  <Package size={11} />
+                  {topper.fornecedor}
+                </p>
+              )}
+            </div>
           </div>
 
           <Link
             href={`/pedidos/${pedido.id}`}
-            className="text-gray-400 hover:text-brand-600 flex-shrink-0 mt-1"
+            className="text-gray-400 hover:text-brand-600 flex-shrink-0 mt-1 p-1 -mr-1 rounded transition-colors"
             title="Ver pedido"
           >
             <ExternalLink size={15} />
           </Link>
         </div>
 
-        {/* Badges de status */}
+        {/* Status de progresso */}
         <div className="flex items-center gap-2 mt-3 flex-wrap">
           <button
             onClick={handleToggleSolicitado}
             disabled={isPending}
-            className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full border transition-colors ${
+            className={cn(
+              "flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition-all",
               topper?.solicitado
-                ? "bg-blue-100 border-blue-300 text-blue-700"
-                : "bg-white border-gray-300 text-gray-500 hover:border-blue-300 hover:text-blue-600"
-            }`}
+                ? "bg-blue-50 border-blue-300 text-blue-700 font-medium"
+                : "bg-white border-gray-200 text-gray-500 hover:border-blue-300 hover:text-blue-600"
+            )}
           >
             {topper?.solicitado ? <CheckCircle2 size={12} /> : <Circle size={12} />}
             Solicitado
@@ -179,33 +194,43 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
           <button
             onClick={handleToggleRecebido}
             disabled={isPending}
-            className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full border transition-colors ${
+            className={cn(
+              "flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition-all",
               topper?.recebido
-                ? "bg-emerald-100 border-emerald-300 text-emerald-700"
-                : "bg-white border-gray-300 text-gray-500 hover:border-emerald-300 hover:text-emerald-600"
-            }`}
+                ? "bg-green-50 border-green-300 text-green-700 font-medium"
+                : "bg-white border-gray-200 text-gray-500 hover:border-green-300 hover:text-green-600"
+            )}
           >
             {topper?.recebido ? <CheckCircle2 size={12} /> : <Circle size={12} />}
             Recebido
           </button>
         </div>
 
+        {/* Resumo financeiro compacto */}
+        {totalFornecedor > 0 && (
+          <div className="mt-3 flex items-center gap-2 text-xs bg-gray-50 rounded-lg px-3 py-2">
+            <span className="text-gray-500">Topper {formatCurrency(topper?.valor ?? 0)}</span>
+            {(topper?.frete ?? 0) > 0 && (
+              <>
+                <span className="text-gray-300">·</span>
+                <span className="text-gray-500">Frete {formatCurrency(topper?.frete ?? 0)}</span>
+              </>
+            )}
+            <span className="ml-auto font-semibold text-brand-700">{formatCurrency(totalFornecedor)}</span>
+          </div>
+        )}
+
         {/* Bloco de pagamento */}
         {totalFornecedor > 0 && (
-          <div className="mt-3">
+          <div className="mt-2.5">
             {topper?.pago_fornecedor ? (
-              /* ── Pago ── */
               <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 size={14} className="text-emerald-600" />
                   <div>
-                    <p className="text-xs font-semibold text-emerald-700">
-                      Pago ao fornecedor
-                    </p>
+                    <p className="text-xs font-semibold text-emerald-700">Pago ao fornecedor</p>
                     {topper.data_pagamento && (
-                      <p className="text-[10px] text-emerald-600">
-                        {formatDate(topper.data_pagamento)}
-                      </p>
+                      <p className="text-[10px] text-emerald-600">{formatDate(topper.data_pagamento)}</p>
                     )}
                   </div>
                 </div>
@@ -220,8 +245,7 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
                 </button>
               </div>
             ) : showPagamento ? (
-              /* ── Formulário de pagamento individual ── */
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 space-y-2">
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 space-y-2.5">
                 <p className="text-xs font-semibold text-orange-700 flex items-center gap-1">
                   <Banknote size={13} />
                   Registrar pagamento ao fornecedor
@@ -237,13 +261,10 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-gray-600">
-                    Total:{" "}
-                    <strong className="text-orange-700">{formatCurrency(totalFornecedor)}</strong>
+                    Total: <strong className="text-orange-700">{formatCurrency(totalFornecedor)}</strong>
                   </span>
                 </div>
-                {erroPagamento && (
-                  <p className="text-xs text-red-600">{erroPagamento}</p>
-                )}
+                {erroPagamento && <p className="text-xs text-red-600">{erroPagamento}</p>}
                 <div className="flex gap-2">
                   <button
                     onClick={handleRegistrarPagamento}
@@ -263,11 +284,10 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
                 </div>
               </div>
             ) : (
-              /* ── Botão registrar pagamento ── */
               <button
                 onClick={() => setShowPagamento(true)}
                 disabled={isPending}
-                className="w-full flex items-center justify-center gap-1.5 text-xs font-medium text-orange-600 border border-orange-300 bg-orange-50 hover:bg-orange-100 rounded-lg px-3 py-2 transition-colors"
+                className="w-full flex items-center justify-center gap-1.5 text-xs font-medium text-orange-600 border border-orange-200 bg-orange-50 hover:bg-orange-100 rounded-lg px-3 py-2 transition-colors"
               >
                 <Banknote size={13} />
                 Registrar pagamento ao fornecedor
@@ -276,39 +296,15 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
           </div>
         )}
 
-        {/* Resumo financeiro */}
-        {totalFornecedor > 0 && (
-          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-            <div className="bg-gray-50 rounded-lg p-2">
-              <p className="text-[10px] text-gray-500 mb-0.5">Topper</p>
-              <p className="text-xs font-semibold text-gray-800">
-                {formatCurrency(topper?.valor ?? 0)}
-              </p>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-2">
-              <p className="text-[10px] text-gray-500 mb-0.5">Frete</p>
-              <p className="text-xs font-semibold text-gray-800">
-                {formatCurrency(topper?.frete ?? 0)}
-              </p>
-            </div>
-            <div className="bg-brand-50 rounded-lg p-2">
-              <p className="text-[10px] text-brand-600 mb-0.5">Total</p>
-              <p className="text-xs font-bold text-brand-700">
-                {formatCurrency(totalFornecedor)}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Expandir detalhes */}
+        {/* Expandir / recolher detalhes */}
         <button
           onClick={() => setExpanded((v) => !v)}
-          className="mt-3 w-full flex items-center justify-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+          className="mt-3 w-full flex items-center justify-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors py-1"
         >
           {expanded ? (
             <><ChevronUp size={14} /> Recolher detalhes</>
           ) : (
-            <><ChevronDown size={14} /> Editar detalhes</>
+            <><ChevronDown size={14} /> Editar fornecedor / valores</>
           )}
         </button>
       </div>
@@ -333,9 +329,7 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
                 <Package size={12} /> Valor do topper
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-                  R$
-                </span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">R$</span>
                 <input
                   type="number"
                   min="0"
@@ -351,9 +345,7 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
                 <Truck size={12} /> Frete
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-                  R$
-                </span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">R$</span>
                 <input
                   type="number"
                   min="0"
@@ -367,11 +359,9 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
           </div>
 
           {(parseFloat(valor) || 0) + (parseFloat(frete) || 0) > 0 && (
-            <p className="text-xs text-center text-brand-600 font-medium">
+            <p className="text-xs text-center text-brand-600 font-medium bg-brand-50 rounded-lg py-1.5">
               Total:{" "}
-              <strong>
-                {formatCurrency((parseFloat(valor) || 0) + (parseFloat(frete) || 0))}
-              </strong>
+              <strong>{formatCurrency((parseFloat(valor) || 0) + (parseFloat(frete) || 0))}</strong>
             </p>
           )}
 
@@ -387,7 +377,7 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
           </div>
 
           {erroDetalhes && (
-            <p className="text-xs text-red-600 bg-red-50 rounded p-2">{erroDetalhes}</p>
+            <p className="text-xs text-red-600 bg-red-50 rounded-lg p-2">{erroDetalhes}</p>
           )}
 
           <button
@@ -398,7 +388,7 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
             {salvoOk ? (
               <><CheckCircle2 size={15} /> Salvo!</>
             ) : (
-              <><Save size={15} /> {isPending ? "Salvando…" : "Salvar"}</>
+              <><Save size={15} /> {isPending ? "Salvando…" : "Salvar detalhes"}</>
             )}
           </button>
         </div>
@@ -412,7 +402,6 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
 export function ToppersList({ pedidos }: Props) {
   const [filtro, setFiltro] = useState<Filtro>("todos");
 
-  // Modo lote
   const [batchMode, setBatchMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBatchPanel, setShowBatchPanel] = useState(false);
@@ -420,13 +409,11 @@ export function ToppersList({ pedidos }: Props) {
   const [isBatchPending, startBatchTransition] = useTransition();
   const [batchErro, setBatchErro] = useState<string | null>(null);
 
-  // Pedidos pagáveis (têm valor e ainda não foram pagos)
   const pagaveisFiltrados = pedidos.filter((p) => {
     const t = p.toppers_pedido as TopperPedido | null;
     return t && !t.pago_fornecedor && (t.valor + t.frete) > 0;
   });
 
-  // Resumo financeiro
   const totalToppers = pedidos.length;
   const totalAReceber = pedidos.filter(
     (p) => !(p.toppers_pedido as TopperPedido | null)?.recebido
@@ -442,7 +429,6 @@ export function ToppersList({ pedidos }: Props) {
       return acc + t.valor + t.frete;
     }, 0);
 
-  // Filtros
   const pedidosFiltrados = pedidos.filter((p) => {
     const t = p.toppers_pedido as TopperPedido | null;
     if (filtro === "pendentes") return !t?.solicitado;
@@ -485,7 +471,6 @@ export function ToppersList({ pedidos }: Props) {
     },
   ];
 
-  // Selecionar todos os pagáveis visíveis
   const pagaveisVisiveis = pedidosFiltrados.filter((p) => {
     const t = p.toppers_pedido as TopperPedido | null;
     return t && !t.pago_fornecedor && (t.valor + t.frete) > 0;
@@ -524,7 +509,6 @@ export function ToppersList({ pedidos }: Props) {
     setShowBatchPanel(false);
   }
 
-  // Total dos selecionados
   const totalSelecionado = Array.from(selectedIds).reduce((acc, id) => {
     const pedido = pedidos.find((p) => p.id === id);
     const t = pedido?.toppers_pedido as TopperPedido | null;
@@ -546,45 +530,70 @@ export function ToppersList({ pedidos }: Props) {
   }
 
   return (
-    <div className="space-y-4 pb-32">
+    <div className="space-y-4 pb-52">
       {/* Cards de resumo */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="card p-3 text-center">
-          <p className="text-2xl font-bold text-gray-900">{totalToppers}</p>
-          <p className="text-xs text-gray-500 mt-0.5">Pedidos com topper</p>
+        <div className="card p-3 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
+            <Layers size={16} className="text-purple-600" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xl font-bold text-gray-900 leading-none">{totalToppers}</p>
+            <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">Pedidos com topper</p>
+          </div>
         </div>
-        <div className="card p-3 text-center">
-          <p className="text-2xl font-bold text-orange-500">{totalAReceber}</p>
-          <p className="text-xs text-gray-500 mt-0.5">Aguardando recebimento</p>
+
+        <div className="card p-3 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
+            <Truck size={16} className="text-orange-600" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xl font-bold text-orange-600 leading-none">{totalAReceber}</p>
+            <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">Aguardando recebimento</p>
+          </div>
         </div>
-        <div className="card p-3 text-center">
-          <p className="text-lg font-bold text-red-500">{formatCurrency(totalAPagar)}</p>
-          <p className="text-xs text-gray-500 mt-0.5">A pagar fornecedores</p>
+
+        <div className="card p-3 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
+            <Banknote size={16} className="text-red-500" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-base font-bold text-red-500 leading-none">{formatCurrency(totalAPagar)}</p>
+            <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">A pagar fornecedores</p>
+          </div>
         </div>
-        <div className="card p-3 text-center">
-          <p className="text-lg font-bold text-emerald-600">{formatCurrency(totalJaPago)}</p>
-          <p className="text-xs text-gray-500 mt-0.5">Já pago fornecedores</p>
+
+        <div className="card p-3 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+            <CheckCircle2 size={16} className="text-emerald-600" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-base font-bold text-emerald-600 leading-none">{formatCurrency(totalJaPago)}</p>
+            <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">Já pago fornecedores</p>
+          </div>
         </div>
       </div>
 
       {/* Barra de filtros + botão lote */}
       <div className="flex items-center gap-2">
-        <div className="flex gap-1.5 overflow-x-auto pb-1 flex-1">
+        <div className="flex gap-1.5 overflow-x-auto pb-1 flex-1 scrollbar-hide">
           {filtros.map(({ key, label, count }) => (
             <button
               key={key}
               onClick={() => setFiltro(key)}
-              className={`flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              className={cn(
+                "flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
                 filtro === key
-                  ? "bg-brand-600 text-white"
+                  ? "bg-brand-600 text-white shadow-sm"
                   : "bg-white text-gray-600 border border-gray-200 hover:border-brand-300"
-              }`}
+              )}
             >
               {label}
               <span
-                className={`text-[10px] px-1 rounded-full ${
+                className={cn(
+                  "text-[10px] px-1 rounded-full min-w-[16px] text-center",
                   filtro === key ? "bg-brand-500 text-white" : "bg-gray-100 text-gray-500"
-                }`}
+                )}
               >
                 {count}
               </span>
@@ -592,18 +601,18 @@ export function ToppersList({ pedidos }: Props) {
           ))}
         </div>
 
-        {/* Toggle modo lote */}
         {pagaveisFiltrados.length > 0 && (
           <button
             onClick={() => (batchMode ? exitBatchMode() : setBatchMode(true))}
-            className={`flex-shrink-0 flex items-center gap-1 text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
+            className={cn(
+              "flex-shrink-0 flex items-center gap-1 text-xs px-3 py-1.5 rounded-full border font-medium transition-colors",
               batchMode
                 ? "bg-brand-600 text-white border-brand-600"
                 : "bg-white text-gray-600 border-gray-300 hover:border-brand-400"
-            }`}
+            )}
           >
             <Layers size={13} />
-            {batchMode ? "Sair do lote" : "Pagar em lote"}
+            {batchMode ? "Sair" : "Pagar em lote"}
           </button>
         )}
       </div>
@@ -633,8 +642,14 @@ export function ToppersList({ pedidos }: Props) {
 
       {/* Lista */}
       {pedidosFiltrados.length === 0 ? (
-        <div className="card p-8 text-center">
-          <p className="text-gray-400 text-sm">Nenhum topper encontrado para este filtro.</p>
+        <div className="card p-10 text-center">
+          <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+            <Layers size={24} className="text-gray-400" />
+          </div>
+          <p className="text-gray-600 font-medium text-sm">Nenhum topper encontrado</p>
+          <p className="text-xs text-gray-400 mt-1">
+            {filtro === "todos" ? "Não há pedidos com topper cadastrados" : "Tente outro filtro"}
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -650,10 +665,12 @@ export function ToppersList({ pedidos }: Props) {
         </div>
       )}
 
-      {/* ── Barra flutuante de pagamento em lote ── */}
+      {/* ── Barra flutuante de pagamento em lote (acima da nav) ── */}
       {batchMode && selectedIds.size > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-50">
-          {/* Painel de data (expansível) */}
+        <div
+          className="fixed left-0 right-0 z-50"
+          style={{ bottom: "calc(52px + env(safe-area-inset-bottom, 0px))" }}
+        >
           {showBatchPanel && (
             <div className="bg-white border-t border-gray-200 shadow-lg px-4 py-4 space-y-3 max-w-2xl mx-auto">
               <div className="flex items-center justify-between">
@@ -662,7 +679,7 @@ export function ToppersList({ pedidos }: Props) {
                 </p>
                 <button
                   onClick={() => setShowBatchPanel(false)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-400 hover:text-gray-600 p-1 rounded"
                 >
                   <X size={18} />
                 </button>
@@ -681,7 +698,7 @@ export function ToppersList({ pedidos }: Props) {
                 <span className="font-bold text-brand-700">{formatCurrency(totalSelecionado)}</span>
               </div>
               {batchErro && (
-                <p className="text-xs text-red-600 bg-red-50 rounded p-2">{batchErro}</p>
+                <p className="text-xs text-red-600 bg-red-50 rounded-lg p-2">{batchErro}</p>
               )}
               <button
                 onClick={handlePagarLote}
@@ -696,7 +713,6 @@ export function ToppersList({ pedidos }: Props) {
             </div>
           )}
 
-          {/* Barra inferior sempre visível quando há seleção */}
           <div className="bg-brand-600 text-white px-4 py-3 flex items-center justify-between gap-3 max-w-2xl mx-auto">
             <div>
               <p className="text-sm font-semibold">
