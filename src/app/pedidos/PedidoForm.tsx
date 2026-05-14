@@ -147,9 +147,9 @@ export function PedidoForm({ clientes, pedido, produtos = [] }: Props) {
     setError("");
 
     if (!dataEntrega) { setError("Data de entrega é obrigatória"); return; }
-    // Peso/quantidade só obrigatórios se não houver itens
-    if (needsPeso && !peso && !hasItens) { setError("Informe o peso ou adicione pelo menos um item"); return; }
-    if (needsQuantidade && !quantidade && !hasItens) { setError("Informe a quantidade ou adicione pelo menos um item"); return; }
+    // Peso/quantidade só validados no modo edição (na criação os itens registram as quantidades)
+    if (isEdit && needsPeso && !peso) { setError("Peso é obrigatório para este tipo"); return; }
+    if (isEdit && needsQuantidade && !quantidade) { setError("Quantidade é obrigatória para este tipo"); return; }
     if (!isEdit && (novoCliente || !clienteId)) {
       if (!nomeCliente) { setError("Nome do cliente é obrigatório"); return; }
       if (!telefoneCliente) { setError("Telefone do cliente é obrigatório"); return; }
@@ -271,37 +271,20 @@ export function PedidoForm({ clientes, pedido, produtos = [] }: Props) {
           </div>
         </div>
 
-        {needsPeso && (
+        {/* Peso e quantidade: apenas no modo edição (na criação os itens registram as quantidades) */}
+        {isEdit && needsPeso && (
           <div>
-            <label className="label">Peso (kg){!hasItens && " *"}</label>
+            <label className="label">Peso (kg) *</label>
             <input className="input" type="number" step="0.1" min="0" value={peso} onChange={(e) => setPeso(e.target.value)} placeholder="Ex: 2.5" />
           </div>
         )}
 
-        {needsQuantidade && (
+        {isEdit && needsQuantidade && (
           <div>
-            <label className="label">Quantidade{!hasItens && " *"}</label>
+            <label className="label">Quantidade *</label>
             <input className="input" type="number" min="1" value={quantidade} onChange={(e) => setQuantidade(e.target.value)} placeholder="Ex: 50" />
           </div>
         )}
-
-        <div>
-          <label className="label">Topper</label>
-          <div className="flex gap-2">
-            {(["nao", "sim", "brinde"] as Topper[]).map((t) => (
-              <button key={t} type="button" onClick={() => setTopper(t)}
-                className={`flex-1 py-2 text-xs rounded-lg border font-medium transition-colors capitalize ${topper === t ? "bg-brand-600 text-white border-brand-600" : "bg-white text-gray-600 border-gray-300"}`}>
-                {t === "nao" ? "Não" : t.charAt(0).toUpperCase() + t.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="label">Descrição</label>
-          <textarea className="input min-h-[80px] resize-none" value={descricao} onChange={(e) => setDescricao(e.target.value)}
-            placeholder="Detalhes do pedido, sabor, decoração..." />
-        </div>
       </div>
 
       {/* ── Itens (somente na criação) ───────────────────────────────── */}
@@ -403,6 +386,27 @@ export function PedidoForm({ clientes, pedido, produtos = [] }: Props) {
           )}
         </div>
       )}
+
+      {/* ── Topper e Descrição (após os itens) ──────────────────────── */}
+      <div className="card p-4 space-y-3">
+        <div>
+          <label className="label">Topper</label>
+          <div className="flex gap-2">
+            {(["nao", "sim", "brinde"] as Topper[]).map((t) => (
+              <button key={t} type="button" onClick={() => setTopper(t)}
+                className={`flex-1 py-2 text-xs rounded-lg border font-medium transition-colors capitalize ${topper === t ? "bg-brand-600 text-white border-brand-600" : "bg-white text-gray-600 border-gray-300"}`}>
+                {t === "nao" ? "Não" : t.charAt(0).toUpperCase() + t.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="label">Descrição</label>
+          <textarea className="input min-h-[80px] resize-none" value={descricao} onChange={(e) => setDescricao(e.target.value)}
+            placeholder="Detalhes do pedido, sabor, decoração..." />
+        </div>
+      </div>
 
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{error}</div>
