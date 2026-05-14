@@ -112,6 +112,12 @@ export interface CardapioConfig {
   alinhamento: string;
   observacoes: string | null;
   font_family: string;
+  layout_type: string;
+  overlay_anchor: string;
+  position_x: number;
+  position_y: number;
+  panel_opacity: number;
+  panel_color: string;
   created_at: string;
   updated_at: string;
 }
@@ -461,6 +467,12 @@ export type Database = {
           alinhamento: string
           observacoes: string | null
           font_family: string
+          layout_type: string
+          overlay_anchor: string
+          position_x: number
+          position_y: number
+          panel_opacity: number
+          panel_color: string
           created_at: string
           updated_at: string
         }
@@ -478,6 +490,12 @@ export type Database = {
           alinhamento?: string
           observacoes?: string | null
           font_family?: string
+          layout_type?: string
+          overlay_anchor?: string
+          position_x?: number
+          position_y?: number
+          panel_opacity?: number
+          panel_color?: string
           created_at?: string
           updated_at?: string
         }
@@ -495,6 +513,12 @@ export type Database = {
           alinhamento?: string
           observacoes?: string | null
           font_family?: string
+          layout_type?: string
+          overlay_anchor?: string
+          position_x?: number
+          position_y?: number
+          panel_opacity?: number
+          panel_color?: string
           created_at?: string
           updated_at?: string
         }
