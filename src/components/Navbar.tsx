@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Briefcase, TrendingUp, MoreHorizontal, Settings } from "lucide-react";
+import { LayoutDashboard, Briefcase, TrendingUp, MoreHorizontal, Settings, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FabPedido } from "./FabPedido";
 
@@ -29,7 +29,7 @@ function isNavActive(pathname: string, href: string): boolean {
 export function Navbar() {
   const pathname = usePathname();
 
-  const renderLink = ({ href, label, icon: Icon }: { href: string; label: string; icon: React.ComponentType<{ size?: number; strokeWidth?: number }> }) => {
+  const renderLink = ({ href, label, icon: Icon }: { href: string; label: string; icon: LucideIcon }) => {
     const active = isNavActive(pathname, href);
     return (
       <Link
