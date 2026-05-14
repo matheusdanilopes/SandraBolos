@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { avancarStatusAction, voltarStatusAction } from "./actions";
 import { STATUS_LABELS, type StatusPedido } from "@/types/database";
-import { Check, ChevronLeft, AlertTriangle } from "lucide-react";
+import { Check, ChevronLeft, AlertTriangle, CheckCircle2 } from "lucide-react";
 
 const STATUS_ORDER: StatusPedido[] = ["novo", "produzindo", "feito", "entregue"];
 
@@ -16,14 +16,21 @@ interface Props {
 export function StatusActions({ pedidoId, currentStatus, proximoStatus }: Props) {
   const [isPending, startTransition] = useTransition();
   const [confirmandoVoltar, setConfirmandoVoltar] = useState(false);
+  const [successMsg, setSuccessMsg] = useState("");
 
   const currentIndex = STATUS_ORDER.indexOf(currentStatus);
   const statusAnterior = currentIndex > 0 ? STATUS_ORDER[currentIndex - 1] : null;
+
+  function showSuccess(msg: string) {
+    setSuccessMsg(msg);
+    setTimeout(() => setSuccessMsg(""), 3000);
+  }
 
   function avancarStatus() {
     if (!proximoStatus) return;
     startTransition(async () => {
       await avancarStatusAction(pedidoId, proximoStatus);
+      showSuccess(`Marcado como ${STATUS_LABELS[proximoStatus]}`);
     });
   }
 
@@ -32,6 +39,7 @@ export function StatusActions({ pedidoId, currentStatus, proximoStatus }: Props)
     setConfirmandoVoltar(false);
     startTransition(async () => {
       await voltarStatusAction(pedidoId, statusAnterior);
+      showSuccess(`Voltou para ${STATUS_LABELS[statusAnterior]}`);
     });
   }
 
@@ -85,6 +93,14 @@ export function StatusActions({ pedidoId, currentStatus, proximoStatus }: Props)
         })}
       </div>
 
+      {/* Feedback de sucesso */}
+      {successMsg && (
+        <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5 text-sm text-emerald-700 font-medium">
+          <CheckCircle2 size={15} className="text-emerald-500 flex-shrink-0" />
+          {successMsg}
+        </div>
+      )}
+
       {/* Confirmação de retorno */}
       {confirmandoVoltar && statusAnterior ? (
         <div className="rounded-xl border border-orange-200 bg-orange-50 p-3 space-y-3">
@@ -100,28 +116,27 @@ export function StatusActions({ pedidoId, currentStatus, proximoStatus }: Props)
             <button
               onClick={() => setConfirmandoVoltar(false)}
               disabled={isPending}
-              className="btn-secondary flex-1 text-sm py-1.5"
+              className="btn-secondary flex-1 text-sm"
             >
               Cancelar
             </button>
             <button
               onClick={executarVoltar}
               disabled={isPending}
-              className="flex-1 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white text-sm py-1.5 px-4 rounded-lg font-medium transition-colors disabled:opacity-50"
+              className="flex-1 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white text-sm px-4 rounded-lg font-medium transition-colors disabled:opacity-50 min-h-[44px]"
             >
               {isPending ? "Voltando..." : "Sim, voltar"}
             </button>
           </div>
         </div>
       ) : (
-        /* Botões normais */
         (statusAnterior || proximoStatus) && (
           <div className="flex gap-2 pt-1">
             {statusAnterior && (
               <button
                 onClick={() => setConfirmandoVoltar(true)}
                 disabled={isPending}
-                className="btn-secondary flex-none flex items-center gap-1 text-sm px-3 py-2"
+                className="btn-secondary flex-none flex items-center gap-1.5 text-sm px-3"
               >
                 <ChevronLeft size={14} />
                 Voltar

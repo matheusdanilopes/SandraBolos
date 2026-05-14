@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ShoppingBag, Users, TrendingUp, Star, Settings, Package } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Users, TrendingUp, Settings, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const links = [
@@ -24,18 +24,21 @@ export function Navbar() {
         <Link
           href="/configuracoes"
           className={cn(
-            "p-1.5 rounded-lg transition-colors",
+            "p-2 rounded-lg transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center",
             pathname.startsWith("/configuracoes")
               ? "bg-brand-800 text-white"
               : "text-brand-200 hover:bg-brand-700 hover:text-white"
           )}
-          title="Configurações"
+          aria-label="Configurações"
         >
-          <Settings size={18} />
+          <Settings size={20} />
         </Link>
       </header>
 
-      <nav className="bg-white border-b border-gray-200 sticky top-12 z-30">
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-[0_-1px_3px_rgba(0,0,0,0.06)]"
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+      >
         <div className="max-w-2xl mx-auto flex">
           {links.map(({ href, label, icon: Icon }) => {
             const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -44,12 +47,12 @@ export function Navbar() {
                 key={href}
                 href={href}
                 className={cn(
-                  "flex-1 flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition-colors",
-                  active ? "text-brand-600 border-b-2 border-brand-600" : "text-gray-500 hover:text-gray-700"
+                  "flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[11px] font-medium transition-colors min-h-[56px]",
+                  active ? "text-brand-600" : "text-gray-400 hover:text-gray-600"
                 )}
               >
-                <Icon size={18} />
-                {label}
+                <Icon size={22} strokeWidth={active ? 2.5 : 1.75} />
+                <span>{label}</span>
               </Link>
             );
           })}

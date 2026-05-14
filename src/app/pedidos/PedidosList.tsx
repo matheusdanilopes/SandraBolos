@@ -21,6 +21,13 @@ const FILTROS: { value: Filtro; label: string }[] = [
   { value: "entregue", label: STATUS_LABELS.entregue },
 ];
 
+const STATUS_BORDER: Record<StatusPedido, string> = {
+  novo: "border-l-4 border-l-blue-400",
+  produzindo: "border-l-4 border-l-yellow-400",
+  feito: "border-l-4 border-l-green-400",
+  entregue: "border-l-4 border-l-gray-300",
+};
+
 function matchesFiltro(p: PedidoComCliente, filtro: Filtro): boolean {
   switch (filtro) {
     case "hoje": return isEntregaHoje(p.data_entrega);
@@ -57,7 +64,7 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
 
   return (
     <div className="space-y-3">
-      {/* Search */}
+      {/* Busca */}
       <div className="relative">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
@@ -70,7 +77,7 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
         {busca && (
           <button
             onClick={() => setBusca("")}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1"
             aria-label="Limpar busca"
           >
             <X size={14} />
@@ -78,50 +85,54 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
         )}
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-        {FILTROS.map(({ value, label }) => {
-          const count = filterCounts[value] ?? 0;
-          const isActive = filtro === value;
-          const isAtrasados = value === "atrasados";
-          const hasUrgent = isAtrasados && atrasadosCount > 0;
+      {/* Filtros com fade lateral indicando scroll */}
+      <div className="relative">
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
+          {FILTROS.map(({ value, label }) => {
+            const count = filterCounts[value] ?? 0;
+            const isActive = filtro === value;
+            const isAtrasados = value === "atrasados";
+            const hasUrgent = isAtrasados && atrasadosCount > 0;
 
-          return (
-            <button
-              key={value}
-              onClick={() => setFiltro(value)}
-              className={cn(
-                "flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5",
-                isActive
-                  ? hasUrgent
-                    ? "bg-red-600 text-white"
-                    : "bg-brand-600 text-white"
-                  : hasUrgent
-                  ? "bg-red-50 text-red-700 border border-red-200 hover:border-red-300"
-                  : "bg-white text-gray-600 border border-gray-200 hover:border-gray-300"
-              )}
-            >
-              {label}
-              {value !== "todos" && count > 0 && (
-                <span
-                  className={cn(
-                    "text-[10px] font-bold rounded-full px-1 min-w-[16px] text-center leading-[16px]",
-                    isActive
-                      ? "bg-white/25 text-white"
-                      : hasUrgent
-                      ? "bg-red-100 text-red-700"
-                      : "bg-gray-100 text-gray-600"
-                  )}
-                >
-                  {count}
-                </span>
-              )}
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={value}
+                onClick={() => setFiltro(value)}
+                className={cn(
+                  "flex-shrink-0 px-3 py-2 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5 min-h-[36px]",
+                  isActive
+                    ? hasUrgent
+                      ? "bg-red-600 text-white"
+                      : "bg-brand-600 text-white"
+                    : hasUrgent
+                    ? "bg-red-50 text-red-700 border border-red-200 hover:border-red-300"
+                    : "bg-white text-gray-600 border border-gray-200 hover:border-gray-300"
+                )}
+              >
+                {label}
+                {value !== "todos" && count > 0 && (
+                  <span
+                    className={cn(
+                      "text-[10px] font-bold rounded-full px-1 min-w-[16px] text-center leading-[16px]",
+                      isActive
+                        ? "bg-white/25 text-white"
+                        : hasUrgent
+                        ? "bg-red-100 text-red-700"
+                        : "bg-gray-100 text-gray-600"
+                    )}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        {/* fade lateral direito indicando scroll horizontal */}
+        <div className="pointer-events-none absolute right-0 top-0 bottom-1 w-8 bg-gradient-to-l from-gray-100 to-transparent" />
       </div>
 
-      {/* Count */}
+      {/* Contagem */}
       <p className="text-xs text-gray-500">
         {filtered.length} pedido{filtered.length !== 1 ? "s" : ""}
         {filtro === "todos" && atrasadosCount > 0 && (
@@ -131,7 +142,7 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
         )}
       </p>
 
-      {/* List */}
+      {/* Lista */}
       {filtered.length === 0 ? (
         <div className="card p-8 text-center space-y-3">
           <span className="text-3xl block">🎂</span>
@@ -157,7 +168,7 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
                 href={`/pedidos/${pedido.id}`}
                 className={cn(
                   "card p-4 block hover:shadow-md transition-all active:scale-[0.99]",
-                  isAtrasado && "border-l-4 border-l-red-400"
+                  isAtrasado ? "border-l-4 border-l-red-400" : STATUS_BORDER[pedido.status]
                 )}
               >
                 <div className="flex items-center gap-2">
