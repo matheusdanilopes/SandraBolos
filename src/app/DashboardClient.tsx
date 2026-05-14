@@ -91,7 +91,6 @@ export function DashboardClient({ pedidos, receitaMes, aReceber }: Props) {
     : filtro === "atrasados" ? grupos.atrasados
     : pedidos;
 
-  // Group by delivery date
   const porDia = filtrados.reduce((acc, p) => {
     const dia = p.data_entrega;
     if (!acc[dia]) acc[dia] = [];
@@ -101,7 +100,6 @@ export function DashboardClient({ pedidos, receitaMes, aReceber }: Props) {
 
   const diasOrdenados = Object.keys(porDia).sort();
 
-  // Within each day, group by status in workflow order
   const isFiltroStatus = filtro === "produzindo" || filtro === "feito";
 
   function toggleFiltro(f: Filtro) {
@@ -109,91 +107,114 @@ export function DashboardClient({ pedidos, receitaMes, aReceber }: Props) {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Stat cards */}
+    <div className="space-y-5">
+      {/* KPI cards */}
       <div className="grid grid-cols-2 gap-3">
         <button
           onClick={() => toggleFiltro("hoje")}
-          className={`card p-3 text-left transition-all active:scale-95 ${
+          className={`card p-4 text-left transition-all active:scale-95 ${
             filtro === "hoje" ? "ring-2 ring-brand-400 shadow-md" : "hover:shadow-md"
           }`}
         >
-          <div className="text-2xl font-bold text-brand-600">{grupos.hoje.length}</div>
-          <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-            <Package size={11} /> Entregas Hoje
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-1.5 bg-brand-50 rounded-lg">
+              <Package size={16} className="text-brand-600" />
+            </div>
+            {filtro === "hoje" && <span className="text-[10px] font-medium text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded-full">ativo</span>}
           </div>
+          <div className="text-2xl font-bold text-brand-600 leading-none">{grupos.hoje.length}</div>
+          <div className="text-xs text-gray-500 mt-1">Entregas Hoje</div>
         </button>
 
         <button
           onClick={() => toggleFiltro("produzindo")}
-          className={`card p-3 text-left transition-all active:scale-95 ${
+          className={`card p-4 text-left transition-all active:scale-95 ${
             filtro === "produzindo" ? "ring-2 ring-yellow-400 shadow-md" : "hover:shadow-md"
           }`}
         >
-          <div className="text-2xl font-bold text-yellow-600">{grupos.produzindo.length}</div>
-          <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-            <Loader size={11} /> Produzindo
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-1.5 bg-yellow-50 rounded-lg">
+              <Loader size={16} className="text-yellow-600" />
+            </div>
+            {filtro === "produzindo" && <span className="text-[10px] font-medium text-yellow-700 bg-yellow-50 px-1.5 py-0.5 rounded-full">ativo</span>}
           </div>
+          <div className="text-2xl font-bold text-yellow-600 leading-none">{grupos.produzindo.length}</div>
+          <div className="text-xs text-gray-500 mt-1">Produzindo</div>
         </button>
 
         <button
           onClick={() => toggleFiltro("feito")}
-          className={`card p-3 text-left transition-all active:scale-95 ${
+          className={`card p-4 text-left transition-all active:scale-95 ${
             filtro === "feito" ? "ring-2 ring-green-400 shadow-md" : "hover:shadow-md"
           }`}
         >
-          <div className="text-2xl font-bold text-green-600">{grupos.feito.length}</div>
-          <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-            <CheckCircle size={11} /> Prontos
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-1.5 bg-green-50 rounded-lg">
+              <CheckCircle size={16} className="text-green-600" />
+            </div>
+            {filtro === "feito" && <span className="text-[10px] font-medium text-green-700 bg-green-50 px-1.5 py-0.5 rounded-full">ativo</span>}
           </div>
+          <div className="text-2xl font-bold text-green-600 leading-none">{grupos.feito.length}</div>
+          <div className="text-xs text-gray-500 mt-1">Prontos</div>
         </button>
 
         <button
           onClick={() => toggleFiltro("atrasados")}
-          className={`card p-3 text-left transition-all active:scale-95 ${
+          className={`card p-4 text-left transition-all active:scale-95 ${
             filtro === "atrasados" ? "ring-2 ring-red-400 shadow-md" : "hover:shadow-md"
           }`}
         >
-          <div className="text-2xl font-bold text-red-600">{grupos.atrasados.length}</div>
-          <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-            <AlertTriangle size={11} /> Atrasados
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-1.5 bg-red-50 rounded-lg">
+              <AlertTriangle size={16} className="text-red-600" />
+            </div>
+            {grupos.atrasados.length > 0 && filtro !== "atrasados" && (
+              <span className="text-[10px] font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded-full">{grupos.atrasados.length}</span>
+            )}
+            {filtro === "atrasados" && <span className="text-[10px] font-medium text-red-700 bg-red-50 px-1.5 py-0.5 rounded-full">ativo</span>}
           </div>
+          <div className="text-2xl font-bold text-red-600 leading-none">{grupos.atrasados.length}</div>
+          <div className="text-xs text-gray-500 mt-1">Atrasados</div>
         </button>
       </div>
 
-      {/* Financial summary */}
+      {/* Resumo financeiro */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="card p-3">
-          <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
-            <TrendingUp size={11} className="text-emerald-500" />
+        <div className="card p-4">
+          <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2">
+            <div className="p-1 bg-emerald-50 rounded-md">
+              <TrendingUp size={12} className="text-emerald-600" />
+            </div>
             Receita do Mês
           </div>
-          <div className="text-base font-bold text-emerald-600 leading-tight">
+          <div className="text-lg font-bold text-emerald-600 leading-tight">
             {formatCurrency(receitaMes)}
           </div>
         </div>
-        <div className="card p-3">
-          <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
-            <Banknote size={11} className="text-blue-500" />
+        <div className="card p-4">
+          <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2">
+            <div className="p-1 bg-blue-50 rounded-md">
+              <Banknote size={12} className="text-blue-600" />
+            </div>
             A Receber
           </div>
-          <div className="text-base font-bold text-blue-600 leading-tight">
-            {aReceber > 0 ? formatCurrency(aReceber) : <span className="text-gray-400">—</span>}
+          <div className="text-lg font-bold text-blue-600 leading-tight">
+            {aReceber > 0 ? formatCurrency(aReceber) : <span className="text-gray-400 font-normal text-sm">Nenhum pendente</span>}
           </div>
         </div>
       </div>
 
-      {/* Filtered list */}
+      {/* Lista filtrada */}
       <div>
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-semibold text-gray-700">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-800">
             {FILTRO_LABELS[filtro]}
-            <span className="text-gray-400 font-normal ml-1">({filtrados.length})</span>
+            <span className="text-gray-400 font-normal ml-1.5">({filtrados.length})</span>
           </h2>
           {filtro !== "todos" && (
             <button
               onClick={() => setFiltro("todos")}
-              className="flex items-center gap-0.5 text-xs text-gray-400 hover:text-gray-600"
+              className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 py-1 px-2 rounded-lg hover:bg-gray-100 transition-colors"
             >
               <X size={12} /> Limpar
             </button>
@@ -211,19 +232,18 @@ export function DashboardClient({ pedidos, receitaMes, aReceber }: Props) {
             {filtro === "todos" && (
               <Link
                 href="/pedidos/novo"
-                className="btn-primary inline-flex items-center gap-1 text-sm"
+                className="btn-primary inline-flex items-center gap-1.5 text-sm"
               >
                 <Plus size={14} /> Criar Pedido
               </Link>
             )}
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-5">
             {diasOrdenados.map((dia) => {
               const { label, variant } = getDayLabel(dia);
               const pedidosDoDia = porDia[dia];
 
-              // Sub-group by status when showing "todos" or "hoje"/"atrasados"
               const mostrarSubgrupos = !isFiltroStatus;
 
               if (mostrarSubgrupos) {
@@ -235,20 +255,20 @@ export function DashboardClient({ pedidos, receitaMes, aReceber }: Props) {
 
                 return (
                   <div key={dia}>
-                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold mb-2 capitalize ${DAY_VARIANT_CLASSES[variant]}`}>
+                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold mb-3 capitalize ${DAY_VARIANT_CLASSES[variant]}`}>
                       {variant === "atrasado" && <AlertTriangle size={10} />}
                       {label}
                     </div>
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       {(Object.entries(porStatus) as [StatusPedido, PedidoComCliente[]][]).map(([status, lista]) => (
                         <div key={status}>
-                          <div className="flex items-center gap-1.5 mb-1.5 px-1">
+                          <div className="flex items-center gap-1.5 mb-2 px-1">
                             <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[status]}`} />
                             <span className="text-xs font-medium text-gray-500">
                               {STATUS_LABELS[status]} ({lista.length})
                             </span>
                           </div>
-                          <div className="space-y-1.5">
+                          <div className="space-y-2">
                             {lista.map((pedido) => (
                               <PedidoCard key={pedido.id} pedido={pedido} />
                             ))}
@@ -262,11 +282,11 @@ export function DashboardClient({ pedidos, receitaMes, aReceber }: Props) {
 
               return (
                 <div key={dia}>
-                  <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold mb-2 capitalize ${DAY_VARIANT_CLASSES[variant]}`}>
+                  <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold mb-3 capitalize ${DAY_VARIANT_CLASSES[variant]}`}>
                     {variant === "atrasado" && <AlertTriangle size={10} />}
                     {label}
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     {pedidosDoDia.map((pedido) => (
                       <PedidoCard key={pedido.id} pedido={pedido} />
                     ))}
@@ -288,14 +308,15 @@ function PedidoCard({ pedido }: { pedido: PedidoComCliente }) {
   return (
     <Link
       href={`/pedidos/${pedido.id}`}
-      className="card p-3 block hover:shadow-md transition-shadow active:bg-gray-50"
+      className="card p-3.5 block hover:shadow-md transition-shadow active:bg-gray-50"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium text-sm text-gray-900 truncate">
+          <div className="flex items-center gap-2 flex-wrap mb-1.5">
+            <span className="font-semibold text-sm text-gray-900 truncate">
               {pedido.clientes?.nome ?? "Sem cliente"}
             </span>
+            <StatusBadge status={pedido.status} />
             <AlertaBadge
               dataEntrega={pedido.data_entrega}
               status={pedido.status}
@@ -303,7 +324,7 @@ function PedidoCard({ pedido }: { pedido: PedidoComCliente }) {
               horaRetirada={pedido.hora_retirada}
             />
           </div>
-          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-gray-500">{TIPO_LABELS[pedido.tipo]}</span>
             {pedido.peso && (
               <span className="text-xs text-gray-400">{pedido.peso} kg</span>
@@ -312,7 +333,7 @@ function PedidoCard({ pedido }: { pedido: PedidoComCliente }) {
               <span className="text-xs text-gray-400">{pedido.quantidade} un.</span>
             )}
             <span className="text-gray-300">·</span>
-            <span className="text-[10px] text-gray-400">{numero}</span>
+            <span className="text-[10px] text-gray-400 font-mono">{numero}</span>
           </div>
         </div>
         {valor != null && (

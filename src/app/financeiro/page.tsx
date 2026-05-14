@@ -98,7 +98,7 @@ export default async function FinanceiroPage() {
 
   return (
     <div className="py-4 space-y-5">
-      <h1 className="text-xl font-bold text-gray-900">Financeiro</h1>
+      <h1 className="text-2xl font-bold text-gray-900">Financeiro</h1>
 
       {/* Cards 2x2 */}
       <div className="grid grid-cols-2 gap-3">
@@ -252,9 +252,9 @@ export default async function FinanceiroPage() {
                     </span>
                   </div>
                 </div>
-                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all ${isMesAtual ? "bg-emerald-400" : "bg-gray-300"}`}
+                    className={`h-full rounded-full transition-all duration-500 ${isMesAtual ? "bg-emerald-400" : "bg-gray-300"}`}
                     style={{ width: `${barWidth}%` }}
                   />
                 </div>
