@@ -253,18 +253,18 @@ export default async function FinanceiroPage() {
         </div>
       )}
 
-      {/* Toppers — resumo compacto */}
-      {mostrarToppers && (
-        <div className="card p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-sm text-gray-700">Custos com Toppers</h2>
-            <Link
-              href="/toppers"
-              className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium transition-colors"
-            >
-              Gerenciar <ArrowRight size={12} />
-            </Link>
-          </div>
+      {/* Toppers — sempre visível para garantir acesso à tela */}
+      <div className="card p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-sm text-gray-700">Custos com Toppers</h2>
+          <Link
+            href="/toppers"
+            className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium transition-colors"
+          >
+            Gerenciar <ArrowRight size={12} />
+          </Link>
+        </div>
+        {mostrarToppers ? (
           <div className="space-y-2">
             {totalToppersAPagar > 0 && (
               <div className="flex items-center justify-between py-1.5 border-b border-gray-100">
@@ -279,8 +279,10 @@ export default async function FinanceiroPage() {
               </div>
             )}
           </div>
-        </div>
-      )}
+        ) : (
+          <p className="text-xs text-gray-400">Nenhum custo com toppers este mês.</p>
+        )}
+      </div>
 
       {/* Histórico mensal */}
       <div className="card p-4 space-y-4">
