@@ -6,12 +6,15 @@ import { formatCurrency } from "@/lib/utils";
 import type { ProdutoComCategoria, UnidadeMedida, CategoriaProduto } from "@/types/database";
 import { UNIDADE_LABELS } from "@/types/database";
 import { criarProdutoAction, editarProdutoAction, toggleAtivoAction } from "./actions";
+import { CardapioVisual } from "./CardapioVisual";
+import type { CardapioConfig } from "@/types/database";
 
 const UNIDADES: UnidadeMedida[] = ["peso_kg", "cento", "unidade"];
 
 interface Props {
   produtos: ProdutoComCategoria[];
   categorias: CategoriaProduto[];
+  configCardapio: CardapioConfig | null;
 }
 
 interface EditState {
@@ -301,7 +304,7 @@ function NovoProdutoForm({ categorias }: { categorias: CategoriaProduto[] }) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export function ProdutosClient({ produtos, categorias }: Props) {
+export function ProdutosClient({ produtos, categorias, configCardapio }: Props) {
   const ativos = produtos.filter((p) => p.ativo);
   const inativos = produtos.filter((p) => !p.ativo);
   const grupos = buildGrupos(ativos, categorias);
@@ -343,6 +346,23 @@ export function ProdutosClient({ produtos, categorias }: Props) {
           <p className="text-xs mt-1">Crie produtos para usar no cálculo de itens.</p>
         </div>
       )}
+
+      {/* Cardápio Visual — preview + export only; personalization is in Configurações */}
+      <div className="border-t border-gray-100 pt-4 space-y-2">
+        <div>
+          <h2 className="text-base font-semibold text-gray-800">Cardápio Visual</h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Prévia do cardápio. Para personalizar, acesse{" "}
+            <span className="text-brand-600 font-medium">Configurações</span>.
+          </p>
+        </div>
+        <CardapioVisual
+          produtos={produtos}
+          categorias={categorias}
+          configInicial={configCardapio}
+          modoVisualizacao
+        />
+      </div>
     </div>
   );
 }

@@ -214,9 +214,10 @@ interface Props {
   produtos: ProdutoComCategoria[];
   categorias: CategoriaProduto[];
   configInicial: CardapioConfig | null;
+  modoVisualizacao?: boolean; // hides the Personalizar tab
 }
 
-export function CardapioVisual({ produtos, categorias, configInicial }: Props) {
+export function CardapioVisual({ produtos, categorias, configInicial, modoVisualizacao = false }: Props) {
   const [tab, setTab] = useState<"preview" | "config">("preview");
   const [cfg, setCfg] = useState<ConfigState>({
     bgType: (configInicial?.background_type as BgType) ?? "rosa_pastel",
@@ -426,24 +427,26 @@ export function CardapioVisual({ produtos, categorias, configInicial }: Props) {
 
   return (
     <div className="space-y-3">
-      {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
-        {(["preview", "config"] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-medium rounded-lg py-1.5 transition-colors ${
-              tab === t ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            {t === "preview" ? <><ImageIcon size={12} /> Visualizar</> : <><Settings size={12} /> Personalizar</>}
-          </button>
-        ))}
-      </div>
+      {/* Tabs — hidden in modoVisualizacao */}
+      {!modoVisualizacao && (
+        <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+          {(["preview", "config"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
+              className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-medium rounded-lg py-1.5 transition-colors ${
+                tab === t ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {t === "preview" ? <><ImageIcon size={12} /> Visualizar</> : <><Settings size={12} /> Personalizar</>}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ── Preview ── */}
-      {tab === "preview" && (
+      {(modoVisualizacao || tab === "preview") && (
         <div className="space-y-3">
           <MenuPreview cfg={cfg} grupos={grupos} />
           <button
@@ -459,7 +462,7 @@ export function CardapioVisual({ produtos, categorias, configInicial }: Props) {
       )}
 
       {/* ── Config ── */}
-      {tab === "config" && (
+      {!modoVisualizacao && tab === "config" && (
         <div className="space-y-3">
           {/* Text */}
           <div className="card p-4 space-y-3">
