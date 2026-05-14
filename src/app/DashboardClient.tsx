@@ -51,7 +51,8 @@ const STATUS_DOT: Record<StatusPedido, string> = {
 
 interface Props {
   pedidos: PedidoComCliente[];
-  receitaMes: number;
+  receitaPeriodo: number;
+  periodoLabel: string;
   aReceber: number;
 }
 
@@ -70,7 +71,7 @@ const DAY_VARIANT_CLASSES = {
   normal: "text-gray-600 bg-gray-100 border border-gray-200",
 };
 
-export function DashboardClient({ pedidos, receitaMes, aReceber }: Props) {
+export function DashboardClient({ pedidos, receitaPeriodo, periodoLabel, aReceber }: Props) {
   const [filtro, setFiltro] = useState<Filtro>("todos");
 
   const grupos = {
@@ -185,10 +186,10 @@ export function DashboardClient({ pedidos, receitaMes, aReceber }: Props) {
             <div className="p-1 bg-emerald-50 rounded-md">
               <TrendingUp size={12} className="text-emerald-600" />
             </div>
-            Receita do Mês
+            <span className="capitalize truncate">{periodoLabel}</span>
           </div>
           <div className="text-lg font-bold text-emerald-600 leading-tight">
-            {formatCurrency(receitaMes)}
+            {formatCurrency(receitaPeriodo)}
           </div>
         </div>
         <div className="card p-4">
