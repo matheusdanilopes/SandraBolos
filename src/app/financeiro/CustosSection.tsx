@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, X, ChevronUp } from "lucide-react";
 import { adicionarCustoAction, excluirCustoAction } from "./actions";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import type { CustoComCategoria, CategoriaCusto } from "@/types/database";
 
-// Paleta de cores para badges de categoria (hash pelo nome)
 const BADGE_COLORS = [
   "bg-purple-100 text-purple-700",
   "bg-blue-100 text-blue-700",
@@ -44,6 +43,14 @@ export function CustosSection({ custos, categorias }: Props) {
 
   const totalMes = custos.reduce((acc, c) => acc + c.valor, 0);
 
+  const porCategoria = custos.reduce<Record<string, number>>((acc, c) => {
+    const cat = c.categorias_custo?.nome ?? "Sem categoria";
+    acc[cat] = (acc[cat] ?? 0) + c.valor;
+    return acc;
+  }, {});
+  const categoriaEntries = Object.entries(porCategoria).sort((a, b) => b[1] - a[1]);
+  const mostrarBreakdown = categoriaEntries.length > 1;
+
   function handleAdicionar() {
     const descTrimmed = descricao.trim();
     const valorNum = parseFloat(valor);
@@ -78,16 +85,27 @@ export function CustosSection({ custos, categorias }: Props) {
   return (
     <div className="card p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-sm text-gray-700">Custos do Mês</h2>
+        <div>
+          <h2 className="font-semibold text-sm text-gray-700">Custos do Mês</h2>
+          {totalMes > 0 && (
+            <p className="text-xs text-gray-400 mt-0.5">
+              {custos.length} lançamento{custos.length !== 1 ? "s" : ""}
+            </p>
+          )}
+        </div>
         <div className="flex items-center gap-3">
           {totalMes > 0 && (
             <span className="text-sm font-bold text-rose-600">{formatCurrency(totalMes)}</span>
           )}
           <button
             onClick={() => { setShowForm((v) => !v); setErro(""); }}
-            className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700 transition-colors"
+            className={
+              showForm
+                ? "flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
+                : "flex items-center gap-1.5 text-xs font-semibold bg-brand-600 text-white px-2.5 py-1.5 rounded-lg hover:bg-brand-700 transition-colors"
+            }
           >
-            {showForm ? <><ChevronUp size={14} /> Fechar</> : <><Plus size={14} /> Adicionar</>}
+            {showForm ? <><ChevronUp size={14} /> Fechar</> : <><Plus size={14} /> Lançar custo</>}
           </button>
         </div>
       </div>
@@ -105,20 +123,8 @@ export function CustosSection({ custos, categorias }: Props) {
                 value={descricao}
                 onChange={(e) => { setDescricao(e.target.value); setErro(""); }}
                 onKeyDown={(e) => e.key === "Enter" && handleAdicionar()}
+                autoFocus
               />
-            </div>
-            <div>
-              <label className="label text-xs">Categoria</label>
-              <select
-                className="input text-sm"
-                value={categoriaId}
-                onChange={(e) => setCategoriaId(e.target.value)}
-              >
-                <option value="">Sem categoria</option>
-                {categorias.map((cat) => (
-                  <option key={cat.id} value={cat.id}>{cat.nome}</option>
-                ))}
-              </select>
             </div>
             <div>
               <label className="label text-xs">Valor (R$)</label>
@@ -132,7 +138,7 @@ export function CustosSection({ custos, categorias }: Props) {
                 onChange={(e) => { setValor(e.target.value); setErro(""); }}
               />
             </div>
-            <div className="col-span-2">
+            <div>
               <label className="label text-xs">Data</label>
               <input
                 type="date"
@@ -140,6 +146,19 @@ export function CustosSection({ custos, categorias }: Props) {
                 value={data}
                 onChange={(e) => setData(e.target.value)}
               />
+            </div>
+            <div className="col-span-2">
+              <label className="label text-xs">Categoria</label>
+              <select
+                className="input text-sm"
+                value={categoriaId}
+                onChange={(e) => setCategoriaId(e.target.value)}
+              >
+                <option value="">Sem categoria</option>
+                {categorias.map((cat) => (
+                  <option key={cat.id} value={cat.id}>{cat.nome}</option>
+                ))}
+              </select>
             </div>
           </div>
           {erro && <p className="text-xs text-red-600">{erro}</p>}
@@ -194,6 +213,17 @@ export function CustosSection({ custos, categorias }: Props) {
               </div>
             );
           })}
+
+          {/* Breakdown por categoria */}
+          {mostrarBreakdown && (
+            <div className="flex flex-wrap gap-1.5 pt-2 border-t border-gray-100">
+              {categoriaEntries.map(([cat, total]) => (
+                <span key={cat} className="text-[11px] bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
+                  {cat} · {formatCurrency(total)}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

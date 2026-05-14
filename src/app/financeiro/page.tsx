@@ -59,32 +59,31 @@ export default async function FinanceiroPage() {
   const categorias = (categoriasResult.data ?? []) as CategoriaCusto[];
   const toppers = toppersResult.data ?? [];
 
-  // Receita e ticket do mês atual
   const doMes = entregues.filter((p) => p.data_entrega >= inicioMes);
   const receitaMes = doMes.reduce((acc, p) => acc + (p.valor_cobrado ?? 0), 0);
   const ticketMedio = doMes.length > 0 ? receitaMes / doMes.length : null;
   const semValorMes = doMes.filter((p) => !p.valor_cobrado).length;
 
-  // A receber
   const aReceber = feitos.reduce(
     (acc, p) => acc + (p.preco_corrigido ?? p.valor_calculado ?? 0),
     0
   );
 
-  // Custos manuais do mês
   const totalCustosMes = custos.reduce((acc, c) => acc + c.valor, 0);
   const lucroEstimado = receitaMes - totalCustosMes;
+  const margemPct =
+    receitaMes > 0 && totalCustosMes > 0
+      ? Math.round((lucroEstimado / receitaMes) * 100)
+      : null;
 
-  // Toppers
   const totalToppersAPagar = toppers
-    .filter((t) => !t.pago_fornecedor && (t.valor + t.frete) > 0)
+    .filter((t) => !t.pago_fornecedor && t.valor + t.frete > 0)
     .reduce((acc, t) => acc + t.valor + t.frete, 0);
   const totalToppersPagosMes = toppers
     .filter((t) => t.pago_fornecedor && t.data_pagamento?.startsWith(mesCurrent))
     .reduce((acc, t) => acc + t.valor + t.frete, 0);
   const mostrarToppers = totalToppersAPagar > 0 || totalToppersPagosMes > 0;
 
-  // Resumo por mês (últimos 6)
   const mesesResumo: MesResumo[] = [];
   for (let i = 0; i <= 5; i++) {
     const inicio = startOfMonth(subMonths(hoje, i));
@@ -100,7 +99,7 @@ export default async function FinanceiroPage() {
     <div className="py-4 space-y-5">
       <h1 className="text-2xl font-bold text-gray-900">Financeiro</h1>
 
-      {/* Cards 2x2 */}
+      {/* KPIs */}
       <div className="grid grid-cols-2 gap-3">
         <div className="card p-4">
           <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2">
@@ -108,7 +107,9 @@ export default async function FinanceiroPage() {
             Receita do Mês
           </div>
           <p className="text-xl font-bold text-emerald-600">{formatCurrency(receitaMes)}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{doMes.length} pedidos entregues</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {doMes.length} pedido{doMes.length !== 1 ? "s" : ""} entregue{doMes.length !== 1 ? "s" : ""}
+          </p>
         </div>
 
         <div className="card p-4">
@@ -117,19 +118,27 @@ export default async function FinanceiroPage() {
             Custos do Mês
           </div>
           <p className="text-xl font-bold text-rose-600">{formatCurrency(totalCustosMes)}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{custos.length} lançamento{custos.length !== 1 ? "s" : ""}</p>
+          {totalToppersAPagar > 0 ? (
+            <p className="text-xs text-orange-500 mt-0.5">
+              + {formatCurrency(totalToppersAPagar)} toppers
+            </p>
+          ) : (
+            <p className="text-xs text-gray-400 mt-0.5">
+              {custos.length} lançamento{custos.length !== 1 ? "s" : ""}
+            </p>
+          )}
         </div>
 
         <div className="card p-4">
           <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2">
-            <Tag size={12} className={lucroEstimado >= 0 ? "text-blue-500" : "text-red-500"} />
+            <Tag size={12} className={lucroEstimado >= 0 ? "text-emerald-500" : "text-red-500"} />
             Lucro Estimado
           </div>
-          <p className={`text-xl font-bold ${lucroEstimado >= 0 ? "text-blue-600" : "text-red-600"}`}>
+          <p className={`text-xl font-bold ${lucroEstimado >= 0 ? "text-emerald-600" : "text-red-600"}`}>
             {formatCurrency(lucroEstimado)}
           </p>
-          {totalCustosMes === 0 ? (
-            <p className="text-xs text-gray-400 mt-0.5">Adicione custos para ver</p>
+          {margemPct !== null ? (
+            <p className="text-xs text-gray-400 mt-0.5">margem {margemPct}%</p>
           ) : (
             <p className="text-xs text-gray-400 mt-0.5">receita − custos</p>
           )}
@@ -143,55 +152,102 @@ export default async function FinanceiroPage() {
           <p className="text-xl font-bold text-gray-700">
             {ticketMedio != null ? formatCurrency(ticketMedio) : <span className="text-gray-300">—</span>}
           </p>
-          <p className="text-xs text-gray-400 mt-0.5 capitalize">
-            {format(hoje, "MMMM", { locale: ptBR })}
+          <p className="text-xs text-gray-400 mt-0.5">
+            {ticketMedio != null ? "por pedido" : "nenhuma entrega"}
           </p>
         </div>
       </div>
 
-      {/* A receber */}
-      {feitos.length > 0 && (
-        <div className="card p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-sm text-gray-700">A Receber</h2>
-            <span className="text-sm font-bold text-blue-600">{formatCurrency(aReceber)}</span>
-          </div>
-          <div className="space-y-2">
-            {feitos.map((p) => {
-              const valor = calcularValorFinal(p);
-              return (
-                <Link
-                  key={p.id}
-                  href={`/pedidos/${p.id}`}
-                  className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 -mx-1 px-1 rounded transition-colors"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">
-                      {p.clientes?.nome ?? "Sem cliente"}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {TIPO_LABELS[p.tipo]} · Entrega: {formatDate(p.data_entrega)}
-                    </p>
-                  </div>
-                  {valor != null ? (
-                    <span className="text-sm font-semibold text-blue-600">{formatCurrency(valor)}</span>
-                  ) : (
-                    <span className="text-xs text-gray-400 italic">sem valor</span>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* Lançamentos de Custos — ação operacional principal */}
+      <CustosSection custos={custos} categorias={categorias} />
 
-      {/* Aviso pedidos sem valor no mês */}
+      {/* Aviso pedidos sem valor */}
       {semValorMes > 0 && (
         <div className="flex items-start gap-2 bg-orange-50 border border-orange-200 rounded-xl p-3">
           <AlertCircle size={14} className="text-orange-500 mt-0.5 flex-shrink-0" />
           <p className="text-xs text-orange-700">
             {semValorMes} pedido{semValorMes > 1 ? "s" : ""} entregue{semValorMes > 1 ? "s" : ""} este mês sem valor registrado.
           </p>
+        </div>
+      )}
+
+      {/* Pedidos — A Receber e Entregas do Mês unificados */}
+      {(feitos.length > 0 || doMes.length > 0) && (
+        <div className="card p-4 space-y-4">
+          {feitos.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-sm text-gray-700">A Receber</h2>
+                <span className="text-sm font-bold text-blue-600">{formatCurrency(aReceber)}</span>
+              </div>
+              <div className="space-y-1">
+                {feitos.map((p) => {
+                  const valor = calcularValorFinal(p);
+                  return (
+                    <Link
+                      key={p.id}
+                      href={`/pedidos/${p.id}`}
+                      className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 -mx-1 px-1 rounded transition-colors"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">
+                          {p.clientes?.nome ?? "Sem cliente"}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {TIPO_LABELS[p.tipo]} · Entrega: {formatDate(p.data_entrega)}
+                        </p>
+                      </div>
+                      {valor != null ? (
+                        <span className="text-sm font-semibold text-blue-600">{formatCurrency(valor)}</span>
+                      ) : (
+                        <span className="text-xs text-gray-400 italic">sem valor</span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {feitos.length > 0 && doMes.length > 0 && <hr className="border-gray-100" />}
+
+          {doMes.length > 0 && (
+            <div className="space-y-2">
+              <h2 className="font-semibold text-sm text-gray-700">Entregas do Mês</h2>
+              <div className="space-y-1">
+                {doMes.map((p) => (
+                  <Link
+                    key={p.id}
+                    href={`/pedidos/${p.id}`}
+                    className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 -mx-1 px-1 rounded transition-colors"
+                  >
+                    <div className="flex items-start gap-2">
+                      {p.valor_cobrado ? (
+                        <CheckCircle size={14} className="text-emerald-500 mt-0.5 flex-shrink-0" />
+                      ) : (
+                        <AlertCircle size={14} className="text-orange-400 mt-0.5 flex-shrink-0" />
+                      )}
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">
+                          {p.clientes?.nome ?? "Sem cliente"}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {TIPO_LABELS[p.tipo]} · {formatDate(p.data_entrega)}
+                        </p>
+                      </div>
+                    </div>
+                    {p.valor_cobrado ? (
+                      <span className="text-sm font-semibold text-emerald-600">
+                        {formatCurrency(p.valor_cobrado)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-orange-500 font-medium">sem valor</span>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -223,9 +279,6 @@ export default async function FinanceiroPage() {
           </div>
         </div>
       )}
-
-      {/* Custos do Mês */}
-      <CustosSection custos={custos} categorias={categorias} />
 
       {/* Histórico mensal */}
       <div className="card p-4 space-y-4">
@@ -263,45 +316,6 @@ export default async function FinanceiroPage() {
           })}
         </div>
       </div>
-
-      {/* Entregas do mês */}
-      {doMes.length > 0 && (
-        <div className="card p-4 space-y-3">
-          <h2 className="font-semibold text-sm text-gray-700">Entregas do Mês</h2>
-          <div className="space-y-2">
-            {doMes.map((p) => (
-              <Link
-                key={p.id}
-                href={`/pedidos/${p.id}`}
-                className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 -mx-1 px-1 rounded transition-colors"
-              >
-                <div className="flex items-start gap-2">
-                  {p.valor_cobrado ? (
-                    <CheckCircle size={14} className="text-emerald-500 mt-0.5 flex-shrink-0" />
-                  ) : (
-                    <AlertCircle size={14} className="text-orange-400 mt-0.5 flex-shrink-0" />
-                  )}
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">
-                      {p.clientes?.nome ?? "Sem cliente"}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {TIPO_LABELS[p.tipo]} · {formatDate(p.data_entrega)}
-                    </p>
-                  </div>
-                </div>
-                {p.valor_cobrado ? (
-                  <span className="text-sm font-semibold text-emerald-600">
-                    {formatCurrency(p.valor_cobrado)}
-                  </span>
-                ) : (
-                  <span className="text-xs text-orange-500 font-medium">sem valor</span>
-                )}
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
 
       {entregues.length === 0 && feitos.length === 0 && (
         <div className="card p-8 text-center space-y-2">
