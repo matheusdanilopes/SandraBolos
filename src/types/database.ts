@@ -92,6 +92,7 @@ export interface CardapioConfig {
   titulo: string;
   subtitulo: string | null;
   cor_texto: string;
+  font_family: string;
   created_at: string;
   updated_at: string;
 }
@@ -397,6 +398,7 @@ export type Database = {
           titulo: string
           subtitulo: string | null
           cor_texto: string
+          font_family: string
           created_at: string
           updated_at: string
         }
@@ -408,6 +410,7 @@ export type Database = {
           titulo?: string
           subtitulo?: string | null
           cor_texto?: string
+          font_family?: string
           created_at?: string
           updated_at?: string
         }
@@ -419,6 +422,7 @@ export type Database = {
           titulo?: string
           subtitulo?: string | null
           cor_texto?: string
+          font_family?: string
           created_at?: string
           updated_at?: string
         }

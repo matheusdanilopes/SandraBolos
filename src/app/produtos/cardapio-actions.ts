@@ -12,6 +12,7 @@ interface ConfigPayload {
   titulo?: string;
   subtitulo?: string | null;
   cor_texto?: string;
+  font_family?: string;
 }
 
 export async function salvarConfigCardapio(

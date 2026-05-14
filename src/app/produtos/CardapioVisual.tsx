@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useTransition, type CSSProperties } from "react";
+import { useState, useRef, useTransition, useEffect, type CSSProperties } from "react";
 import {
   Download,
   Settings,
@@ -12,112 +12,132 @@ import { formatCurrency } from "@/lib/utils";
 import type { Produto, CardapioConfig } from "@/types/database";
 import { salvarConfigCardapio } from "./cardapio-actions";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Font library ─────────────────────────────────────────────────────────────
+
+const FONTS: Record<
+  string,
+  { label: string; stack: string; googleUrl: string | null }
+> = {
+  georgia: {
+    label: "Georgia",
+    stack: "Georgia, serif",
+    googleUrl: null,
+  },
+  playfair: {
+    label: "Playfair Display",
+    stack: "'Playfair Display', serif",
+    googleUrl:
+      "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap",
+  },
+  dancing: {
+    label: "Dancing Script",
+    stack: "'Dancing Script', cursive",
+    googleUrl:
+      "https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;700&display=swap",
+  },
+  montserrat: {
+    label: "Montserrat",
+    stack: "'Montserrat', sans-serif",
+    googleUrl:
+      "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap",
+  },
+};
+
+function injectGoogleFont(url: string) {
+  if (typeof document === "undefined") return;
+  if (document.querySelector(`link[data-gf="${url}"]`)) return;
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = url;
+  link.dataset.gf = url;
+  document.head.appendChild(link);
+}
+
+async function ensureFontReady(fontId: string) {
+  const font = FONTS[fontId];
+  if (!font) return;
+  if (font.googleUrl) injectGoogleFont(font.googleUrl);
+  await document.fonts.ready;
+  const name = font.stack.split(",")[0].replace(/'/g, "").trim();
+  try {
+    await document.fonts.load(`bold 80px "${name}"`);
+    await document.fonts.load(`400 44px "${name}"`);
+  } catch {
+    // fallback silently
+  }
+}
+
+// ─── Background library ───────────────────────────────────────────────────────
 
 type BgType = "rosa_pastel" | "kraft" | "marble" | "upload";
 
-interface ConfigState {
-  bgType: BgType;
-  bgUrl: string | null;
-  opacity: number; // 0–1
-  titulo: string;
-  subtitulo: string;
-  corTexto: string;
-}
-
-interface GradStop {
-  offset: number;
-  color: string;
-}
-
-// ─── Library backgrounds ──────────────────────────────────────────────────────
-
-const LIBRARY: Record<string, { label: string; css: string; stops: GradStop[] }> = {
+const LIBRARY: Record<string, { label: string; css: string; stops: { offset: number; color: string }[] }> = {
   rosa_pastel: {
     label: "Rosa Pastel",
     css: "linear-gradient(135deg, #f9c6d0, #f5a8b8)",
-    stops: [
-      { offset: 0, color: "#f9c6d0" },
-      { offset: 1, color: "#f5a8b8" },
-    ],
+    stops: [{ offset: 0, color: "#f9c6d0" }, { offset: 1, color: "#f5a8b8" }],
   },
   kraft: {
     label: "Papel Kraft",
     css: "linear-gradient(135deg, #d4a574, #b8843e, #a07030)",
-    stops: [
-      { offset: 0, color: "#d4a574" },
-      { offset: 0.5, color: "#b8843e" },
-      { offset: 1, color: "#a07030" },
-    ],
+    stops: [{ offset: 0, color: "#d4a574" }, { offset: 0.5, color: "#b8843e" }, { offset: 1, color: "#a07030" }],
   },
   marble: {
     label: "Mármore Branco",
     css: "linear-gradient(135deg, #f8f7f4, #ede9e0, #e8e4d8)",
-    stops: [
-      { offset: 0, color: "#f8f7f4" },
-      { offset: 0.5, color: "#ede9e0" },
-      { offset: 1, color: "#e8e4d8" },
-    ],
+    stops: [{ offset: 0, color: "#f8f7f4" }, { offset: 0.5, color: "#ede9e0" }, { offset: 1, color: "#e8e4d8" }],
   },
 };
+
+// ─── Config state ─────────────────────────────────────────────────────────────
+
+interface ConfigState {
+  bgType: BgType;
+  bgUrl: string | null;
+  opacity: number;
+  titulo: string;
+  subtitulo: string;
+  corTexto: string;
+  fontFamily: string;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getBgStyle(cfg: ConfigState): CSSProperties {
   if (cfg.bgType === "upload" && cfg.bgUrl) {
-    return {
-      backgroundImage: `url(${cfg.bgUrl})`,
-      backgroundSize: "cover",
-      backgroundPosition: "center",
-    };
+    return { backgroundImage: `url(${cfg.bgUrl})`, backgroundSize: "cover", backgroundPosition: "center" };
   }
   return { background: LIBRARY[cfg.bgType]?.css ?? LIBRARY.rosa_pastel.css };
 }
 
 function priceLabel(p: Produto): string {
-  const suffix =
-    p.unidade_medida === "peso_kg"
-      ? "/kg"
-      : p.unidade_medida === "cento"
-      ? "/cento"
-      : "/un.";
-  return `${formatCurrency(p.preco_padrao)}${suffix}`;
+  const s = p.unidade_medida === "peso_kg" ? "/kg" : p.unidade_medida === "cento" ? "/cento" : "/un.";
+  return `${formatCurrency(p.preco_padrao)}${s}`;
 }
 
 function drawGradient(
   ctx: CanvasRenderingContext2D,
   w: number,
   h: number,
-  stops: GradStop[]
+  stops: { offset: number; color: string }[]
 ) {
-  const grad = ctx.createLinearGradient(0, 0, w, h);
-  stops.forEach((s) => grad.addColorStop(s.offset, s.color));
-  ctx.fillStyle = grad;
+  const g = ctx.createLinearGradient(0, 0, w, h);
+  stops.forEach((s) => g.addColorStop(s.offset, s.color));
+  ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
 }
 
-function truncateText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  maxWidth: number
-): string {
-  if (ctx.measureText(text).width <= maxWidth) return text;
+function truncateText(ctx: CanvasRenderingContext2D, text: string, maxW: number): string {
+  if (ctx.measureText(text).width <= maxW) return text;
   let t = text;
-  while (ctx.measureText(t + "…").width > maxWidth && t.length > 0) {
-    t = t.slice(0, -1);
-  }
+  while (ctx.measureText(t + "…").width > maxW && t.length > 0) t = t.slice(0, -1);
   return t + "…";
 }
 
-// ─── Preview component (CSS-based, synced with canvas output) ─────────────────
+// ─── CSS Preview ──────────────────────────────────────────────────────────────
 
-function MenuPreview({
-  cfg,
-  produtos,
-}: {
-  cfg: ConfigState;
-  produtos: Produto[];
-}) {
+function MenuPreview({ cfg, produtos }: { cfg: ConfigState; produtos: Produto[] }) {
+  const font = FONTS[cfg.fontFamily] ?? FONTS.georgia;
   const bg = getBgStyle(cfg);
   const overlay = `rgba(255,255,255,${cfg.opacity})`;
 
@@ -126,20 +146,14 @@ function MenuPreview({
       className="relative rounded-2xl overflow-hidden w-full"
       style={{ aspectRatio: "4/5", ...bg }}
     >
-      {/* Legibility overlay */}
       <div className="absolute inset-0" style={{ backgroundColor: overlay }} />
-
-      {/* Content */}
       <div
         className="relative z-10 flex flex-col h-full p-5"
-        style={{ color: cfg.corTexto }}
+        style={{ color: cfg.corTexto, fontFamily: font.stack }}
       >
         {/* Header */}
         <div className="text-center mb-3 shrink-0">
-          <h2
-            className="text-2xl font-bold leading-tight"
-            style={{ fontFamily: "Georgia, serif" }}
-          >
+          <h2 className="text-2xl font-bold leading-tight">
             {cfg.titulo || "Cardápio"}
           </h2>
           {cfg.subtitulo && (
@@ -155,7 +169,7 @@ function MenuPreview({
           style={{ background: cfg.corTexto, opacity: 0.35 }}
         />
 
-        {/* Products list */}
+        {/* Products */}
         <div className="flex-1 space-y-2 overflow-hidden">
           {produtos.length === 0 ? (
             <p className="text-center text-xs" style={{ opacity: 0.4 }}>
@@ -180,10 +194,7 @@ function MenuPreview({
         </div>
 
         {/* Footer */}
-        <p
-          className="text-center text-[10px] mt-3 shrink-0"
-          style={{ opacity: 0.4 }}
-        >
+        <p className="text-center text-[10px] mt-3 shrink-0" style={{ opacity: 0.4 }}>
           Sandra Bolos
         </p>
       </div>
@@ -207,6 +218,7 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
     titulo: configInicial?.titulo ?? "Cardápio",
     subtitulo: configInicial?.subtitulo ?? "",
     corTexto: configInicial?.cor_texto ?? "#1f2937",
+    fontFamily: configInicial?.font_family ?? "georgia",
   });
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -215,6 +227,13 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const ativos = produtos.filter((p) => p.ativo);
+
+  // Pre-load all Google Fonts so the selector previews render correctly
+  useEffect(() => {
+    Object.values(FONTS).forEach((f) => {
+      if (f.googleUrl) injectGoogleFont(f.googleUrl);
+    });
+  }, []);
 
   function upd<K extends keyof ConfigState>(key: K, val: ConfigState[K]) {
     setCfg((prev) => ({ ...prev, [key]: val }));
@@ -225,26 +244,20 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setUploading(true);
     const fd = new FormData();
     fd.append("file", file);
     try {
-      const res = await fetch("/api/upload-background", {
-        method: "POST",
-        body: fd,
-      });
+      const res = await fetch("/api/upload-background", { method: "POST", body: fd });
       const json = (await res.json()) as { url?: string; error?: string };
-      if (json.url) {
-        setCfg((prev) => ({ ...prev, bgUrl: json.url!, bgType: "upload" }));
-      }
+      if (json.url) setCfg((prev) => ({ ...prev, bgUrl: json.url!, bgType: "upload" }));
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
     }
   }
 
-  // ── Save config ─────────────────────────────────────────────────────────────
+  // ── Save ────────────────────────────────────────────────────────────────────
 
   function handleSave() {
     startTransition(async () => {
@@ -255,6 +268,7 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
         titulo: cfg.titulo,
         subtitulo: cfg.subtitulo || null,
         cor_texto: cfg.corTexto,
+        font_family: cfg.fontFamily,
       });
       setSaveOk(true);
       setTimeout(() => setSaveOk(false), 2000);
@@ -266,8 +280,13 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
   async function handleExport() {
     setExporting(true);
     try {
+      await ensureFontReady(cfg.fontFamily);
+
+      const font = FONTS[cfg.fontFamily] ?? FONTS.georgia;
+      const fontName = font.stack.split(",")[0].replace(/'/g, "").trim();
+
       const W = 1080;
-      const H = 1350; // 4:5 — ideal for social media
+      const H = 1350;
       const canvas = document.createElement("canvas");
       canvas.width = W;
       canvas.height = H;
@@ -279,7 +298,7 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
         img.crossOrigin = "anonymous";
         await new Promise<void>((resolve) => {
           img.onload = () => resolve();
-          img.onerror = () => resolve(); // fallback on CORS failure
+          img.onerror = () => resolve();
           img.src = cfg.bgUrl!;
         });
         if (img.width > 0) {
@@ -291,12 +310,7 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
           drawGradient(ctx, W, H, LIBRARY.rosa_pastel.stops);
         }
       } else {
-        drawGradient(
-          ctx,
-          W,
-          H,
-          (LIBRARY[cfg.bgType] ?? LIBRARY.rosa_pastel).stops
-        );
+        drawGradient(ctx, W, H, (LIBRARY[cfg.bgType] ?? LIBRARY.rosa_pastel).stops);
       }
 
       // 2. Overlay
@@ -306,12 +320,11 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
       // 3. Content
       const PAD = 72;
       let y = PAD + 80;
-
       ctx.fillStyle = cfg.corTexto;
-      ctx.textAlign = "center";
 
       // Title
-      ctx.font = "bold 80px Georgia, serif";
+      ctx.font = `bold 80px "${fontName}", serif`;
+      ctx.textAlign = "center";
       ctx.fillText(cfg.titulo || "Cardápio", W / 2, y);
       y += 90;
 
@@ -319,7 +332,7 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
       if (cfg.subtitulo) {
         ctx.save();
         ctx.globalAlpha = 0.75;
-        ctx.font = "italic 42px Georgia, serif";
+        ctx.font = `italic 42px "${fontName}", serif`;
         ctx.fillText(cfg.subtitulo, W / 2, y);
         ctx.restore();
         y += 55;
@@ -339,35 +352,28 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
 
       // Products
       const ITEM_H = 72;
-      const MAX_NAME_W = W / 2 - PAD - 30;
-
       for (const p of ativos) {
         if (y + ITEM_H > H - PAD - 80) break;
 
         const pl = priceLabel(p);
 
-        // Measure price first (bold)
-        ctx.font = "bold 44px system-ui, -apple-system, sans-serif";
+        ctx.font = `bold 44px "${fontName}", sans-serif`;
         const priceW = ctx.measureText(pl).width;
 
-        // Measure & truncate name
-        ctx.font = "44px system-ui, -apple-system, sans-serif";
+        ctx.font = `400 44px "${fontName}", sans-serif`;
         const maxNW = W - PAD * 2 - priceW - 60;
-        const nameTxt = truncateText(ctx, p.nome, maxNW > MAX_NAME_W ? MAX_NAME_W : maxNW);
+        const nameTxt = truncateText(ctx, p.nome, maxNW);
         const nameW = ctx.measureText(nameTxt).width;
 
-        // Draw name
         ctx.fillStyle = cfg.corTexto;
         ctx.textAlign = "left";
         ctx.fillText(nameTxt, PAD, y);
 
-        // Draw price
-        ctx.font = "bold 44px system-ui, -apple-system, sans-serif";
+        ctx.font = `bold 44px "${fontName}", sans-serif`;
         ctx.textAlign = "right";
-        ctx.fillStyle = cfg.corTexto;
         ctx.fillText(pl, W - PAD, y);
 
-        // Dotted connector line
+        // Dotted connector
         ctx.save();
         ctx.globalAlpha = 0.2;
         ctx.strokeStyle = cfg.corTexto;
@@ -385,13 +391,12 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
       // Footer
       ctx.save();
       ctx.globalAlpha = 0.4;
-      ctx.font = "32px Georgia, serif";
+      ctx.font = `32px "${fontName}", serif`;
       ctx.textAlign = "center";
       ctx.fillStyle = cfg.corTexto;
       ctx.fillText("Sandra Bolos", W / 2, H - PAD);
       ctx.restore();
 
-      // Download
       const a = document.createElement("a");
       a.href = canvas.toDataURL("image/png", 1.0);
       a.download = "cardapio-sandra-bolos.png";
@@ -419,13 +424,9 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
             }`}
           >
             {t === "preview" ? (
-              <>
-                <ImageIcon size={12} /> Visualizar
-              </>
+              <><ImageIcon size={12} /> Visualizar</>
             ) : (
-              <>
-                <Settings size={12} /> Personalizar
-              </>
+              <><Settings size={12} /> Personalizar</>
             )}
           </button>
         ))}
@@ -450,11 +451,10 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
       {/* ── Config tab ─────────────────────────────────────────────────────── */}
       {tab === "config" && (
         <div className="space-y-3">
-          {/* Text settings */}
+
+          {/* Text */}
           <div className="card p-4 space-y-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              Texto
-            </p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Texto</p>
             <div>
               <label className="label">Título</label>
               <input
@@ -482,20 +482,46 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
                   onChange={(e) => upd("corTexto", e.target.value)}
                   className="h-9 w-12 rounded border border-gray-300 cursor-pointer p-0.5"
                 />
-                <span className="text-xs font-mono text-gray-500">
-                  {cfg.corTexto}
-                </span>
+                <span className="text-xs font-mono text-gray-500">{cfg.corTexto}</span>
               </div>
+            </div>
+          </div>
+
+          {/* Font selector */}
+          <div className="card p-4 space-y-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Fonte</p>
+            <div className="grid grid-cols-2 gap-2">
+              {Object.entries(FONTS).map(([id, font]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => upd("fontFamily", id)}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    cfg.fontFamily === id
+                      ? "border-brand-500 bg-brand-50"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <p
+                    className="text-xl leading-tight"
+                    style={{ fontFamily: font.stack }}
+                  >
+                    Abc
+                  </p>
+                  <p className="text-[10px] text-gray-500 mt-1 leading-tight">
+                    {font.label}
+                  </p>
+                  {cfg.fontFamily === id && (
+                    <span className="text-[9px] text-brand-600 font-semibold">✓ ativa</span>
+                  )}
+                </button>
+              ))}
             </div>
           </div>
 
           {/* Background */}
           <div className="card p-4 space-y-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              Fundo
-            </p>
-
-            {/* Library grid */}
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Fundo</p>
             <div className="grid grid-cols-3 gap-2">
               {Object.entries(LIBRARY).map(([id, bg]) => (
                 <button
@@ -509,10 +535,7 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
                   }`}
                   style={{ aspectRatio: "1/1" }}
                 >
-                  <div
-                    className="w-full h-full"
-                    style={{ background: bg.css }}
-                  />
+                  <div className="w-full h-full" style={{ background: bg.css }} />
                   <span className="absolute inset-x-0 bottom-0 bg-black/50 text-white text-[9px] text-center py-0.5 font-medium leading-tight">
                     {bg.label}
                   </span>
@@ -524,8 +547,6 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
                 </button>
               ))}
             </div>
-
-            {/* Custom upload */}
             <input
               ref={fileRef}
               type="file"
@@ -538,9 +559,7 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
               className={`btn-secondary w-full flex items-center justify-center gap-2 text-sm ${
-                cfg.bgType === "upload" && cfg.bgUrl
-                  ? "ring-2 ring-brand-500"
-                  : ""
+                cfg.bgType === "upload" && cfg.bgUrl ? "ring-2 ring-brand-500" : ""
               }`}
             >
               <Upload size={14} />
@@ -564,9 +583,7 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
             </p>
             <div>
               <div className="flex justify-between text-xs mb-2">
-                <span className="text-gray-600">
-                  Opacidade do overlay (branco)
-                </span>
+                <span className="text-gray-600">Opacidade do overlay (branco)</span>
                 <span className="font-semibold text-gray-800">
                   {Math.round(cfg.opacity * 100)}%
                 </span>
@@ -586,7 +603,6 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
                 <span>100% — branco total</span>
               </div>
             </div>
-
             {/* Opacity mini-preview */}
             <div
               className="relative rounded-lg overflow-hidden h-16"
@@ -594,14 +610,15 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
             >
               <div
                 className="absolute inset-0"
-                style={{
-                  background: `rgba(255,255,255,${cfg.opacity})`,
-                }}
+                style={{ background: `rgba(255,255,255,${cfg.opacity})` }}
               />
               <div className="relative z-10 h-full flex items-center justify-center">
                 <span
                   className="text-xs font-semibold"
-                  style={{ color: cfg.corTexto }}
+                  style={{
+                    color: cfg.corTexto,
+                    fontFamily: (FONTS[cfg.fontFamily] ?? FONTS.georgia).stack,
+                  }}
                 >
                   Texto de exemplo
                 </span>
@@ -609,7 +626,7 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
             </div>
           </div>
 
-          {/* Save button */}
+          {/* Save */}
           <button
             type="button"
             onClick={handleSave}
@@ -617,9 +634,7 @@ export function CardapioVisual({ produtos, configInicial }: Props) {
             className="btn-primary w-full flex items-center justify-center gap-2"
           >
             {saveOk ? (
-              <>
-                <Check size={15} /> Salvo!
-              </>
+              <><Check size={15} /> Salvo!</>
             ) : isPending ? (
               "Salvando…"
             ) : (
