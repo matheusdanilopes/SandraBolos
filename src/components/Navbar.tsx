@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ShoppingBag, Users, TrendingUp, Star, Settings } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Users, TrendingUp, Star, Settings, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/pedidos", label: "Pedidos", icon: ShoppingBag },
+  { href: "/produtos", label: "Produtos", icon: Package },
   { href: "/clientes", label: "Clientes", icon: Users },
-  { href: "/toppers", label: "Toppers", icon: Star },
   { href: "/financeiro", label: "Financeiro", icon: TrendingUp },
 ];
 

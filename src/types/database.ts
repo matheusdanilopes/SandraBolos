@@ -2,6 +2,7 @@
 export type TipoPedido = "bolo" | "doce" | "kit";
 export type StatusPedido = "novo" | "produzindo" | "feito" | "entregue";
 export type Topper = "sim" | "nao" | "brinde";
+export type UnidadeMedida = "peso_kg" | "cento" | "unidade";
 
 export interface Cliente {
   id: string;
@@ -72,6 +73,27 @@ export interface TopperPedidoComPedido extends TopperPedido {
 export interface PedidoComTopper extends Pedido {
   clientes?: { nome: string; telefone: string } | null;
   toppers_pedido?: TopperPedido | null;
+}
+
+export interface Produto {
+  id: string;
+  nome: string;
+  unidade_medida: UnidadeMedida;
+  preco_padrao: number;
+  ativo: boolean;
+  created_at: string;
+}
+
+export interface ItemPedido {
+  id: string;
+  pedido_id: string;
+  produto_id: string | null;
+  nome_produto: string;
+  unidade_medida: UnidadeMedida;
+  preco_unitario: number;
+  quantidade: number;
+  valor_total: number;
+  created_at: string;
 }
 
 export interface CategoriaCusto {
@@ -276,6 +298,84 @@ export type Database = {
           }
         ]
       }
+      produtos: {
+        Row: {
+          id: string
+          nome: string
+          unidade_medida: string
+          preco_padrao: number
+          ativo: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          nome: string
+          unidade_medida: string
+          preco_padrao?: number
+          ativo?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          nome?: string
+          unidade_medida?: string
+          preco_padrao?: number
+          ativo?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      itens_pedido: {
+        Row: {
+          id: string
+          pedido_id: string
+          produto_id: string | null
+          nome_produto: string
+          unidade_medida: string
+          preco_unitario: number
+          quantidade: number
+          valor_total: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          pedido_id: string
+          produto_id?: string | null
+          nome_produto: string
+          unidade_medida: string
+          preco_unitario: number
+          quantidade: number
+          valor_total: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          pedido_id?: string
+          produto_id?: string | null
+          nome_produto?: string
+          unidade_medida?: string
+          preco_unitario?: number
+          quantidade?: number
+          valor_total?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "itens_pedido_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "itens_pedido_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       categorias_custo: {
         Row: {
           id: string
@@ -376,4 +476,10 @@ export const TOPPER_LABELS: Record<Topper, string> = {
   sim: "Sim",
   nao: "Não",
   brinde: "Brinde",
+};
+
+export const UNIDADE_LABELS: Record<UnidadeMedida, string> = {
+  peso_kg: "Peso (Kg)",
+  cento: "Cento",
+  unidade: "Unidade",
 };
