@@ -4,12 +4,13 @@ import { supabase } from "@/lib/supabase";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AlertaBadge } from "@/components/AlertaBadge";
 import { formatDate, formatTime, formatPhone, calcularValorFinal, formatCurrency, pedidoNumero } from "@/lib/utils";
-import { TIPO_LABELS, TOPPER_LABELS, STATUS_FLOW, type PedidoComCliente } from "@/types/database";
+import { TIPO_LABELS, TOPPER_LABELS, STATUS_FLOW, type PedidoComCliente, type ItemPedido, type Produto } from "@/types/database";
 import { Edit, CheckCircle, AlertCircle, MessageCircle, Phone } from "lucide-react";
 import { StatusActions } from "./StatusActions";
 import { PrecificacaoForm } from "./PrecificacaoForm";
 import { EntregaForm } from "./EntregaForm";
 import { ImagensSection } from "./ImagensSection";
+import { ItensForm } from "./ItensForm";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,18 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
     .select("*")
     .eq("pedido_id", params.id)
     .order("created_at");
+
+  const { data: itens } = await supabase
+    .from("itens_pedido")
+    .select("*")
+    .eq("pedido_id", params.id)
+    .order("created_at");
+
+  const { data: produtos } = await supabase
+    .from("produtos")
+    .select("*")
+    .eq("ativo", true)
+    .order("nome");
 
   const cliente = pedidoTyped.clientes ?? null;
   const valorFinal = calcularValorFinal(pedidoTyped);
@@ -165,6 +178,13 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
           </div>
         )}
       </div>
+
+      {/* Itens do pedido com cálculo automático por unidade */}
+      <ItensForm
+        pedidoId={pedidoTyped.id}
+        produtos={(produtos ?? []) as Produto[]}
+        itens={(itens ?? []) as ItemPedido[]}
+      />
 
       {/* Imagens */}
       <ImagensSection pedidoId={pedidoTyped.id} imagens={imagens ?? []} driveFolderId={pedidoTyped.drive_folder_id} />
