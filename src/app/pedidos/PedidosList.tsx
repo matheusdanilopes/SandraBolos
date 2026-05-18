@@ -3,12 +3,13 @@
 import { useState, useMemo, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Search, X, ChevronRight, Calendar, FileEdit, Trash2 } from "lucide-react";
+import { Search, X, ChevronRight, Calendar, FileEdit, Trash2, LayoutList, CalendarDays } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AlertaBadge } from "@/components/AlertaBadge";
 import { cn, formatDate, isEntregaHoje, isEntregaSemana, pedidoAlerta } from "@/lib/utils";
 import { TIPO_LABELS, STATUS_LABELS, type PedidoComCliente, type StatusPedido } from "@/types/database";
 import { excluirRascunhoAction } from "./actions";
+import { PedidosCalendar } from "./PedidosCalendar";
 
 type Filtro = "todos" | "hoje" | "semana" | "atrasados" | StatusPedido;
 
@@ -58,15 +59,26 @@ function getNomeDisplay(pedido: PedidoComCliente): string {
   return pedido.clientes?.nome ?? pedido.nome_cliente ?? "Sem cliente";
 }
 
+type Visualizacao = "lista" | "calendario";
+
 export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
   const router = useRouter();
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("todos");
+  const [visualizacao, setVisualizacao] = useState<Visualizacao>("lista");
   const [confirmandoExclusaoId, setConfirmandoExclusaoId] = useState<string | null>(null);
   const [localDeleted, setLocalDeleted] = useState<Set<string>>(new Set());
   const [isPendingExclusao, startExclusaoTransition] = useTransition();
 
   const pedidosVisiveis = pedidos.filter((p) => !localDeleted.has(p.id));
+
+  const pedidosCalendario = useMemo(() => {
+    if (!busca) return pedidosVisiveis;
+    const q = busca.toLowerCase();
+    return pedidosVisiveis.filter((p) =>
+      getNomeDisplay(p).toLowerCase().includes(q)
+    );
+  }, [pedidosVisiveis, busca]);
 
   const filterCounts = useMemo(() => {
     const counts: Partial<Record<Filtro, number>> = {};
@@ -106,28 +118,64 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
   return (
     <>
       <div className="space-y-3">
-        {/* Busca */}
-        <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Buscar por cliente..."
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            className="input pl-9 pr-9"
-          />
-          {busca && (
+        {/* Busca + toggle de visualização */}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Buscar por cliente..."
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              className="input pl-9 pr-9"
+            />
+            {busca && (
+              <button
+                onClick={() => setBusca("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1"
+                aria-label="Limpar busca"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          {/* Toggle lista/calendário */}
+          <div className="flex items-center bg-white border border-gray-200 rounded-xl p-1 gap-0.5 flex-shrink-0">
             <button
-              onClick={() => setBusca("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1"
-              aria-label="Limpar busca"
+              onClick={() => setVisualizacao("lista")}
+              className={cn(
+                "p-2 rounded-lg transition-colors",
+                visualizacao === "lista"
+                  ? "bg-brand-50 text-brand-600"
+                  : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+              )}
+              aria-label="Visualização em lista"
             >
-              <X size={14} />
+              <LayoutList size={16} />
             </button>
-          )}
+            <button
+              onClick={() => setVisualizacao("calendario")}
+              className={cn(
+                "p-2 rounded-lg transition-colors",
+                visualizacao === "calendario"
+                  ? "bg-brand-50 text-brand-600"
+                  : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+              )}
+              aria-label="Visualização em calendário"
+            >
+              <CalendarDays size={16} />
+            </button>
+          </div>
         </div>
 
-        {/* Filtros */}
+        {/* Calendário */}
+        {visualizacao === "calendario" && (
+          <PedidosCalendar pedidos={pedidosCalendario} />
+        )}
+
+        {/* Filtros, contagem e lista — apenas na visualização em lista */}
+        {visualizacao === "lista" && (
+        <>
         <div className="relative">
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
             {FILTROS.map(({ value, label }) => {
@@ -189,6 +237,7 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
         </div>
 
         {/* Contagem */}
+
         <p className="text-xs text-gray-500">
           {filtered.length} pedido{filtered.length !== 1 ? "s" : ""}
           {filtro === "todos" && atrasadosCount > 0 && (
@@ -299,6 +348,8 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
               );
             })}
           </div>
+        )}
+        </>
         )}
       </div>
 
