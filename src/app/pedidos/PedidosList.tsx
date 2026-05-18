@@ -87,7 +87,7 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
   });
 
   function confirmarExclusao(pedidoId: string) {
-    setLocalDeleted((prev) => new Set([...prev, pedidoId]));
+    setLocalDeleted((prev) => new Set(prev).add(pedidoId));
     setConfirmandoExclusaoId(null);
     startExclusaoTransition(async () => {
       const result = await excluirRascunhoAction(pedidoId);
