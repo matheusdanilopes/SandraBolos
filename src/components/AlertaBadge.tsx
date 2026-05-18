@@ -9,7 +9,7 @@ interface Props {
 }
 
 export function AlertaBadge({ dataEntrega, status, horaEntrega, horaRetirada }: Props) {
-  if (status === "entregue") return null;
+  if (status === "entregue" || status === "rascunho" || status === "cancelado") return null;
   const alerta = pedidoAlerta(dataEntrega, horaEntrega, horaRetirada);
   if (!alerta) return null;
 

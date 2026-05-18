@@ -1,11 +1,25 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { avancarStatusAction, voltarStatusAction } from "./actions";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { avancarStatusAction, voltarStatusAction, cancelarPedidoAction } from "./actions";
+import { excluirRascunhoAction } from "@/app/pedidos/actions";
 import { STATUS_LABELS, type StatusPedido } from "@/types/database";
-import { Check, ChevronLeft, AlertTriangle, CheckCircle2 } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  AlertTriangle,
+  CheckCircle2,
+  FileEdit,
+  PencilLine,
+  Trash2,
+  XCircle,
+  Loader2,
+} from "lucide-react";
 
 const STATUS_ORDER: StatusPedido[] = ["novo", "produzindo", "feito", "entregue"];
+const CANCELAVEIS: StatusPedido[] = ["novo", "produzindo", "feito"];
 
 interface Props {
   pedidoId: string;
@@ -14,35 +28,152 @@ interface Props {
 }
 
 export function StatusActions({ pedidoId, currentStatus, proximoStatus }: Props) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [isPendingExclusao, startExclusaoTransition] = useTransition();
+  const [isPendingCancelamento, startCancelamentoTransition] = useTransition();
+
   const [confirmandoVoltar, setConfirmandoVoltar] = useState(false);
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
+  const [confirmandoCancelamento, setConfirmandoCancelamento] = useState(false);
+  const [motivo, setMotivo] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [erro, setErro] = useState("");
+
+  // ── Handlers definidos antes de qualquer early return ──────────────────────
+
+  const handleExcluirRascunho = () => {
+    startExclusaoTransition(async () => {
+      const result = await excluirRascunhoAction(pedidoId);
+      if (result.error) {
+        setErro(result.error);
+        setConfirmandoExclusao(false);
+      } else {
+        router.push("/pedidos");
+      }
+    });
+  };
 
   const currentIndex = STATUS_ORDER.indexOf(currentStatus);
   const statusAnterior = currentIndex > 0 ? STATUS_ORDER[currentIndex - 1] : null;
+  const podeCancelar = CANCELAVEIS.includes(currentStatus);
 
-  function showSuccess(msg: string) {
+  const showSuccess = (msg: string) => {
     setSuccessMsg(msg);
     setTimeout(() => setSuccessMsg(""), 3000);
-  }
+  };
 
-  function avancarStatus() {
+  const avancarStatus = () => {
     if (!proximoStatus) return;
     startTransition(async () => {
       await avancarStatusAction(pedidoId, proximoStatus);
       showSuccess(`Marcado como ${STATUS_LABELS[proximoStatus]}`);
     });
-  }
+  };
 
-  function executarVoltar() {
+  const executarVoltar = () => {
     if (!statusAnterior) return;
     setConfirmandoVoltar(false);
     startTransition(async () => {
       await voltarStatusAction(pedidoId, statusAnterior);
       showSuccess(`Voltou para ${STATUS_LABELS[statusAnterior]}`);
     });
+  };
+
+  const executarCancelamento = () => {
+    startCancelamentoTransition(async () => {
+      const result = await cancelarPedidoAction(pedidoId, motivo);
+      if (result.error) {
+        setErro(result.error);
+      } else {
+        setConfirmandoCancelamento(false);
+        setMotivo("");
+        router.refresh();
+      }
+    });
+  };
+
+  // ── Rascunho ────────────────────────────────────────────────────────────────
+  if (currentStatus === "rascunho") {
+    return (
+      <div className="card p-4 space-y-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+            <FileEdit size={15} className="text-amber-600" />
+          </div>
+          <div>
+            <h2 className="font-semibold text-sm text-gray-700">Rascunho</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Complete as informações para iniciar o pedido</p>
+          </div>
+        </div>
+
+        <Link
+          href={`/pedidos/${pedidoId}/editar`}
+          className="btn-primary flex items-center justify-center gap-2 text-sm"
+        >
+          <PencilLine size={14} />
+          Completar Pedido
+        </Link>
+
+        <div className="border-t border-gray-100 pt-3">
+          {!confirmandoExclusao ? (
+            <button
+              onClick={() => setConfirmandoExclusao(true)}
+              className="w-full flex items-center justify-center gap-2 text-sm text-red-500 hover:text-red-700 py-2 rounded-xl hover:bg-red-50 transition-colors font-medium"
+            >
+              <Trash2 size={14} />
+              Excluir rascunho
+            </button>
+          ) : (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 space-y-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle size={15} className="text-red-500 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-800 font-medium">Excluir este rascunho definitivamente?</p>
+              </div>
+              {erro && <p className="text-xs text-red-600">{erro}</p>}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setConfirmandoExclusao(false); setErro(""); }}
+                  disabled={isPendingExclusao}
+                  className="btn-secondary flex-1 text-sm"
+                >
+                  Não
+                </button>
+                <button
+                  onClick={handleExcluirRascunho}
+                  disabled={isPendingExclusao}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm px-4 rounded-xl font-medium transition-colors disabled:opacity-50 min-h-[44px] flex items-center justify-center gap-2"
+                >
+                  {isPendingExclusao ? (
+                    <><Loader2 size={13} className="animate-spin" /> Excluindo...</>
+                  ) : "Sim, excluir"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
   }
 
+  // ── Cancelado ───────────────────────────────────────────────────────────────
+  if (currentStatus === "cancelado") {
+    return (
+      <div className="card p-4 space-y-2">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
+            <XCircle size={15} className="text-red-600" />
+          </div>
+          <div>
+            <h2 className="font-semibold text-sm text-gray-700">Pedido Cancelado</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Este pedido foi encerrado e não pode ser reativado</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Fluxo normal ────────────────────────────────────────────────────────────
   return (
     <div className="card p-4 space-y-4">
       <h2 className="font-semibold text-sm text-gray-700">Status do Pedido</h2>
@@ -101,7 +232,7 @@ export function StatusActions({ pedidoId, currentStatus, proximoStatus }: Props)
         </div>
       )}
 
-      {/* Confirmação de retorno */}
+      {/* Confirmar retorno de status */}
       {confirmandoVoltar && statusAnterior ? (
         <div className="rounded-xl border border-orange-200 bg-orange-50 p-3 space-y-3">
           <div className="flex items-start gap-2">
@@ -153,6 +284,62 @@ export function StatusActions({ pedidoId, currentStatus, proximoStatus }: Props)
             )}
           </div>
         )
+      )}
+
+      {/* Cancelar pedido */}
+      {podeCancelar && !confirmandoVoltar && (
+        <div className="border-t border-gray-100 pt-3">
+          {!confirmandoCancelamento ? (
+            <button
+              onClick={() => { setConfirmandoCancelamento(true); setErro(""); }}
+              className="w-full flex items-center justify-center gap-2 text-sm text-gray-400 hover:text-red-500 py-2 rounded-xl hover:bg-red-50 transition-colors font-medium"
+            >
+              <XCircle size={14} />
+              Cancelar pedido
+            </button>
+          ) : (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 space-y-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle size={15} className="text-red-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm text-red-800 font-semibold">Cancelar este pedido?</p>
+                  <p className="text-xs text-red-600 mt-0.5">O histórico será preservado</p>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-red-700 font-medium mb-1">
+                  Motivo (opcional)
+                </label>
+                <textarea
+                  value={motivo}
+                  onChange={(e) => setMotivo(e.target.value)}
+                  placeholder="Ex: cliente desistiu, data mudou..."
+                  className="w-full text-sm rounded-xl border border-red-200 bg-white px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-red-300 placeholder:text-gray-400"
+                  rows={2}
+                />
+              </div>
+              {erro && <p className="text-xs text-red-700 font-medium">{erro}</p>}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setConfirmandoCancelamento(false); setMotivo(""); setErro(""); }}
+                  disabled={isPendingCancelamento}
+                  className="btn-secondary flex-1 text-sm"
+                >
+                  Voltar
+                </button>
+                <button
+                  onClick={executarCancelamento}
+                  disabled={isPendingCancelamento}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm px-4 rounded-xl font-medium transition-colors disabled:opacity-50 min-h-[44px] flex items-center justify-center gap-2"
+                >
+                  {isPendingCancelamento ? (
+                    <><Loader2 size={13} className="animate-spin" /> Cancelando...</>
+                  ) : "Confirmar cancelamento"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

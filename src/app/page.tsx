@@ -23,6 +23,7 @@ export default async function DashboardPage() {
       .from("pedidos")
       .select("*, clientes(nome, telefone)")
       .neq("status", "entregue")
+      .neq("status", "cancelado")
       .order("data_entrega", { ascending: true }),
 
     supabase

@@ -3,6 +3,45 @@
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 
+const CANCELAVEIS = ["novo", "produzindo", "feito"];
+
+export async function cancelarPedidoAction(
+  pedidoId: string,
+  motivo?: string
+): Promise<{ error?: string }> {
+  const supabase = createServerSupabaseClient();
+
+  const { data: pedido, error: fetchError } = await supabase
+    .from("pedidos")
+    .select("status, descricao")
+    .eq("id", pedidoId)
+    .single();
+
+  if (fetchError || !pedido) return { error: "Pedido não encontrado" };
+  if (!CANCELAVEIS.includes(pedido.status)) return { error: "Este pedido não pode ser cancelado" };
+
+  const dataAtual = new Date().toLocaleDateString("pt-BR");
+  const nota = motivo?.trim()
+    ? `[Cancelado em ${dataAtual} — Motivo: ${motivo.trim()}]`
+    : `[Cancelado em ${dataAtual}]`;
+
+  const novaDescricao = pedido.descricao
+    ? `${nota}\n\n${pedido.descricao}`
+    : nota;
+
+  const { error } = await supabase
+    .from("pedidos")
+    .update({ status: "cancelado", descricao: novaDescricao })
+    .eq("id", pedidoId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath(`/pedidos/${pedidoId}`);
+  revalidatePath("/pedidos");
+  revalidatePath("/");
+  return {};
+}
+
 export async function avancarStatusAction(
   pedidoId: string,
   proximoStatus: string
