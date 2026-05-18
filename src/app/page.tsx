@@ -1,8 +1,6 @@
-import Link from "next/link";
 import { cookies } from "next/headers";
 import { supabase } from "@/lib/supabase";
 import { type PedidoComCliente } from "@/types/database";
-import { Plus } from "lucide-react";
 import { DashboardClient } from "./DashboardClient";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -52,15 +50,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="py-4 space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-sm text-gray-400 capitalize">{hoje}</p>
-        </div>
-        <Link href="/pedidos/novo" className="btn-primary flex items-center gap-1.5 text-sm">
-          <Plus size={16} />
-          Novo Pedido
-        </Link>
+      <div>
+        <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
+        <p className="text-sm text-gray-400 capitalize">{hoje}</p>
       </div>
 
       <DashboardClient
