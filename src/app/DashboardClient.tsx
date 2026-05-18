@@ -28,6 +28,8 @@ import {
   Plus,
   TrendingUp,
   Banknote,
+  FileEdit,
+  ChevronRight,
 } from "lucide-react";
 
 type Filtro = "todos" | "hoje" | "produzindo" | "feito" | "atrasados";
@@ -75,11 +77,14 @@ const DAY_VARIANT_CLASSES = {
 export function DashboardClient({ pedidos, receitaPeriodo, periodoLabel, aReceber }: Props) {
   const [filtro, setFiltro] = useState<Filtro>("todos");
 
+  const rascunhos = pedidos.filter((p) => p.status === "rascunho");
+  const pedidosAtivos = pedidos.filter((p) => p.status !== "rascunho");
+
   const grupos = {
-    hoje: pedidos.filter((p) => isEntregaHoje(p.data_entrega)),
-    produzindo: pedidos.filter((p) => p.status === "produzindo"),
-    feito: pedidos.filter((p) => p.status === "feito"),
-    atrasados: pedidos.filter(
+    hoje: pedidosAtivos.filter((p) => isEntregaHoje(p.data_entrega)),
+    produzindo: pedidosAtivos.filter((p) => p.status === "produzindo"),
+    feito: pedidosAtivos.filter((p) => p.status === "feito"),
+    atrasados: pedidosAtivos.filter(
       (p) =>
         pedidoAlerta(p.data_entrega, p.hora_entrega, p.hora_retirada) === "atrasado" &&
         p.status !== "entregue"
@@ -91,7 +96,7 @@ export function DashboardClient({ pedidos, receitaPeriodo, periodoLabel, aRecebe
     : filtro === "produzindo" ? grupos.produzindo
     : filtro === "feito" ? grupos.feito
     : filtro === "atrasados" ? grupos.atrasados
-    : pedidos;
+    : pedidosAtivos;
 
   const porDia = filtrados.reduce((acc, p) => {
     const dia = p.data_entrega;
@@ -179,6 +184,25 @@ export function DashboardClient({ pedidos, receitaPeriodo, periodoLabel, aRecebe
           <div className="text-xs text-gray-500 mt-1">Atrasados</div>
         </button>
       </div>
+
+      {/* Indicador de rascunhos */}
+      {rascunhos.length > 0 && (
+        <Link
+          href="/pedidos"
+          className="flex items-center gap-3 p-3.5 bg-amber-50 border border-amber-200 rounded-xl hover:bg-amber-100 active:bg-amber-200 transition-colors"
+        >
+          <div className="w-9 h-9 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+            <FileEdit size={16} className="text-amber-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-800">
+              {rascunhos.length} rascunho{rascunhos.length !== 1 ? "s" : ""} incompleto{rascunhos.length !== 1 ? "s" : ""}
+            </p>
+            <p className="text-xs text-amber-600 mt-0.5">Toque para ver e completar</p>
+          </div>
+          <ChevronRight size={16} className="text-amber-400 flex-shrink-0" />
+        </Link>
+      )}
 
       {/* Resumo financeiro */}
       <div className="grid grid-cols-2 gap-3">
@@ -316,7 +340,7 @@ function PedidoCard({ pedido }: { pedido: PedidoComCliente }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1.5">
             <span className="font-semibold text-sm text-gray-900 truncate">
-              {pedido.clientes?.nome ?? "Sem cliente"}
+              {pedido.clientes?.nome ?? pedido.nome_cliente ?? "Sem cliente"}
             </span>
             <StatusBadge status={pedido.status} />
             <AlertaBadge
