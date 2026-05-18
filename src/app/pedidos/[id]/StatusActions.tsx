@@ -40,20 +40,61 @@ export function StatusActions({ pedidoId, currentStatus, proximoStatus }: Props)
   const [successMsg, setSuccessMsg] = useState("");
   const [erro, setErro] = useState("");
 
+  // ── Handlers definidos antes de qualquer early return ──────────────────────
+
+  const handleExcluirRascunho = () => {
+    startExclusaoTransition(async () => {
+      const result = await excluirRascunhoAction(pedidoId);
+      if (result.error) {
+        setErro(result.error);
+        setConfirmandoExclusao(false);
+      } else {
+        router.push("/pedidos");
+      }
+    });
+  };
+
+  const currentIndex = STATUS_ORDER.indexOf(currentStatus);
+  const statusAnterior = currentIndex > 0 ? STATUS_ORDER[currentIndex - 1] : null;
+  const podeCancelar = CANCELAVEIS.includes(currentStatus);
+
+  const showSuccess = (msg: string) => {
+    setSuccessMsg(msg);
+    setTimeout(() => setSuccessMsg(""), 3000);
+  };
+
+  const avancarStatus = () => {
+    if (!proximoStatus) return;
+    startTransition(async () => {
+      await avancarStatusAction(pedidoId, proximoStatus);
+      showSuccess(`Marcado como ${STATUS_LABELS[proximoStatus]}`);
+    });
+  };
+
+  const executarVoltar = () => {
+    if (!statusAnterior) return;
+    setConfirmandoVoltar(false);
+    startTransition(async () => {
+      await voltarStatusAction(pedidoId, statusAnterior);
+      showSuccess(`Voltou para ${STATUS_LABELS[statusAnterior]}`);
+    });
+  };
+
+  const executarCancelamento = () => {
+    startCancelamentoTransition(async () => {
+      const result = await cancelarPedidoAction(pedidoId, motivo);
+      if (result.error) {
+        setErro(result.error);
+      } else {
+        setConfirmandoCancelamento(false);
+        setMotivo("");
+        router.refresh();
+      }
+    });
+  };
+
   // ── Rascunho ────────────────────────────────────────────────────────────────
   if (currentStatus === "rascunho") {
-    function handleExcluirRascunho() {
-      startExclusaoTransition(async () => {
-        const result = await excluirRascunhoAction(pedidoId);
-        if (result.error) {
-          setErro(result.error);
-          setConfirmandoExclusao(false);
-        } else {
-          router.push("/pedidos");
-        }
-      });
-    }
-
     return (
       <div className="card p-4 space-y-3">
         <div className="flex items-center gap-2.5">
@@ -133,45 +174,6 @@ export function StatusActions({ pedidoId, currentStatus, proximoStatus }: Props)
   }
 
   // ── Fluxo normal ────────────────────────────────────────────────────────────
-  const currentIndex = STATUS_ORDER.indexOf(currentStatus);
-  const statusAnterior = currentIndex > 0 ? STATUS_ORDER[currentIndex - 1] : null;
-  const podeCancelar = CANCELAVEIS.includes(currentStatus);
-
-  function showSuccess(msg: string) {
-    setSuccessMsg(msg);
-    setTimeout(() => setSuccessMsg(""), 3000);
-  }
-
-  function avancarStatus() {
-    if (!proximoStatus) return;
-    startTransition(async () => {
-      await avancarStatusAction(pedidoId, proximoStatus);
-      showSuccess(`Marcado como ${STATUS_LABELS[proximoStatus]}`);
-    });
-  }
-
-  function executarVoltar() {
-    if (!statusAnterior) return;
-    setConfirmandoVoltar(false);
-    startTransition(async () => {
-      await voltarStatusAction(pedidoId, statusAnterior);
-      showSuccess(`Voltou para ${STATUS_LABELS[statusAnterior]}`);
-    });
-  }
-
-  function executarCancelamento() {
-    startCancelamentoTransition(async () => {
-      const result = await cancelarPedidoAction(pedidoId, motivo);
-      if (result.error) {
-        setErro(result.error);
-      } else {
-        setConfirmandoCancelamento(false);
-        setMotivo("");
-        router.refresh();
-      }
-    });
-  }
-
   return (
     <div className="card p-4 space-y-4">
       <h2 className="font-semibold text-sm text-gray-700">Status do Pedido</h2>
