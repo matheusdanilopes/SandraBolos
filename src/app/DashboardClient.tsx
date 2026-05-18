@@ -25,7 +25,6 @@ import {
   CheckCircle,
   AlertTriangle,
   X,
-  Plus,
   TrendingUp,
   Banknote,
   FileEdit,
@@ -256,14 +255,6 @@ export function DashboardClient({ pedidos, receitaPeriodo, periodoLabel, aRecebe
                 ? "Nenhum pedido ativo no momento"
                 : `Nenhum pedido em "${FILTRO_LABELS[filtro].toLowerCase()}"`}
             </p>
-            {filtro === "todos" && (
-              <Link
-                href="/pedidos/novo"
-                className="btn-primary inline-flex items-center gap-1.5 text-sm"
-              >
-                <Plus size={14} /> Criar Pedido
-              </Link>
-            )}
           </div>
         ) : (
           <div className="space-y-5">
