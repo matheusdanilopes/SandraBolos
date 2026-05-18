@@ -50,6 +50,7 @@ const STATUS_DOT: Record<StatusPedido, string> = {
   produzindo: "bg-yellow-400",
   feito: "bg-green-400",
   entregue: "bg-gray-300",
+  cancelado: "bg-red-300",
 };
 
 interface Props {

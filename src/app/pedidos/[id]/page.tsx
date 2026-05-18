@@ -5,7 +5,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { AlertaBadge } from "@/components/AlertaBadge";
 import { formatDate, formatTime, formatPhone, calcularValorFinal, formatCurrency, pedidoNumero } from "@/lib/utils";
 import { TIPO_LABELS, TOPPER_LABELS, STATUS_FLOW, type PedidoComCliente, type ItemPedido, type Produto } from "@/types/database";
-import { Edit, CheckCircle, AlertCircle, MessageCircle, Phone, ArrowLeft, Lock, FileEdit } from "lucide-react";
+import { Edit, CheckCircle, AlertCircle, MessageCircle, Phone, ArrowLeft, Lock, FileEdit, XCircle } from "lucide-react";
 import { StatusActions } from "./StatusActions";
 import { PrecificacaoForm } from "./PrecificacaoForm";
 import { EntregaForm } from "./EntregaForm";
@@ -60,6 +60,7 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
     ? `Retirada: ${formatDate(pedidoTyped.data_entrega)} às ${formatTime(pedidoTyped.hora_retirada)}`
     : `Entrega: ${formatDate(pedidoTyped.data_entrega)}`;
 
+  const isCancelado = pedidoTyped.status === "cancelado";
   const precisaPreco = pedidoTyped.status === "novo" || pedidoTyped.status === "produzindo";
 
   return (
@@ -118,6 +119,17 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
             <Edit size={14} />
             Completar Pedido
           </Link>
+        </div>
+      )}
+
+      {/* Banner de cancelado */}
+      {isCancelado && (
+        <div className="card p-4 bg-red-50 border-red-200 flex items-center gap-2.5">
+          <XCircle size={18} className="text-red-500 flex-shrink-0" />
+          <div>
+            <p className="text-sm text-red-800 font-semibold">Pedido cancelado</p>
+            <p className="text-xs text-red-600 mt-0.5">Histórico preservado — consulte a descrição para detalhes</p>
+          </div>
         </div>
       )}
 
@@ -234,12 +246,12 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
       <ImagensSection pedidoId={pedidoTyped.id} imagens={imagens ?? []} driveFolderId={pedidoTyped.drive_folder_id} />
 
       {/* Precificação — aparece quando status = feito ou entregue */}
-      {(pedidoTyped.status === "feito" || pedidoTyped.status === "entregue") && (
+      {!isCancelado && (pedidoTyped.status === "feito" || pedidoTyped.status === "entregue") && (
         <PrecificacaoForm pedido={pedidoTyped} />
       )}
 
       {/* Hint de precificação quando status ainda não chegou em "feito" */}
-      {precisaPreco && (
+      {!isCancelado && precisaPreco && (
         <div className="flex items-center gap-2.5 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-500">
           <Lock size={13} className="flex-shrink-0 text-gray-400" />
           Precificação disponível após marcar como <span className="font-medium text-gray-700">Feito</span>
@@ -247,7 +259,7 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
       )}
 
       {/* Entrega */}
-      {pedidoTyped.status === "entregue" && (
+      {!isCancelado && pedidoTyped.status === "entregue" && (
         <EntregaForm pedido={pedidoTyped} valorFinal={valorFinal} />
       )}
 

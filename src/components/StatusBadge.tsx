@@ -1,5 +1,5 @@
 import { type ElementType } from "react";
-import { Circle, Loader2, CheckCircle2, Package, FileEdit } from "lucide-react";
+import { Circle, Loader2, CheckCircle2, Package, FileEdit, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STATUS_COLORS, STATUS_LABELS, type StatusPedido } from "@/types/database";
 
@@ -9,6 +9,7 @@ const STATUS_ICONS: Record<StatusPedido, ElementType> = {
   produzindo: Loader2,
   feito: CheckCircle2,
   entregue: Package,
+  cancelado: XCircle,
 };
 
 export function StatusBadge({ status }: { status: StatusPedido }) {

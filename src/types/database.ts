@@ -1,6 +1,6 @@
 // App-level types used across components
 export type TipoPedido = "bolo" | "doce" | "kit";
-export type StatusPedido = "rascunho" | "novo" | "produzindo" | "feito" | "entregue";
+export type StatusPedido = "rascunho" | "novo" | "produzindo" | "feito" | "entregue" | "cancelado";
 export type Topper = "sim" | "nao" | "brinde";
 export type UnidadeMedida = "peso_kg" | "cento" | "unidade";
 
@@ -599,6 +599,7 @@ export const STATUS_LABELS: Record<StatusPedido, string> = {
   produzindo: "Produzindo",
   feito: "Feito",
   entregue: "Entregue",
+  cancelado: "Cancelado",
 };
 
 export const STATUS_FLOW: Record<StatusPedido, StatusPedido | null> = {
@@ -607,6 +608,7 @@ export const STATUS_FLOW: Record<StatusPedido, StatusPedido | null> = {
   produzindo: "feito",
   feito: "entregue",
   entregue: null,
+  cancelado: null,
 };
 
 export const STATUS_COLORS: Record<StatusPedido, string> = {
@@ -615,6 +617,7 @@ export const STATUS_COLORS: Record<StatusPedido, string> = {
   produzindo: "bg-yellow-100 text-yellow-800",
   feito: "bg-green-100 text-green-800",
   entregue: "bg-gray-100 text-gray-600",
+  cancelado: "bg-red-100 text-red-700",
 };
 
 export const TIPO_LABELS: Record<TipoPedido, string> = {
