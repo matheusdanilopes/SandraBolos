@@ -70,7 +70,10 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
   const [localDeleted, setLocalDeleted] = useState<Set<string>>(new Set());
   const [isPendingExclusao, startExclusaoTransition] = useTransition();
 
-  const pedidosVisiveis = pedidos.filter((p) => !localDeleted.has(p.id));
+  const pedidosVisiveis = useMemo(
+    () => pedidos.filter((p) => !localDeleted.has(p.id)),
+    [pedidos, localDeleted]
+  );
 
   const pedidosCalendario = useMemo(() => {
     if (!busca) return pedidosVisiveis;
@@ -92,11 +95,12 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
   const rascunhosCount = filterCounts["rascunho"] ?? 0;
   const canceladosCount = filterCounts["cancelado"] ?? 0;
 
-  const filtered = pedidosVisiveis.filter((p) => {
-    const nome = getNomeDisplay(p).toLowerCase();
-    if (busca && !nome.includes(busca.toLowerCase())) return false;
+  const buscaLower = useMemo(() => busca.toLowerCase(), [busca]);
+
+  const filtered = useMemo(() => pedidosVisiveis.filter((p) => {
+    if (busca && !getNomeDisplay(p).toLowerCase().includes(buscaLower)) return false;
     return matchesFiltro(p, filtro);
-  });
+  }), [pedidosVisiveis, buscaLower, busca, filtro]);
 
   function confirmarExclusao(pedidoId: string) {
     setLocalDeleted((prev) => new Set(prev).add(pedidoId));

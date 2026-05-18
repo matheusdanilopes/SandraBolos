@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { memo, useState, useMemo, useTransition } from "react";
 import { ChevronDown, Plus, Pencil, Check, X, ToggleLeft, ToggleRight } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import type { ProdutoComCategoria, UnidadeMedida, CategoriaProduto } from "@/types/database";
@@ -55,7 +55,7 @@ function buildGrupos(ativos: ProdutoComCategoria[], categorias: CategoriaProduto
 
 // ─── Produto Row ──────────────────────────────────────────────────────────────
 
-function ProdutoRow({
+const ProdutoRow = memo(function ProdutoRow({
   produto,
   categorias,
 }: {
@@ -207,11 +207,11 @@ function ProdutoRow({
       </button>
     </div>
   );
-}
+});
 
 // ─── Novo Produto Form ────────────────────────────────────────────────────────
 
-function NovoProdutoForm({ categorias }: { categorias: CategoriaProduto[] }) {
+const NovoProdutoForm = memo(function NovoProdutoForm({ categorias }: { categorias: CategoriaProduto[] }) {
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [nome, setNome] = useState("");
@@ -322,14 +322,14 @@ function NovoProdutoForm({ categorias }: { categorias: CategoriaProduto[] }) {
       </div>
     </form>
   );
-}
+});
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export function ProdutosClient({ produtos, categorias, configCardapio }: Props) {
-  const ativos = produtos.filter((p) => p.ativo);
-  const inativos = produtos.filter((p) => !p.ativo);
-  const grupos = buildGrupos(ativos, categorias);
+  const ativos = useMemo(() => produtos.filter((p) => p.ativo), [produtos]);
+  const inativos = useMemo(() => produtos.filter((p) => !p.ativo), [produtos]);
+  const grupos = useMemo(() => buildGrupos(ativos, categorias), [ativos, categorias]);
 
   return (
     <div className="space-y-4">
