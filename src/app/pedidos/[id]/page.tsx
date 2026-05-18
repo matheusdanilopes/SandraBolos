@@ -5,7 +5,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { AlertaBadge } from "@/components/AlertaBadge";
 import { formatDate, formatTime, formatPhone, calcularValorFinal, formatCurrency, pedidoNumero } from "@/lib/utils";
 import { TIPO_LABELS, TOPPER_LABELS, STATUS_FLOW, type PedidoComCliente, type ItemPedido, type Produto } from "@/types/database";
-import { Edit, CheckCircle, AlertCircle, MessageCircle, Phone, ArrowLeft, Lock } from "lucide-react";
+import { Edit, CheckCircle, AlertCircle, MessageCircle, Phone, ArrowLeft, Lock, FileEdit } from "lucide-react";
 import { StatusActions } from "./StatusActions";
 import { PrecificacaoForm } from "./PrecificacaoForm";
 import { EntregaForm } from "./EntregaForm";
@@ -80,7 +80,9 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
         <div>
           <p className="text-[10px] text-gray-400 font-mono mb-0.5">{numero}</p>
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-xl font-bold text-gray-900">{cliente?.nome ?? "Sem cliente"}</h1>
+            <h1 className="text-xl font-bold text-gray-900">
+              {cliente?.nome ?? pedidoTyped.nome_cliente ?? "Sem cliente"}
+            </h1>
             <StatusBadge status={pedidoTyped.status} />
             <AlertaBadge
               dataEntrega={pedidoTyped.data_entrega}
@@ -98,6 +100,26 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
           <Edit size={14} /> Editar
         </Link>
       </div>
+
+      {/* Banner de rascunho */}
+      {pedidoTyped.status === "rascunho" && (
+        <div className="card p-4 bg-amber-50 border-amber-200 space-y-3">
+          <div className="flex items-center gap-2.5">
+            <FileEdit size={18} className="text-amber-500 flex-shrink-0" />
+            <div>
+              <p className="text-sm text-amber-800 font-semibold">Pedido incompleto</p>
+              <p className="text-xs text-amber-600 mt-0.5">Complete as informações para iniciar o fluxo</p>
+            </div>
+          </div>
+          <Link
+            href={`/pedidos/${pedidoTyped.id}/editar`}
+            className="btn-primary flex items-center justify-center gap-2 text-sm"
+          >
+            <Edit size={14} />
+            Completar Pedido
+          </Link>
+        </div>
+      )}
 
       {/* Banner de pagamento */}
       {isPago && (
@@ -117,7 +139,7 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
       )}
 
       {/* Cliente info */}
-      {cliente && (
+      {cliente ? (
         <div className="card p-4">
           <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-3">Cliente</p>
           <p className="font-semibold text-sm text-gray-900 mb-3">{cliente.nome}</p>
@@ -142,7 +164,13 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
             )}
           </div>
         </div>
-      )}
+      ) : pedidoTyped.nome_cliente ? (
+        <div className="card p-4">
+          <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-3">Cliente</p>
+          <p className="font-semibold text-sm text-gray-900">{pedidoTyped.nome_cliente}</p>
+          <p className="text-xs text-gray-400 mt-1">Cadastro incompleto · Vincule ao completar o pedido</p>
+        </div>
+      ) : null}
 
       {/* Detalhes */}
       <div className="card p-4 space-y-3">

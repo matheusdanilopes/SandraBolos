@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { Search, X, ChevronRight, Calendar } from "lucide-react";
+import { Search, X, ChevronRight, Calendar, FileEdit } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AlertaBadge } from "@/components/AlertaBadge";
 import { cn, formatDate, isEntregaHoje, isEntregaSemana, pedidoAlerta } from "@/lib/utils";
@@ -12,6 +12,7 @@ type Filtro = "todos" | "hoje" | "semana" | "atrasados" | StatusPedido;
 
 const FILTROS: { value: Filtro; label: string }[] = [
   { value: "todos", label: "Todos" },
+  { value: "rascunho", label: "Rascunhos" },
   { value: "hoje", label: "Hoje" },
   { value: "semana", label: "Semana" },
   { value: "atrasados", label: "Atrasados" },
@@ -22,6 +23,7 @@ const FILTROS: { value: Filtro; label: string }[] = [
 ];
 
 const STATUS_BORDER: Record<StatusPedido, string> = {
+  rascunho: "border-l-4 border-l-amber-400",
   novo: "border-l-4 border-l-blue-400",
   produzindo: "border-l-4 border-l-yellow-400",
   feito: "border-l-4 border-l-green-400",
@@ -30,16 +32,21 @@ const STATUS_BORDER: Record<StatusPedido, string> = {
 
 function matchesFiltro(p: PedidoComCliente, filtro: Filtro): boolean {
   switch (filtro) {
-    case "hoje": return isEntregaHoje(p.data_entrega);
-    case "semana": return isEntregaSemana(p.data_entrega);
+    case "hoje": return isEntregaHoje(p.data_entrega) && p.status !== "rascunho";
+    case "semana": return isEntregaSemana(p.data_entrega) && p.status !== "rascunho";
     case "atrasados":
       return (
         pedidoAlerta(p.data_entrega, p.hora_entrega, p.hora_retirada) === "atrasado" &&
-        p.status !== "entregue"
+        p.status !== "entregue" &&
+        p.status !== "rascunho"
       );
     case "todos": return true;
     default: return p.status === filtro;
   }
+}
+
+function getNomeDisplay(pedido: PedidoComCliente): string {
+  return pedido.clientes?.nome ?? pedido.nome_cliente ?? "Sem cliente";
 }
 
 export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
@@ -55,9 +62,10 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
   }, [pedidos]);
 
   const atrasadosCount = filterCounts["atrasados"] ?? 0;
+  const rascunhosCount = filterCounts["rascunho"] ?? 0;
 
   const filtered = pedidos.filter((p) => {
-    const nome = p.clientes?.nome?.toLowerCase() ?? "";
+    const nome = getNomeDisplay(p).toLowerCase();
     if (busca && !nome.includes(busca.toLowerCase())) return false;
     return matchesFiltro(p, filtro);
   });
@@ -85,14 +93,16 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
         )}
       </div>
 
-      {/* Filtros com fade lateral indicando scroll */}
+      {/* Filtros */}
       <div className="relative">
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
           {FILTROS.map(({ value, label }) => {
             const count = filterCounts[value] ?? 0;
             const isActive = filtro === value;
             const isAtrasados = value === "atrasados";
+            const isRascunho = value === "rascunho";
             const hasUrgent = isAtrasados && atrasadosCount > 0;
+            const hasDraft = isRascunho && rascunhosCount > 0;
 
             return (
               <button
@@ -103,9 +113,13 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
                   isActive
                     ? hasUrgent
                       ? "bg-red-600 text-white"
+                      : hasDraft
+                      ? "bg-amber-500 text-white"
                       : "bg-brand-600 text-white"
                     : hasUrgent
                     ? "bg-red-50 text-red-700 border border-red-200 hover:border-red-300"
+                    : hasDraft
+                    ? "bg-amber-50 text-amber-700 border border-amber-200 hover:border-amber-300"
                     : "bg-white text-gray-600 border border-gray-200 hover:border-gray-300"
                 )}
               >
@@ -118,6 +132,8 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
                         ? "bg-white/25 text-white"
                         : hasUrgent
                         ? "bg-red-100 text-red-700"
+                        : hasDraft
+                        ? "bg-amber-100 text-amber-700"
                         : "bg-gray-100 text-gray-600"
                     )}
                   >
@@ -128,7 +144,6 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
             );
           })}
         </div>
-        {/* fade lateral direito indicando scroll horizontal */}
         <div className="pointer-events-none absolute right-0 top-0 bottom-1 w-8 bg-gradient-to-l from-gray-100 to-transparent" />
       </div>
 
@@ -138,6 +153,11 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
         {filtro === "todos" && atrasadosCount > 0 && (
           <span className="text-red-600 font-medium ml-1">
             · {atrasadosCount} atrasado{atrasadosCount !== 1 ? "s" : ""}
+          </span>
+        )}
+        {filtro === "todos" && rascunhosCount > 0 && (
+          <span className="text-amber-600 font-medium ml-1">
+            · {rascunhosCount} rascunho{rascunhosCount !== 1 ? "s" : ""}
           </span>
         )}
       </p>
@@ -156,8 +176,9 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
       ) : (
         <div className="space-y-2">
           {filtered.map((pedido) => {
+            const isRascunho = pedido.status === "rascunho";
             const alerta =
-              pedido.status !== "entregue"
+              !isRascunho && pedido.status !== "entregue"
                 ? pedidoAlerta(pedido.data_entrega, pedido.hora_entrega, pedido.hora_retirada)
                 : null;
             const isAtrasado = alerta === "atrasado";
@@ -175,18 +196,28 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1.5">
                       <span className="font-semibold text-sm text-gray-900">
-                        {pedido.clientes?.nome ?? "Sem cliente"}
+                        {getNomeDisplay(pedido)}
                       </span>
                       <StatusBadge status={pedido.status} />
-                      <AlertaBadge
-                        dataEntrega={pedido.data_entrega}
-                        status={pedido.status}
-                        horaEntrega={pedido.hora_entrega}
-                        horaRetirada={pedido.hora_retirada}
-                      />
+                      {!isRascunho && (
+                        <AlertaBadge
+                          dataEntrega={pedido.data_entrega}
+                          status={pedido.status}
+                          horaEntrega={pedido.hora_entrega}
+                          horaRetirada={pedido.hora_retirada}
+                        />
+                      )}
+                      {isRascunho && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-600 border border-amber-200">
+                          <FileEdit size={8} />
+                          Incompleto
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-gray-500 flex-wrap">
-                      <span className="font-medium">{TIPO_LABELS[pedido.tipo]}</span>
+                      {!isRascunho && (
+                        <span className="font-medium">{TIPO_LABELS[pedido.tipo]}</span>
+                      )}
                       {pedido.peso && <span>{pedido.peso}kg</span>}
                       {pedido.quantidade && <span>{pedido.quantidade} un.</span>}
                       <span className="flex items-center gap-0.5">

@@ -43,6 +43,7 @@ const FILTRO_LABELS: Record<Filtro, string> = {
 const STATUS_ORDER: StatusPedido[] = ["novo", "produzindo", "feito", "entregue"];
 
 const STATUS_DOT: Record<StatusPedido, string> = {
+  rascunho: "bg-amber-400",
   novo: "bg-blue-400",
   produzindo: "bg-yellow-400",
   feito: "bg-green-400",

@@ -84,6 +84,38 @@ export async function criarPedidoAction(
   redirect(`/pedidos/${novoPedido.id}`);
 }
 
+export async function criarPedidoRapidoAction(data: {
+  nomeCliente: string;
+  descricao?: string;
+  valorEstimado?: number;
+  dataEntrega?: string;
+}): Promise<{ pedidoId?: string; error?: string }> {
+  const supabase = createServerSupabaseClient();
+
+  const hoje = new Date().toISOString().split("T")[0];
+
+  const { data: novoPedido, error } = await supabase
+    .from("pedidos")
+    .insert({
+      nome_cliente: data.nomeCliente.trim(),
+      data_entrega: data.dataEntrega || hoje,
+      tipo: "bolo",
+      descricao: data.descricao?.trim() || null,
+      topper: "nao",
+      preco_corrigido: data.valorEstimado ?? null,
+      status: "rascunho",
+    })
+    .select()
+    .single();
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/pedidos");
+  revalidatePath("/");
+
+  return { pedidoId: novoPedido.id };
+}
+
 export async function editarPedidoAction(
   pedidoId: string,
   data: Pick<PedidoPayload, "tipo" | "dataEntrega" | "horaEntrega" | "horaRetirada" | "descricao" | "topper" | "peso" | "quantidade">

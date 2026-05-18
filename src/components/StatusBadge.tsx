@@ -1,13 +1,15 @@
-import { Circle, Loader2, CheckCircle2, Package } from "lucide-react";
+import { type ElementType } from "react";
+import { Circle, Loader2, CheckCircle2, Package, FileEdit } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STATUS_COLORS, STATUS_LABELS, type StatusPedido } from "@/types/database";
 
-const STATUS_ICONS = {
+const STATUS_ICONS: Record<StatusPedido, ElementType> = {
+  rascunho: FileEdit,
   novo: Circle,
   produzindo: Loader2,
   feito: CheckCircle2,
   entregue: Package,
-} as const;
+};
 
 export function StatusBadge({ status }: { status: StatusPedido }) {
   const Icon = STATUS_ICONS[status];

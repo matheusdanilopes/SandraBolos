@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { avancarStatusAction, voltarStatusAction } from "./actions";
 import { STATUS_LABELS, type StatusPedido } from "@/types/database";
-import { Check, ChevronLeft, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Check, ChevronLeft, AlertTriangle, CheckCircle2, FileEdit, PencilLine } from "lucide-react";
 
 const STATUS_ORDER: StatusPedido[] = ["novo", "produzindo", "feito", "entregue"];
 
@@ -17,6 +18,29 @@ export function StatusActions({ pedidoId, currentStatus, proximoStatus }: Props)
   const [isPending, startTransition] = useTransition();
   const [confirmandoVoltar, setConfirmandoVoltar] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
+
+  if (currentStatus === "rascunho") {
+    return (
+      <div className="card p-4 space-y-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+            <FileEdit size={15} className="text-amber-600" />
+          </div>
+          <div>
+            <h2 className="font-semibold text-sm text-gray-700">Rascunho</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Complete as informações para iniciar o pedido</p>
+          </div>
+        </div>
+        <Link
+          href={`/pedidos/${pedidoId}/editar`}
+          className="btn-primary flex items-center justify-center gap-2 text-sm"
+        >
+          <PencilLine size={14} />
+          Completar Pedido
+        </Link>
+      </div>
+    );
+  }
 
   const currentIndex = STATUS_ORDER.indexOf(currentStatus);
   const statusAnterior = currentIndex > 0 ? STATUS_ORDER[currentIndex - 1] : null;
