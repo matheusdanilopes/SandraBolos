@@ -7,12 +7,14 @@ import { ComercialTabs } from "@/components/ComercialTabs";
 import { cookies } from "next/headers";
 import { isValidPreset } from "@/lib/periodo";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], display: "swap", preload: true });
 
 export const viewport: Viewport = {
   themeColor: "#db2777",
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export const metadata: Metadata = {

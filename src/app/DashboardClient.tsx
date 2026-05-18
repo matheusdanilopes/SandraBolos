@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { memo, useState, useMemo, useCallback } from "react";
 import {
   format,
   isToday,
@@ -77,10 +77,10 @@ const DAY_VARIANT_CLASSES = {
 export function DashboardClient({ pedidos, receitaPeriodo, periodoLabel, aReceber }: Props) {
   const [filtro, setFiltro] = useState<Filtro>("todos");
 
-  const rascunhos = pedidos.filter((p) => p.status === "rascunho");
-  const pedidosAtivos = pedidos.filter((p) => p.status !== "rascunho");
+  const rascunhos = useMemo(() => pedidos.filter((p) => p.status === "rascunho"), [pedidos]);
+  const pedidosAtivos = useMemo(() => pedidos.filter((p) => p.status !== "rascunho"), [pedidos]);
 
-  const grupos = {
+  const grupos = useMemo(() => ({
     hoje: pedidosAtivos.filter((p) => isEntregaHoje(p.data_entrega)),
     produzindo: pedidosAtivos.filter((p) => p.status === "produzindo"),
     feito: pedidosAtivos.filter((p) => p.status === "feito"),
@@ -89,29 +89,30 @@ export function DashboardClient({ pedidos, receitaPeriodo, periodoLabel, aRecebe
         pedidoAlerta(p.data_entrega, p.hora_entrega, p.hora_retirada) === "atrasado" &&
         p.status !== "entregue"
     ),
-  };
+  }), [pedidosAtivos]);
 
-  const filtrados =
+  const filtrados = useMemo(() => (
     filtro === "hoje" ? grupos.hoje
     : filtro === "produzindo" ? grupos.produzindo
     : filtro === "feito" ? grupos.feito
     : filtro === "atrasados" ? grupos.atrasados
-    : pedidosAtivos;
+    : pedidosAtivos
+  ), [filtro, grupos, pedidosAtivos]);
 
-  const porDia = filtrados.reduce((acc, p) => {
+  const porDia = useMemo(() => filtrados.reduce((acc, p) => {
     const dia = p.data_entrega;
     if (!acc[dia]) acc[dia] = [];
     acc[dia].push(p);
     return acc;
-  }, {} as Record<string, PedidoComCliente[]>);
+  }, {} as Record<string, PedidoComCliente[]>), [filtrados]);
 
-  const diasOrdenados = Object.keys(porDia).sort();
+  const diasOrdenados = useMemo(() => Object.keys(porDia).sort(), [porDia]);
 
   const isFiltroStatus = filtro === "produzindo" || filtro === "feito";
 
-  function toggleFiltro(f: Filtro) {
+  const toggleFiltro = useCallback((f: Filtro) => {
     setFiltro((prev) => (prev === f ? "todos" : f));
-  }
+  }, []);
 
   return (
     <div className="space-y-5">
@@ -319,7 +320,7 @@ export function DashboardClient({ pedidos, receitaPeriodo, periodoLabel, aRecebe
   );
 }
 
-function PedidoCard({ pedido }: { pedido: PedidoComCliente }) {
+const PedidoCard = memo(function PedidoCard({ pedido }: { pedido: PedidoComCliente }) {
   const valor = calcularValorFinal(pedido);
   const numero = pedidoNumero(pedido.created_at, pedido.id);
 
@@ -362,4 +363,4 @@ function PedidoCard({ pedido }: { pedido: PedidoComCliente }) {
       </div>
     </Link>
   );
-}
+});

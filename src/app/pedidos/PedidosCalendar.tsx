@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { memo, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import {
   startOfMonth,
@@ -78,23 +78,24 @@ export function PedidosCalendar({ pedidos }: Props) {
     return eachDayOfInterval({ start, end });
   }, [currentDate]);
 
-  function navPrev() {
+  const navPrev = useCallback(() => {
     setSelectedDay(null);
     setCurrentDate((d) => (calView === "mes" ? subMonths(d, 1) : subWeeks(d, 1)));
-  }
-  function navNext() {
+  }, [calView]);
+
+  const navNext = useCallback(() => {
     setSelectedDay(null);
     setCurrentDate((d) => (calView === "mes" ? addMonths(d, 1) : addWeeks(d, 1)));
-  }
+  }, [calView]);
 
-  function switchView(v: CalView) {
+  const switchView = useCallback((v: CalView) => {
     setCalView(v);
     setSelectedDay(null);
-  }
+  }, []);
 
-  function toggleDay(day: Date) {
+  const toggleDay = useCallback((day: Date) => {
     setSelectedDay((prev) => (prev && isSameDay(prev, day) ? null : day));
-  }
+  }, []);
 
   const navLabel =
     calView === "mes"
@@ -390,7 +391,7 @@ export function PedidosCalendar({ pedidos }: Props) {
   );
 }
 
-function PedidoCalCard({ pedido }: { pedido: PedidoComCliente }) {
+const PedidoCalCard = memo(function PedidoCalCard({ pedido }: { pedido: PedidoComCliente }) {
   const valor = calcularValorFinal(pedido);
   const alerta = pedidoAlerta(
     pedido.data_entrega,
@@ -434,4 +435,4 @@ function PedidoCalCard({ pedido }: { pedido: PedidoComCliente }) {
       )}
     </Link>
   );
-}
+});
