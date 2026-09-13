@@ -4,6 +4,7 @@ import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { PeriodoBar } from "@/components/PeriodoBar";
 import { ComercialTabs } from "@/components/ComercialTabs";
+import { InstalarApp } from "@/components/InstalarApp";
 import { cookies } from "next/headers";
 import { isValidPreset } from "@/lib/periodo";
 
@@ -20,6 +21,18 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "Sandra Bolos",
   description: "Gestão de pedidos de confeitaria",
+  applicationName: "Sandra Bolos",
+  manifest: "/manifest.webmanifest",
+  // PNGs estáticos e opacos: o iOS descarta apple-touch-icon com transparência
+  // (cantos arredondados) e mostra um monograma no lugar do ícone.
+  icons: {
+    icon: [
+      { url: "/icon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   appleWebApp: {
     capable: true,
     title: "Sandra Bolos",
@@ -27,6 +40,10 @@ export const metadata: Metadata = {
   },
   formatDetection: {
     telephone: false,
+  },
+  other: {
+    // Equivalente padronizado do apple-mobile-web-app-capable, lido pelo Chrome.
+    "mobile-web-app-capable": "yes",
   },
 };
 
@@ -48,6 +65,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {children}
           </main>
         </div>
+        <InstalarApp />
       </body>
     </html>
   );
