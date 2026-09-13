@@ -26,6 +26,8 @@ interface PedidoPayload {
   descricao?: string;
   topper: Topper;
   topperDetalhes?: TopperDetalhesPayload;
+  /** Valor do topper de brinde — receita do pedido, não custo de fornecedor. */
+  valorBrinde?: number | null;
   peso?: number | null;
   quantidade?: number | null;
   itens?: ItemPayload[];
@@ -39,6 +41,17 @@ interface TopperDetalhesPayload {
 }
 
 type SupabaseServerClient = ReturnType<typeof createServerSupabaseClient>;
+
+/**
+ * Valor do brinde a gravar no pedido.
+ *
+ * Só faz sentido com topper "brinde": trocar a opção depois não pode deixar para
+ * trás uma receita de um brinde que não existe mais.
+ */
+function valorBrindeDoPedido(topper: Topper, valor?: number | null): number | null {
+  if (topper !== "brinde") return null;
+  return valor && valor > 0 ? valor : null;
+}
 
 /** Ficha de topper que ninguém preencheu ainda — nada a perder se for descartada. */
 function fichaEmBranco(ficha: TopperPedido): boolean {
@@ -60,6 +73,9 @@ function fichaEmBranco(ficha: TopperPedido): boolean {
  * recebido/pago) e o custo no financeiro. Antes ela só nascia quando alguém
  * abria /toppers e salvava algo — até lá o pedido com topper "sim" aparecia lá
  * em branco, sem nada para acompanhar. Agora o registro do pedido já a cria.
+ *
+ * Só vale para "sim": brinde não é compra de fornecedor e não entra na tela de
+ * Toppers.
  */
 async function sincronizarTopperPedido(
   supabase: SupabaseServerClient,
@@ -79,9 +95,10 @@ async function sincronizarTopperPedido(
 
   const ficha = fichaAtual as TopperPedido | null;
 
-  if (topper === "nao") {
-    // Topper desmarcado: descarta a ficha apenas se ainda estiver em branco.
-    // Apagar valores ou pagamento já registrados tiraria custo do financeiro.
+  if (topper !== "sim") {
+    // Topper desmarcado ou virou brinde: descarta a ficha apenas se ainda
+    // estiver em branco. Apagar valores ou pagamento já registrados tiraria
+    // custo do financeiro.
     if (ficha && fichaEmBranco(ficha)) {
       const { error } = await supabase.from("toppers_pedido").delete().eq("pedido_id", pedidoId);
       if (error) return { error: mensagemErro(error) };
@@ -135,6 +152,7 @@ export async function criarPedidoAction(
       tipo: data.tipo,
       descricao: data.descricao || null,
       topper: data.topper,
+      valor_brinde: valorBrindeDoPedido(data.topper, data.valorBrinde),
       peso: data.peso ?? null,
       quantidade: data.quantidade ?? null,
       status: "novo",
@@ -158,11 +176,11 @@ export async function criarPedidoAction(
     );
   }
 
-  // Topper "sim"/"brinde" nasce com ficha própria, para o pedido já entrar na
-  // tela de Toppers com o que foi informado aqui. Sem bloquear a criação: o
-  // pedido já está gravado e o redirect não pode ser abortado por causa da
-  // ficha, que continua editável em /toppers.
-  if (data.topper !== "nao") {
+  // Topper "sim" nasce com ficha própria, para o pedido já entrar na tela de
+  // Toppers com o que foi informado aqui. Sem bloquear a criação: o pedido já
+  // está gravado e o redirect não pode ser abortado por causa da ficha, que
+  // continua editável em /toppers.
+  if (data.topper === "sim") {
     await sincronizarTopperPedido(supabase, novoPedido.id, data.topper, data.topperDetalhes);
     revalidatePath("/toppers");
     revalidatePath("/financeiro");
@@ -236,7 +254,7 @@ export async function criarPedidoRapidoAction(data: {
 
 export async function editarPedidoAction(
   pedidoId: string,
-  data: Pick<PedidoPayload, "tipo" | "dataEntrega" | "horaEntrega" | "horaRetirada" | "descricao" | "topper" | "topperDetalhes" | "peso" | "quantidade">
+  data: Pick<PedidoPayload, "tipo" | "dataEntrega" | "horaEntrega" | "horaRetirada" | "descricao" | "topper" | "topperDetalhes" | "valorBrinde" | "peso" | "quantidade">
 ): Promise<{ error?: string }> {
   const supabase = createServerSupabaseClient();
   const { error } = await supabase
@@ -248,6 +266,7 @@ export async function editarPedidoAction(
       tipo: data.tipo,
       descricao: data.descricao || null,
       topper: data.topper,
+      valor_brinde: valorBrindeDoPedido(data.topper, data.valorBrinde),
       peso: data.peso ?? null,
       quantidade: data.quantidade ?? null,
     })

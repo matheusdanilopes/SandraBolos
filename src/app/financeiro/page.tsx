@@ -25,7 +25,7 @@ export default async function FinanceiroPage() {
     await Promise.all([
       supabase
         .from("pedidos")
-        .select("data_entrega, valor_cobrado, valor_calculado, preco_corrigido, tipo, id, created_at, clientes(nome)")
+        .select("data_entrega, valor_cobrado, valor_calculado, preco_corrigido, valor_brinde, tipo, id, created_at, clientes(nome)")
         .eq("status", "entregue")
         .gte("data_entrega", periodo.inicio)
         .lte("data_entrega", periodo.fim)
@@ -33,7 +33,7 @@ export default async function FinanceiroPage() {
 
       supabase
         .from("pedidos")
-        .select("id, data_entrega, valor_calculado, preco_corrigido, tipo, created_at, clientes(nome)")
+        .select("id, data_entrega, valor_calculado, preco_corrigido, valor_brinde, tipo, created_at, clientes(nome)")
         .eq("status", "feito")
         .order("data_entrega", { ascending: true }),
 
@@ -73,10 +73,7 @@ export default async function FinanceiroPage() {
   const ticketMedio = entregues.length > 0 ? receitaPeriodo / entregues.length : null;
   const semValor = entregues.filter((p) => !p.valor_cobrado).length;
 
-  const aReceber = feitos.reduce(
-    (acc, p) => acc + (p.preco_corrigido ?? p.valor_calculado ?? 0),
-    0
-  );
+  const aReceber = feitos.reduce((acc, p) => acc + (calcularValorFinal(p) ?? 0), 0);
 
   const totalCustosLancados = custos.reduce((acc, c) => acc + c.valor, 0);
 

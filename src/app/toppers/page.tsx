@@ -11,7 +11,9 @@ export default async function ToppersPage() {
   const { data: pedidos, error } = await supabase
     .from("pedidos")
     .select("*, clientes(nome, telefone), toppers_pedido(*)")
-    .in("topper", ["sim", "brinde"])
+    // Brinde não é compra de fornecedor: fica fora desta tela, que existe para
+    // acompanhar solicitação, recebimento e pagamento do topper encomendado.
+    .eq("topper", "sim")
     .order("data_entrega", { ascending: true });
 
   const lista = (pedidos ?? []) as unknown as PedidoComTopper[];
@@ -26,8 +28,8 @@ export default async function ToppersPage() {
           <h1 className="text-xl font-bold text-gray-900">Toppers</h1>
           <p className="text-xs text-gray-500 mt-0.5">
             {lista.length === 0
-              ? "Nenhum pedido com topper"
-              : `${lista.length} pedido${lista.length !== 1 ? "s" : ""} com topper`}
+              ? "Nenhum topper encomendado"
+              : `${lista.length} pedido${lista.length !== 1 ? "s" : ""} com topper encomendado`}
           </p>
         </div>
       </div>

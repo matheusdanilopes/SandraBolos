@@ -72,6 +72,20 @@ export function pedidoNumero(createdAt: string, id: string) {
   return `PED-${id.slice(0, 4).toUpperCase()}`;
 }
 
-export function calcularValorFinal(pedido: { valor_calculado?: number | null; preco_corrigido?: number | null }) {
-  return pedido.preco_corrigido ?? pedido.valor_calculado ?? null;
+/**
+ * Valor do pedido: o preço do que foi produzido mais o topper dado de brinde.
+ *
+ * O brinde é receita do pedido (não custo de fornecedor), então entra aqui para
+ * aparecer no valor estimado, no que está a receber e na sugestão do valor
+ * cobrado na entrega.
+ */
+export function calcularValorFinal(pedido: {
+  valor_calculado?: number | null;
+  preco_corrigido?: number | null;
+  valor_brinde?: number | null;
+}) {
+  const producao = pedido.preco_corrigido ?? pedido.valor_calculado ?? null;
+  const brinde = pedido.valor_brinde ?? null;
+  if (producao == null && brinde == null) return null;
+  return (producao ?? 0) + (brinde ?? 0);
 }
