@@ -2,11 +2,13 @@ import { supabase } from "@/lib/supabase";
 import { ToppersList } from "./ToppersList";
 import { Sparkles } from "lucide-react";
 import type { PedidoComTopper } from "@/types/database";
+import { isErroDeConexao } from "@/lib/erros";
+import { AvisoConexao } from "@/components/AvisoConexao";
 
 export const dynamic = "force-dynamic";
 
 export default async function ToppersPage() {
-  const { data: pedidos } = await supabase
+  const { data: pedidos, error } = await supabase
     .from("pedidos")
     .select("*, clientes(nome, telefone), toppers_pedido(*)")
     .in("topper", ["sim", "brinde"])
@@ -29,6 +31,8 @@ export default async function ToppersPage() {
           </p>
         </div>
       </div>
+      {isErroDeConexao(error) && <AvisoConexao detalhe="A lista pode estar incompleta." />}
+
       <ToppersList pedidos={lista} />
     </div>
   );

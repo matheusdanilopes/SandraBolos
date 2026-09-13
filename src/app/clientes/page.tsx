@@ -2,11 +2,13 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { ClientesList } from "./ClientesList";
 import { Plus } from "lucide-react";
+import { isErroDeConexao } from "@/lib/erros";
+import { AvisoConexao } from "@/components/AvisoConexao";
 
 export const dynamic = "force-dynamic";
 
 export default async function ClientesPage() {
-  const { data: clientes } = await supabase
+  const { data: clientes, error } = await supabase
     .from("clientes")
     .select("*")
     .order("nome");
@@ -20,6 +22,8 @@ export default async function ClientesPage() {
           Novo
         </Link>
       </div>
+      {isErroDeConexao(error) && <AvisoConexao detalhe="A lista pode estar incompleta." />}
+
       <ClientesList clientes={clientes ?? []} />
     </div>
   );

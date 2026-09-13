@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { createPedidoFolder, uploadFileToDrive } from "@/lib/googleDrive";
+import { isErroDeConexao, mensagemErro } from "@/lib/erros";
 import sharp from "sharp";
 
 const MAX_IMAGENS = 5;
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
     console.error("[upload-imagem] pedido fetch error:", pedidoError);
     // PGRST116 = no rows returned by .single()
     const status = pedidoError.code === "PGRST116" ? 404 : 500;
-    const message = status === 404 ? "Pedido não encontrado" : pedidoError.message;
+    const message = status === 404 ? "Pedido não encontrado" : mensagemErro(pedidoError);
     return NextResponse.json({ error: message }, { status });
   }
   if (!pedido) {
@@ -73,10 +74,11 @@ export async function POST(req: NextRequest) {
       folderId = await createPedidoFolder(pedido.id, clienteNome);
       await supabase.from("pedidos").update({ drive_folder_id: folderId }).eq("id", pedido.id);
     } catch (driveErr: unknown) {
-      const e = driveErr as { message?: string; code?: number };
+      const e = driveErr as { code?: number };
       console.error("[Drive] createPedidoFolder failed:", driveErr);
+      const detalhe = mensagemErro(driveErr);
       return NextResponse.json(
-        { error: `Drive: ${e.message ?? String(driveErr)}`, code: e.code },
+        { error: isErroDeConexao(driveErr) ? detalhe : `Drive: ${detalhe}`, code: e.code },
         { status: 502 }
       );
     }
@@ -97,10 +99,11 @@ export async function POST(req: NextRequest) {
   try {
     ({ fileId, url } = await uploadFileToDrive(folderId, compressed, fileName, "image/jpeg"));
   } catch (driveErr: unknown) {
-    const e = driveErr as { message?: string; code?: number };
+    const e = driveErr as { code?: number };
     console.error("[Drive] uploadFileToDrive failed:", driveErr);
+    const detalhe = mensagemErro(driveErr);
     return NextResponse.json(
-      { error: `Drive upload: ${e.message ?? String(driveErr)}`, code: e.code },
+      { error: isErroDeConexao(driveErr) ? detalhe : `Drive upload: ${detalhe}`, code: e.code },
       { status: 502 }
     );
   }
@@ -113,7 +116,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (imgError) {
-    return NextResponse.json({ error: imgError.message }, { status: 500 });
+    return NextResponse.json({ error: mensagemErro(imgError) }, { status: 500 });
   }
 
   return NextResponse.json(imagem, { status: 201 });

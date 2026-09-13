@@ -5,15 +5,23 @@ import { formatDate, formatPhone } from "@/lib/utils";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TIPO_LABELS, type Pedido } from "@/types/database";
 import { Edit, Phone, ShoppingBag } from "lucide-react";
+import { houveErroDeConexao } from "@/lib/erros";
+import { PainelSemConexao } from "@/components/PainelSemConexao";
 
 export const dynamic = "force-dynamic";
 
 export default async function ClienteDetailPage({ params }: { params: { id: string } }) {
-  const [{ data: cliente }, { data: pedidos }] = await Promise.all([
+  const [clienteResult, pedidosResult] = await Promise.all([
     supabase.from("clientes").select("*").eq("id", params.id).single(),
     supabase.from("pedidos").select("*").eq("cliente_id", params.id).order("data_entrega", { ascending: false }),
   ]);
 
+  const { data: cliente } = clienteResult;
+  const { data: pedidos } = pedidosResult;
+
+  // Falha de rede não é cliente inexistente — ver o 404 aqui assusta à toa.
+  if (houveErroDeConexao(clienteResult, pedidosResult))
+    return <PainelSemConexao titulo="Não foi possível carregar o cliente" />;
   if (!cliente) notFound();
 
   return (

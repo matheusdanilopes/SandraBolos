@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
+import { mensagemErro } from "@/lib/erros";
 
 export async function adicionarItemAction(
   pedidoId: string,
@@ -28,7 +29,7 @@ export async function adicionarItemAction(
     valor_total: Math.round(data.valorTotal * 100) / 100,
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: mensagemErro(error) };
   revalidatePath(`/pedidos/${pedidoId}`);
   return {};
 }
@@ -43,7 +44,7 @@ export async function removerItemAction(
     .delete()
     .eq("id", itemId);
 
-  if (error) return { error: error.message };
+  if (error) return { error: mensagemErro(error) };
   revalidatePath(`/pedidos/${pedidoId}`);
   return {};
 }

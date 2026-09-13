@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
+import { mensagemErro } from "@/lib/erros";
 
 export async function adicionarCategoriaAction(nome: string): Promise<{ error?: string }> {
   const nomeTrimmed = nome.trim();
@@ -9,7 +10,7 @@ export async function adicionarCategoriaAction(nome: string): Promise<{ error?: 
 
   const supabase = createServerSupabaseClient();
   const { error } = await supabase.from("categorias_custo").insert({ nome: nomeTrimmed });
-  if (error) return { error: error.message };
+  if (error) return { error: mensagemErro(error) };
 
   revalidatePath("/configuracoes");
   revalidatePath("/financeiro");
@@ -19,7 +20,7 @@ export async function adicionarCategoriaAction(nome: string): Promise<{ error?: 
 export async function excluirCategoriaAction(id: string): Promise<{ error?: string }> {
   const supabase = createServerSupabaseClient();
   const { error } = await supabase.from("categorias_custo").delete().eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: mensagemErro(error) };
 
   revalidatePath("/configuracoes");
   revalidatePath("/financeiro");
@@ -39,7 +40,7 @@ export async function adicionarCategoriaProdutoAction(
   const { error } = await supabase
     .from("categorias_produto")
     .insert({ nome: nomeTrimmed, ordem: ordemAtual + 1 });
-  if (error) return { error: error.message };
+  if (error) return { error: mensagemErro(error) };
 
   revalidatePath("/configuracoes");
   revalidatePath("/produtos");
@@ -58,7 +59,7 @@ export async function editarCategoriaProdutoAction(
     .from("categorias_produto")
     .update({ nome: nomeTrimmed })
     .eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: mensagemErro(error) };
 
   revalidatePath("/configuracoes");
   revalidatePath("/produtos");
@@ -79,7 +80,7 @@ export async function excluirCategoriaProdutoAction(id: string): Promise<{ error
   }
 
   const { error } = await supabase.from("categorias_produto").delete().eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: mensagemErro(error) };
 
   revalidatePath("/configuracoes");
   revalidatePath("/produtos");
@@ -95,7 +96,7 @@ export async function toggleCategoriaProdutoAtivoAction(
     .from("categorias_produto")
     .update({ ativo })
     .eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: mensagemErro(error) };
 
   revalidatePath("/configuracoes");
   revalidatePath("/produtos");
@@ -111,7 +112,7 @@ export async function reordenarCategoriaProdutoAction(
       .from("categorias_produto")
       .update({ ordem })
       .eq("id", id);
-    if (error) return { error: error.message };
+    if (error) return { error: mensagemErro(error) };
   }
 
   revalidatePath("/configuracoes");

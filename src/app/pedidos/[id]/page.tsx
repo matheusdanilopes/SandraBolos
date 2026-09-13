@@ -11,16 +11,21 @@ import { PrecificacaoForm } from "./PrecificacaoForm";
 import { EntregaForm } from "./EntregaForm";
 import { ImagensSection } from "./ImagensSection";
 import { ItensForm } from "./ItensForm";
+import { isErroDeConexao } from "@/lib/erros";
+import { PainelSemConexao } from "@/components/PainelSemConexao";
 
 export const dynamic = "force-dynamic";
 
 export default async function PedidoDetailPage({ params }: { params: { id: string } }) {
-  const { data: pedido } = await supabase
+  const { data: pedido, error } = await supabase
     .from("pedidos")
     .select("*, clientes(nome, telefone)")
     .eq("id", params.id)
     .single();
 
+  // Falha de rede não é pedido inexistente: mandar para o 404 faria parecer
+  // que o pedido foi apagado.
+  if (isErroDeConexao(error)) return <PainelSemConexao titulo="Não foi possível carregar o pedido" />;
   if (!pedido) notFound();
 
   const pedidoTyped = pedido as unknown as PedidoComCliente;
