@@ -3,11 +3,13 @@ import { supabase } from "@/lib/supabase";
 import { PedidosList } from "./PedidosList";
 import { type PedidoComCliente } from "@/types/database";
 import { Plus } from "lucide-react";
+import { isErroDeConexao } from "@/lib/erros";
+import { AvisoConexao } from "@/components/AvisoConexao";
 
 export const dynamic = "force-dynamic";
 
 export default async function PedidosPage() {
-  const { data: pedidos } = await supabase
+  const { data: pedidos, error } = await supabase
     .from("pedidos")
     .select("*, clientes(nome, telefone)")
     .order("data_entrega", { ascending: true });
@@ -21,6 +23,8 @@ export default async function PedidosPage() {
           Novo
         </Link>
       </div>
+
+      {isErroDeConexao(error) && <AvisoConexao detalhe="A lista pode estar incompleta." />}
 
       <PedidosList pedidos={(pedidos ?? []) as unknown as PedidoComCliente[]} />
     </div>

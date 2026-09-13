@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
+import { mensagemErro } from "@/lib/erros";
 
 interface TopperPayload {
   pedidoId: string;
@@ -27,7 +28,7 @@ export async function salvarTopperAction(data: TopperPayload): Promise<{ error?:
       { onConflict: "pedido_id" }
     );
 
-  if (error) return { error: error.message };
+  if (error) return { error: mensagemErro(error) };
   revalidatePath("/toppers");
   return {};
 }
@@ -48,13 +49,13 @@ export async function toggleSolicitadoAction(
     const { error } = await supabase
       .from("toppers_pedido")
       .insert({ pedido_id: pedidoId, solicitado, valor: 0, frete: 0 });
-    if (error) return { error: error.message };
+    if (error) return { error: mensagemErro(error) };
   } else {
     const { error } = await supabase
       .from("toppers_pedido")
       .update({ solicitado })
       .eq("pedido_id", pedidoId);
-    if (error) return { error: error.message };
+    if (error) return { error: mensagemErro(error) };
   }
 
   revalidatePath("/toppers");
@@ -77,13 +78,13 @@ export async function toggleRecebidoAction(
     const { error } = await supabase
       .from("toppers_pedido")
       .insert({ pedido_id: pedidoId, recebido, valor: 0, frete: 0 });
-    if (error) return { error: error.message };
+    if (error) return { error: mensagemErro(error) };
   } else {
     const { error } = await supabase
       .from("toppers_pedido")
       .update({ recebido })
       .eq("pedido_id", pedidoId);
-    if (error) return { error: error.message };
+    if (error) return { error: mensagemErro(error) };
   }
 
   revalidatePath("/toppers");
@@ -112,13 +113,13 @@ export async function registrarPagamentoAction(
         valor: 0,
         frete: 0,
       });
-    if (error) return { error: error.message };
+    if (error) return { error: mensagemErro(error) };
   } else {
     const { error } = await supabase
       .from("toppers_pedido")
       .update({ pago_fornecedor: true, data_pagamento: dataPagamento })
       .eq("pedido_id", pedidoId);
-    if (error) return { error: error.message };
+    if (error) return { error: mensagemErro(error) };
   }
 
   revalidatePath("/toppers");
@@ -135,7 +136,7 @@ export async function desfazerPagamentoAction(
     .update({ pago_fornecedor: false, data_pagamento: null })
     .eq("pedido_id", pedidoId);
 
-  if (error) return { error: error.message };
+  if (error) return { error: mensagemErro(error) };
   revalidatePath("/toppers");
   return {};
 }
@@ -152,7 +153,7 @@ export async function registrarPagamentoLoteAction(
     .update({ pago_fornecedor: true, data_pagamento: dataPagamento })
     .in("pedido_id", pedidoIds);
 
-  if (error) return { error: error.message };
+  if (error) return { error: mensagemErro(error) };
   revalidatePath("/toppers");
   return {};
 }

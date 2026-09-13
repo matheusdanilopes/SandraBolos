@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
+import { mensagemErro } from "@/lib/erros";
 
 const SINGLETON_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -35,7 +36,7 @@ export async function salvarConfigCardapio(
     .update({ ...config, updated_at: new Date().toISOString() })
     .eq("id", SINGLETON_ID);
 
-  if (error) return { error: error.message };
+  if (error) return { error: mensagemErro(error) };
   revalidatePath("/produtos");
   revalidatePath("/configuracoes");
   return {};

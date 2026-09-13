@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
+import { isErroDeConexao, mensagemErro } from "@/lib/erros";
 import type { TipoPedido, Topper } from "@/types/database";
 
 interface ItemPayload {
@@ -41,7 +42,7 @@ export async function criarPedidoAction(
       .insert({ nome: data.novoClienteNome!, telefone: data.novoClienteTelefone! })
       .select()
       .single();
-    if (clienteError) return { error: clienteError.message };
+    if (clienteError) return { error: mensagemErro(clienteError) };
     resolvedClienteId = clienteData.id;
     revalidatePath("/clientes");
   }
@@ -63,7 +64,7 @@ export async function criarPedidoAction(
     .select()
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: mensagemErro(error) };
 
   if (data.itens && data.itens.length > 0) {
     await supabase.from("itens_pedido").insert(
@@ -95,6 +96,9 @@ export async function excluirRascunhoAction(
     .eq("id", pedidoId)
     .single();
 
+  // Rede fora do ar não é pedido inexistente — dizer "não encontrado" aqui
+  // faria parecer que o pedido sumiu do banco.
+  if (isErroDeConexao(fetchError)) return { error: mensagemErro(fetchError) };
   if (fetchError || !pedido) return { error: "Pedido não encontrado" };
   if (pedido.status !== "rascunho") return { error: "Apenas rascunhos podem ser excluídos" };
 
@@ -103,7 +107,7 @@ export async function excluirRascunhoAction(
   await supabase.from("toppers_pedido").delete().eq("pedido_id", pedidoId);
 
   const { error } = await supabase.from("pedidos").delete().eq("id", pedidoId);
-  if (error) return { error: error.message };
+  if (error) return { error: mensagemErro(error) };
 
   revalidatePath("/pedidos");
   revalidatePath("/");
@@ -134,7 +138,7 @@ export async function criarPedidoRapidoAction(data: {
     .select()
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: mensagemErro(error) };
 
   revalidatePath("/pedidos");
   revalidatePath("/");
@@ -161,7 +165,7 @@ export async function editarPedidoAction(
     })
     .eq("id", pedidoId);
 
-  if (error) return { error: error.message };
+  if (error) return { error: mensagemErro(error) };
 
   revalidatePath(`/pedidos/${pedidoId}`);
   revalidatePath("/pedidos");

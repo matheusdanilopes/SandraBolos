@@ -5,6 +5,8 @@ import { DashboardClient } from "./DashboardClient";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { getPeriodoRange, isValidPreset } from "@/lib/periodo";
+import { houveErroDeConexao } from "@/lib/erros";
+import { AvisoConexao } from "@/components/AvisoConexao";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +48,8 @@ export default async function DashboardPage() {
       0
     ) ?? 0;
 
+  const semConexao = houveErroDeConexao(pedidosResult, receitaResult, feitosResult);
+
   const hoje = format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR });
 
   return (
@@ -54,6 +58,8 @@ export default async function DashboardPage() {
         <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-sm text-gray-400 capitalize">{hoje}</p>
       </div>
+
+      {semConexao && <AvisoConexao detalhe="Os números abaixo podem estar incompletos." />}
 
       <DashboardClient
         pedidos={(pedidosResult.data ?? []) as unknown as PedidoComCliente[]}

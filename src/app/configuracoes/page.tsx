@@ -4,15 +4,17 @@ import { CategoriasSection } from "./CategoriasSection";
 import { CategoriasProdutoSection } from "./CategoriasProdutoSection";
 import { CardapioVisual } from "../produtos/CardapioVisual";
 import type { CategoriaCusto, CategoriaProduto, ProdutoComCategoria, CardapioConfig } from "@/types/database";
+import { houveErroDeConexao } from "@/lib/erros";
+import { AvisoConexao } from "@/components/AvisoConexao";
 
 export const dynamic = "force-dynamic";
 
 export default async function ConfiguracoesPage() {
   const [
-    { data: categoriasCusto },
-    { data: categoriasProduto },
-    { data: produtosData },
-    { data: configData },
+    categoriasCustoResult,
+    categoriasProdutoResult,
+    produtosResult,
+    configResult,
   ] = await Promise.all([
     supabase.from("categorias_custo").select("*").order("nome"),
     supabase.from("categorias_produto").select("*").order("ordem").order("nome"),
@@ -28,9 +30,22 @@ export default async function ConfiguracoesPage() {
       .single(),
   ]);
 
+  const { data: categoriasCusto } = categoriasCustoResult;
+  const { data: categoriasProduto } = categoriasProdutoResult;
+  const { data: produtosData } = produtosResult;
+  const { data: configData } = configResult;
+  const semConexao = houveErroDeConexao(
+    categoriasCustoResult,
+    categoriasProdutoResult,
+    produtosResult,
+    configResult
+  );
+
   return (
     <div className="py-4 space-y-6">
       <h1 className="text-xl font-bold text-gray-900">Configurações</h1>
+
+      {semConexao && <AvisoConexao />}
 
       <CategoriasSection categorias={(categoriasCusto ?? []) as CategoriaCusto[]} />
 

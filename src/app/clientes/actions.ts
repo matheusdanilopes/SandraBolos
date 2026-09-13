@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
+import { mensagemErro } from "@/lib/erros";
 
 export async function criarClienteAction(
   nome: string,
@@ -15,7 +16,7 @@ export async function criarClienteAction(
     .select()
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: mensagemErro(error) };
 
   revalidatePath("/clientes");
   redirect(`/clientes/${data.id}`);
@@ -32,7 +33,7 @@ export async function editarClienteAction(
     .update({ nome, telefone })
     .eq("id", clienteId);
 
-  if (error) return { error: error.message };
+  if (error) return { error: mensagemErro(error) };
 
   revalidatePath(`/clientes/${clienteId}`);
   revalidatePath("/clientes");

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
+import { mensagemErro } from "@/lib/erros";
 
 const BUCKET = "cardapio-backgrounds";
 const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest) {
       .upload(fileName, buffer, { contentType: file.type, upsert: false });
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: mensagemErro(error) }, { status: 500 });
     }
 
     const {
@@ -38,7 +39,11 @@ export async function POST(request: NextRequest) {
     } = supabase.storage.from(BUCKET).getPublicUrl(data.path);
 
     return NextResponse.json({ url: publicUrl });
-  } catch {
-    return NextResponse.json({ error: "Erro interno no servidor" }, { status: 500 });
+  } catch (err) {
+    console.error("[upload-background] falhou:", err);
+    return NextResponse.json(
+      { error: mensagemErro(err, "Erro interno no servidor") },
+      { status: 500 }
+    );
   }
 }

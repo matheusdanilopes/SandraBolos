@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
+import { isErroDeConexao, mensagemErro } from "@/lib/erros";
 
 const CANCELAVEIS = ["novo", "produzindo", "feito"];
 
@@ -17,6 +18,9 @@ export async function cancelarPedidoAction(
     .eq("id", pedidoId)
     .single();
 
+  // Rede fora do ar não é pedido inexistente — dizer "não encontrado" aqui
+  // faria parecer que o pedido sumiu do banco.
+  if (isErroDeConexao(fetchError)) return { error: mensagemErro(fetchError) };
   if (fetchError || !pedido) return { error: "Pedido não encontrado" };
   if (!CANCELAVEIS.includes(pedido.status)) return { error: "Este pedido não pode ser cancelado" };
 
@@ -34,7 +38,7 @@ export async function cancelarPedidoAction(
     .update({ status: "cancelado", descricao: novaDescricao })
     .eq("id", pedidoId);
 
-  if (error) return { error: error.message };
+  if (error) return { error: mensagemErro(error) };
 
   revalidatePath(`/pedidos/${pedidoId}`);
   revalidatePath("/pedidos");
@@ -52,7 +56,7 @@ export async function avancarStatusAction(
     .update({ status: proximoStatus })
     .eq("id", pedidoId);
 
-  if (error) return { error: error.message };
+  if (error) return { error: mensagemErro(error) };
 
   revalidatePath(`/pedidos/${pedidoId}`);
   revalidatePath("/pedidos");
@@ -70,7 +74,7 @@ export async function voltarStatusAction(
     .update({ status: statusAnterior })
     .eq("id", pedidoId);
 
-  if (error) return { error: error.message };
+  if (error) return { error: mensagemErro(error) };
 
   revalidatePath(`/pedidos/${pedidoId}`);
   revalidatePath("/pedidos");
@@ -96,7 +100,7 @@ export async function salvarPrecificacaoAction(
     })
     .eq("id", pedidoId);
 
-  if (error) return { error: error.message };
+  if (error) return { error: mensagemErro(error) };
 
   revalidatePath(`/pedidos/${pedidoId}`);
   return {};
@@ -112,7 +116,7 @@ export async function salvarEntregaAction(
     .update({ valor_cobrado: valorCobrado })
     .eq("id", pedidoId);
 
-  if (error) return { error: error.message };
+  if (error) return { error: mensagemErro(error) };
 
   revalidatePath(`/pedidos/${pedidoId}`);
   return {};

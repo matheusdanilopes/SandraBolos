@@ -8,6 +8,8 @@ import { TrendingUp, Banknote, AlertCircle, CheckCircle, TrendingDown, Tag, Arro
 import Link from "next/link";
 import { CustosSection } from "./CustosSection";
 import { getPeriodoRange, getMesesNoPeriodo, isValidPreset } from "@/lib/periodo";
+import { houveErroDeConexao } from "@/lib/erros";
+import { AvisoConexao } from "@/components/AvisoConexao";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +59,14 @@ export default async function FinanceiroPage() {
   const custos = (custosResult.data ?? []) as unknown as CustoComCategoria[];
   const categorias = (categoriasResult.data ?? []) as CategoriaCusto[];
   const toppers = toppersResult.data ?? [];
+
+  const semConexao = houveErroDeConexao(
+    entreguesResult,
+    feitosResult,
+    custosResult,
+    categoriasResult,
+    toppersResult
+  );
 
   // KPIs do período selecionado
   const receitaPeriodo = entregues.reduce((acc, p) => acc + (p.valor_cobrado ?? 0), 0);
@@ -109,6 +119,8 @@ export default async function FinanceiroPage() {
         <h1 className="text-2xl font-bold text-gray-900">Financeiro</h1>
         <p className="text-sm text-gray-400 capitalize mt-0.5">{periodo.label}</p>
       </div>
+
+      {semConexao && <AvisoConexao detalhe="Os valores abaixo podem estar incompletos." />}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3">
