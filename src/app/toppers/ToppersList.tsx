@@ -6,26 +6,35 @@ import {
   ChevronDown,
   ChevronUp,
   Package,
+  PackageCheck,
   Truck,
   CheckCircle2,
-  Circle,
+  Check,
   ExternalLink,
   Save,
   Banknote,
   Layers,
   X,
   RotateCcw,
+  Undo2,
+  Send,
   Square,
   CheckSquare,
   ListChecks,
+  type LucideIcon,
 } from "lucide-react";
 import { formatDate, formatCurrency, pedidoNumero } from "@/lib/utils";
 import { StatusBadge } from "@/components/StatusBadge";
-import { TOPPER_LABELS, type PedidoComTopper, type TopperPedido } from "@/types/database";
+import {
+  TOPPER_LABELS,
+  etapaDoTopper,
+  type EtapaTopper,
+  type PedidoComTopper,
+  type TopperPedido,
+} from "@/types/database";
 import {
   salvarTopperAction,
-  toggleSolicitadoAction,
-  toggleRecebidoAction,
+  definirEtapaTopperAction,
   registrarPagamentoAction,
   desfazerPagamentoAction,
   registrarPagamentoLoteAction,
@@ -44,9 +53,145 @@ function todayISO() {
 
 function getStatusBorder(topper: TopperPedido | null | undefined): string {
   if (topper?.pago_fornecedor) return "border-l-4 border-l-emerald-400";
-  if (topper?.recebido) return "border-l-4 border-l-green-400";
-  if (topper?.solicitado) return "border-l-4 border-l-blue-400";
-  return "border-l-4 border-l-gray-200";
+  const etapa = etapaDoTopper(topper);
+  if (etapa === "recebido") return "border-l-4 border-l-green-400";
+  if (etapa === "solicitado") return "border-l-4 border-l-blue-400";
+  return "border-l-4 border-l-amber-300";
+}
+
+// ─── Andamento do topper ────────────────────────────────────────────────────
+
+/**
+ * A tela antes mostrava "Solicitado" e "Recebido" como dois chips iguais, que
+ * ligavam e desligavam sozinhos: nada dizia qual era o passo da vez, o que cada
+ * um significava, nem que um vem depois do outro. Aqui cada pedido mostra em que
+ * ponto está, o que isso quer dizer e um único botão com o próximo passo escrito
+ * em português claro — com "desfazer" à parte, para voltar sem ser sem querer.
+ */
+
+const ORDEM_ETAPA: Record<EtapaTopper, number> = {
+  pendente: 0,
+  solicitado: 1,
+  recebido: 2,
+};
+
+const PASSOS: { etapa: Exclude<EtapaTopper, "pendente">; label: string }[] = [
+  { etapa: "solicitado", label: "Solicitado" },
+  { etapa: "recebido", label: "Recebido" },
+];
+
+interface GuiaEtapa {
+  titulo: string;
+  descricao: string;
+  resumo: string;
+  bloco: string;
+  corTitulo: string;
+  acao?: { label: string; proxima: EtapaTopper; icone: LucideIcon; classe: string };
+  voltar?: { label: string; proxima: EtapaTopper; titulo: string };
+}
+
+const GUIA_ETAPA: Record<EtapaTopper, GuiaEtapa> = {
+  pendente: {
+    titulo: "Falta pedir ao fornecedor",
+    descricao: "Encomende o topper e toque no botão abaixo para registrar.",
+    resumo: "Falta pedir ao fornecedor",
+    bloco: "bg-amber-50/70 border-amber-200",
+    corTitulo: "text-amber-700",
+    acao: {
+      label: "Já pedi ao fornecedor",
+      proxima: "solicitado",
+      icone: Send,
+      classe: "bg-blue-600 hover:bg-blue-700 active:bg-blue-800",
+    },
+  },
+  solicitado: {
+    titulo: "Pedido feito, aguardando chegar",
+    descricao: "O fornecedor já foi acionado. Marque quando o topper chegar.",
+    resumo: "Aguardando chegar",
+    bloco: "bg-blue-50/70 border-blue-200",
+    corTitulo: "text-blue-700",
+    acao: {
+      label: "Já recebi o topper",
+      proxima: "recebido",
+      icone: PackageCheck,
+      classe: "bg-green-600 hover:bg-green-700 active:bg-green-800",
+    },
+    voltar: {
+      label: "Ainda não pedi",
+      proxima: "pendente",
+      titulo: "Desfazer: voltar para falta pedir ao fornecedor",
+    },
+  },
+  recebido: {
+    titulo: "Topper em mãos",
+    descricao: "Chegou e está com você.",
+    resumo: "Topper em mãos",
+    bloco: "bg-green-50/70 border-green-200",
+    corTitulo: "text-green-700",
+    voltar: {
+      label: "Ainda não chegou",
+      proxima: "solicitado",
+      titulo: "Desfazer: voltar para aguardando chegar",
+    },
+  },
+};
+
+/** Trilha "Solicitado → Recebido" mostrando o passo já vencido e o da vez. */
+function TrilhaEtapas({ etapa }: { etapa: EtapaTopper }) {
+  const atual = ORDEM_ETAPA[etapa];
+
+  return (
+    <div className="flex items-center">
+      {PASSOS.map((passo, i) => {
+        const indice = ORDEM_ETAPA[passo.etapa];
+        const concluido = atual >= indice;
+        const proximo = atual === indice - 1;
+
+        return (
+          <div
+            key={passo.etapa}
+            className={cn("flex items-center", i < PASSOS.length - 1 && "flex-1")}
+          >
+            <div className="flex items-center gap-1.5">
+              <span
+                className={cn(
+                  "w-5 h-5 rounded-full border flex items-center justify-center text-[10px] font-bold flex-shrink-0",
+                  concluido
+                    ? "bg-green-500 border-green-500 text-white"
+                    : proximo
+                      ? "bg-white border-brand-400 text-brand-600"
+                      : "bg-white border-gray-200 text-gray-300"
+                )}
+              >
+                {concluido ? <Check size={12} strokeWidth={3} /> : indice}
+              </span>
+              <span
+                className={cn(
+                  "text-[11px] whitespace-nowrap",
+                  concluido
+                    ? "text-gray-700 font-medium"
+                    : proximo
+                      ? "text-brand-600 font-medium"
+                      : "text-gray-400"
+                )}
+              >
+                {passo.label}
+              </span>
+            </div>
+
+            {i < PASSOS.length - 1 && (
+              <span
+                className={cn(
+                  "flex-1 h-0.5 mx-2 rounded",
+                  atual >= ORDEM_ETAPA[PASSOS[i + 1].etapa] ? "bg-green-400" : "bg-gray-200"
+                )}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 // ─── Card individual ────────────────────────────────────────────────────────
@@ -73,11 +218,14 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
   const [showPagamento, setShowPagamento] = useState(false);
   const [dataPagamento, setDataPagamento] = useState(todayISO());
   const [erroPagamento, setErroPagamento] = useState<string | null>(null);
+  const [erroEtapa, setErroEtapa] = useState<string | null>(null);
 
   const nomeCliente = pedido.clientes?.nome ?? pedido.nome_cliente ?? "Sem cliente";
   const numero = pedidoNumero(pedido.created_at, pedido.id);
   const totalFornecedor = (topper?.valor ?? 0) + (topper?.frete ?? 0);
   const pagavel = totalFornecedor > 0 && !topper?.pago_fornecedor;
+  const etapa = etapaDoTopper(topper);
+  const guia = GUIA_ETAPA[etapa];
 
   function handleSalvar() {
     setErroDetalhes(null);
@@ -98,15 +246,11 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
     });
   }
 
-  function handleToggleSolicitado() {
+  function irParaEtapa(proxima: EtapaTopper) {
+    setErroEtapa(null);
     startTransition(async () => {
-      await toggleSolicitadoAction(pedido.id, !topper?.solicitado);
-    });
-  }
-
-  function handleToggleRecebido() {
-    startTransition(async () => {
-      await toggleRecebidoAction(pedido.id, !topper?.recebido);
+      const res = await definirEtapaTopperAction(pedido.id, proxima);
+      if (res.error) setErroEtapa(res.error);
     });
   }
 
@@ -187,36 +331,69 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
           </Link>
         </div>
 
-        {/* Status de progresso */}
-        <div className="flex items-center gap-2 mt-3 flex-wrap">
-          <button
-            onClick={handleToggleSolicitado}
-            disabled={isPending}
-            className={cn(
-              "flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition-all",
-              topper?.solicitado
-                ? "bg-blue-50 border-blue-300 text-blue-700 font-medium"
-                : "bg-white border-gray-200 text-gray-500 hover:border-blue-300 hover:text-blue-600"
-            )}
-          >
-            {topper?.solicitado ? <CheckCircle2 size={12} /> : <Circle size={12} />}
-            Solicitado
-          </button>
+        {/* Andamento: em que ponto está e qual é o próximo passo */}
+        {batchMode ? (
+          // Em modo lote a tela é sobre pagar: aqui basta dizer onde o topper está.
+          <div className="mt-2.5 flex items-center gap-1.5 text-xs text-gray-500">
+            <span
+              className={cn(
+                "w-1.5 h-1.5 rounded-full flex-shrink-0",
+                etapa === "recebido"
+                  ? "bg-green-500"
+                  : etapa === "solicitado"
+                    ? "bg-blue-500"
+                    : "bg-amber-500"
+              )}
+            />
+            {guia.resumo}
+          </div>
+        ) : (
+          <div className={cn("mt-3 rounded-xl border p-3", guia.bloco)}>
+            <TrilhaEtapas etapa={etapa} />
 
-          <button
-            onClick={handleToggleRecebido}
-            disabled={isPending}
-            className={cn(
-              "flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition-all",
-              topper?.recebido
-                ? "bg-green-50 border-green-300 text-green-700 font-medium"
-                : "bg-white border-gray-200 text-gray-500 hover:border-green-300 hover:text-green-600"
+            <p className="text-xs text-gray-600 mt-2.5 leading-snug">
+              <strong className={guia.corTitulo}>{guia.titulo}.</strong>{" "}
+              {guia.descricao}
+            </p>
+
+            {erroEtapa && (
+              <p className="text-xs text-red-600 bg-red-50 rounded-lg p-2 mt-2">{erroEtapa}</p>
             )}
-          >
-            {topper?.recebido ? <CheckCircle2 size={12} /> : <Circle size={12} />}
-            Recebido
-          </button>
-        </div>
+
+            <div className="mt-2.5 flex items-center gap-2">
+              {guia.acao ? (
+                <button
+                  onClick={() => irParaEtapa(guia.acao!.proxima)}
+                  disabled={isPending}
+                  className={cn(
+                    "flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold text-white rounded-lg px-3 py-2 min-h-[42px] transition-colors disabled:opacity-60",
+                    guia.acao.classe
+                  )}
+                >
+                  <guia.acao.icone size={15} />
+                  {isPending ? "Salvando…" : guia.acao.label}
+                </button>
+              ) : (
+                <p className="flex-1 flex items-center gap-1.5 text-xs font-semibold text-green-700">
+                  <CheckCircle2 size={14} />
+                  Etapa concluída
+                </p>
+              )}
+
+              {guia.voltar && (
+                <button
+                  onClick={() => irParaEtapa(guia.voltar!.proxima)}
+                  disabled={isPending}
+                  title={guia.voltar.titulo}
+                  className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-600 px-2 py-2 transition-colors flex-shrink-0"
+                >
+                  <Undo2 size={12} />
+                  {guia.voltar.label}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Resumo financeiro compacto */}
         {totalFornecedor > 0 && (
@@ -230,6 +407,16 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
             )}
             <span className="ml-auto font-semibold text-brand-700">{formatCurrency(totalFornecedor)}</span>
           </div>
+        )}
+
+        {/* Sem valor lançado não há pagamento a controlar — diz onde preencher. */}
+        {totalFornecedor === 0 && !batchMode && !expanded && (
+          <button
+            onClick={() => setExpanded(true)}
+            className="mt-2.5 w-full text-left text-[11px] text-gray-500 bg-gray-50 border border-dashed border-gray-200 rounded-lg px-3 py-2 hover:border-brand-300 hover:text-brand-600 transition-colors"
+          >
+            Valor do fornecedor ainda não informado — toque para lançar e acompanhar o pagamento.
+          </button>
         )}
 
         {/* Bloco de pagamento (oculto em modo lote para reduzir distração) */}
@@ -419,6 +606,34 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
 
 // ─── Lista principal ─────────────────────────────────────────────────────────
 
+/** Lista vazia é boa notícia em quase todo filtro — vale dizer qual. */
+const VAZIO_POR_FILTRO: Record<Filtro, { titulo: string; detalhe: string }> = {
+  todos: {
+    titulo: "Nenhum topper encomendado",
+    detalhe: "Pedidos marcados com topper \"Sim\" aparecem aqui",
+  },
+  pendentes: {
+    titulo: "Nada para pedir",
+    detalhe: "Todos os toppers já foram solicitados ao fornecedor",
+  },
+  solicitados: {
+    titulo: "Nenhum topper a caminho",
+    detalhe: "Nada solicitado esperando chegar no momento",
+  },
+  recebidos: {
+    titulo: "Nenhum topper recebido ainda",
+    detalhe: "Marque \"Já recebi o topper\" quando a encomenda chegar",
+  },
+  a_pagar: {
+    titulo: "Nada a pagar",
+    detalhe: "Nenhum fornecedor com valor em aberto",
+  },
+  pagos: {
+    titulo: "Nenhum pagamento registrado",
+    detalhe: "Os toppers já pagos ao fornecedor aparecem aqui",
+  },
+};
+
 export function ToppersList({ pedidos }: Props) {
   const [filtro, setFiltro] = useState<Filtro>("todos");
 
@@ -437,7 +652,7 @@ export function ToppersList({ pedidos }: Props) {
 
   const totalToppers = pedidos.length;
   const totalAReceber = pedidos.filter(
-    (p) => !(p.toppers_pedido as TopperPedido | null)?.recebido
+    (p) => etapaDoTopper(p.toppers_pedido as TopperPedido | null) !== "recebido"
   ).length;
   const totalAPagar = pagaveisTodos.reduce((acc, p) => {
     const t = p.toppers_pedido as TopperPedido;
@@ -452,39 +667,26 @@ export function ToppersList({ pedidos }: Props) {
 
   const pedidosFiltrados = pedidos.filter((p) => {
     const t = p.toppers_pedido as TopperPedido | null;
-    if (filtro === "pendentes") return !t?.solicitado;
-    if (filtro === "solicitados") return t?.solicitado && !t?.recebido;
-    if (filtro === "recebidos") return t?.recebido;
+    const etapa = etapaDoTopper(t);
+    if (filtro === "pendentes") return etapa === "pendente";
+    if (filtro === "solicitados") return etapa === "solicitado";
+    if (filtro === "recebidos") return etapa === "recebido";
     if (filtro === "a_pagar") return t && !t.pago_fornecedor && (t.valor + t.frete) > 0;
     if (filtro === "pagos") return t?.pago_fornecedor;
     return true;
   });
 
+  const porEtapa = (alvo: EtapaTopper) =>
+    pedidos.filter((p) => etapaDoTopper(p.toppers_pedido as TopperPedido | null) === alvo).length;
+
+  // Rótulos dizem o que falta fazer, não só o nome do estado: quem bate o olho
+  // na barra precisa saber para onde ir sem abrir cada card.
   const filtros: { key: Filtro; label: string; count: number }[] = [
     { key: "todos", label: "Todos", count: totalToppers },
-    {
-      key: "pendentes",
-      label: "Pendentes",
-      count: pedidos.filter((p) => !(p.toppers_pedido as TopperPedido | null)?.solicitado).length,
-    },
-    {
-      key: "solicitados",
-      label: "Solicitados",
-      count: pedidos.filter((p) => {
-        const t = p.toppers_pedido as TopperPedido | null;
-        return t?.solicitado && !t?.recebido;
-      }).length,
-    },
-    {
-      key: "recebidos",
-      label: "Recebidos",
-      count: pedidos.filter((p) => (p.toppers_pedido as TopperPedido | null)?.recebido).length,
-    },
-    {
-      key: "a_pagar",
-      label: "A pagar",
-      count: pagaveisTodos.length,
-    },
+    { key: "pendentes", label: "Falta pedir", count: porEtapa("pendente") },
+    { key: "solicitados", label: "A caminho", count: porEtapa("solicitado") },
+    { key: "recebidos", label: "Recebidos", count: porEtapa("recebido") },
+    { key: "a_pagar", label: "A pagar", count: pagaveisTodos.length },
     {
       key: "pagos",
       label: "Pagos",
@@ -728,10 +930,8 @@ export function ToppersList({ pedidos }: Props) {
           <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
             <Layers size={24} className="text-gray-400" />
           </div>
-          <p className="text-gray-600 font-medium text-sm">Nenhum topper encontrado</p>
-          <p className="text-xs text-gray-400 mt-1">
-            {filtro === "todos" ? "Não há pedidos com topper cadastrados" : "Tente outro filtro"}
-          </p>
+          <p className="text-gray-600 font-medium text-sm">{VAZIO_POR_FILTRO[filtro].titulo}</p>
+          <p className="text-xs text-gray-400 mt-1">{VAZIO_POR_FILTRO[filtro].detalhe}</p>
         </div>
       ) : (
         <div className="space-y-3">

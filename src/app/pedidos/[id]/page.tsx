@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AlertaBadge } from "@/components/AlertaBadge";
 import { formatDate, formatTime, formatPhone, calcularValorFinal, formatCurrency, pedidoNumero } from "@/lib/utils";
-import { TIPO_LABELS, TOPPER_LABELS, STATUS_FLOW, type PedidoComCliente, type ItemPedido, type Produto } from "@/types/database";
+import { TIPO_LABELS, TOPPER_LABELS, STATUS_FLOW, type PedidoComCliente, type ItemPedido, type ProdutoComCategoria, type CategoriaProduto } from "@/types/database";
 import { Edit, CheckCircle, AlertCircle, MessageCircle, Phone, ArrowLeft, Lock, FileEdit, XCircle } from "lucide-react";
 import { StatusActions } from "./StatusActions";
 import { PrecificacaoForm } from "./PrecificacaoForm";
@@ -42,11 +42,16 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
     .eq("pedido_id", params.id)
     .order("created_at");
 
-  const { data: produtos } = await supabase
-    .from("produtos")
-    .select("*")
-    .eq("ativo", true)
-    .order("nome");
+  // A categoria vem junto (e a lista de categorias também) para o seletor de
+  // item ter a mesma busca e os mesmos chips do lançamento do pedido.
+  const [{ data: produtos }, { data: categorias }] = await Promise.all([
+    supabase
+      .from("produtos")
+      .select("*, categorias_produto(nome, ordem)")
+      .eq("ativo", true)
+      .order("nome"),
+    supabase.from("categorias_produto").select("*").eq("ativo", true).order("ordem").order("nome"),
+  ]);
 
   const cliente = pedidoTyped.clientes ?? null;
   const valorFinal = calcularValorFinal(pedidoTyped);
@@ -256,7 +261,8 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
       {/* Itens */}
       <ItensForm
         pedidoId={pedidoTyped.id}
-        produtos={(produtos ?? []) as Produto[]}
+        produtos={(produtos ?? []) as unknown as ProdutoComCategoria[]}
+        categorias={(categorias ?? []) as CategoriaProduto[]}
         itens={(itens ?? []) as ItemPedido[]}
       />
 
