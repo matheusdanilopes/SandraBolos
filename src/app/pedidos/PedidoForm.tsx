@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { criarPedidoAction, editarPedidoAction } from "./actions";
+import { listarClientesAction } from "@/app/clientes/actions";
 import { type Cliente, type Pedido, type TipoPedido, type Topper, type TopperPedido, type Produto, type UnidadeMedida, UNIDADE_LABELS } from "@/types/database";
-import { AlertTriangle, ChevronDown, Plus, Trash2, Package, Truck, Sparkles, Gift } from "lucide-react";
+import { AlertTriangle, ChevronDown, Plus, Trash2, Package, Truck, Sparkles, Gift, RefreshCw } from "lucide-react";
 import { parseISO, isPast, isToday } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
+import { mensagemErro } from "@/lib/erros";
 
 interface Props {
   clientes: Pick<Cliente, "id" | "nome" | "telefone">[];
@@ -47,6 +49,21 @@ interface ItemLocal {
   valorTotal: number;
 }
 
+// Identificador só para a lista em tela — nunca vai para o banco.
+// `crypto.randomUUID` não existe em WebView e Safari mais antigos: lá a função
+// estourava dentro do clique, o item não entrava e ninguém via erro nenhum.
+let sequenciaItem = 0;
+function novoIdItem(): string {
+  sequenciaItem += 1;
+  return `item-${Date.now()}-${sequenciaItem}`;
+}
+
+/** O redirect do servidor chega ao cliente como erro — não é falha de gravação. */
+function ehRedirecionamento(erro: unknown): boolean {
+  const digest = (erro as { digest?: unknown } | null)?.digest;
+  return typeof digest === "string" && digest.startsWith("NEXT_REDIRECT");
+}
+
 function isDataPassada(data: string): boolean {
   try {
     const d = parseISO(data);
@@ -75,6 +92,35 @@ export function PedidoForm({ clientes, pedido, produtos = [], topperPedido }: Pr
   const [nomeCliente, setNomeCliente] = useState("");
   const [telefoneCliente, setTelefoneCliente] = useState("");
 
+  // ── Lista de clientes do seletor ───────────────────────────────────────────
+  // A lista chega pronta do servidor, mas esse payload pode vir do cache do
+  // roteador do Next (a rota fica guardada no navegador depois da primeira
+  // visita). Quem cadastrava um cliente em /clientes e voltava para cá não o
+  // encontrava no seletor. Por isso ela é relida ao abrir o formulário — e o
+  // botão de recarregar resolve o caso de cadastrar em outra aba ou celular.
+  const [listaClientes, setListaClientes] = useState(clientes);
+  const [carregandoClientes, setCarregandoClientes] = useState(false);
+  const [erroClientes, setErroClientes] = useState("");
+
+  const recarregarClientes = useCallback(async () => {
+    setCarregandoClientes(true);
+    const result = await listarClientesAction();
+    setCarregandoClientes(false);
+    if (result.error || !result.clientes) {
+      // Sem lista nova a que veio do servidor continua valendo: trocar por uma
+      // lista vazia faria parecer que não há cliente cadastrado.
+      setErroClientes(result.error ?? "Não foi possível atualizar a lista de clientes");
+      return;
+    }
+    setErroClientes("");
+    setListaClientes(result.clientes);
+  }, []);
+
+  useEffect(() => {
+    if (isEdit) return;
+    void recarregarClientes();
+  }, [isEdit, recarregarClientes]);
+
   const [tipo, setTipo] = useState<TipoPedido>(pedido?.tipo ?? "bolo");
   const [dataEntrega, setDataEntrega] = useState(pedido?.data_entrega ?? "");
   const [horaEntrega, setHoraEntrega] = useState(pedido?.hora_entrega ?? "");
@@ -89,6 +135,15 @@ export function PedidoForm({ clientes, pedido, produtos = [], topperPedido }: Pr
   const [peso, setPeso] = useState(pedido?.peso?.toString() ?? "");
   const [quantidade, setQuantidade] = useState(pedido?.quantidade?.toString() ?? "");
   const [error, setError] = useState("");
+
+  // Estado próprio de salvamento em vez do `isPending` da transição: com uma
+  // função async o React 18 só considera pendente o trecho antes do primeiro
+  // await, então o botão voltava ao normal enquanto a gravação corria e um
+  // segundo toque criava outro pedido.
+  const [salvando, setSalvando] = useState(false);
+  // Pedido que chegou a ser gravado mas terminou com aviso: tentar de novo
+  // duplicaria, então a tela oferece abrir o que já existe.
+  const [pedidoCriadoId, setPedidoCriadoId] = useState<string | null>(null);
 
   // ── Itens do pedido (somente no modo de criação) ──────────────────────────
   const [itensLocais, setItensLocais] = useState<ItemLocal[]>([]);
@@ -125,7 +180,7 @@ export function PedidoForm({ clientes, pedido, produtos = [], topperPedido }: Pr
     setItensLocais((prev) => [
       ...prev,
       {
-        _id: crypto.randomUUID(),
+        _id: novoIdItem(),
         produtoId: produtoSelecionado.id,
         nomeProduto: produtoSelecionado.nome,
         unidadeMedida: unidadeItem,
@@ -173,6 +228,7 @@ export function PedidoForm({ clientes, pedido, produtos = [], topperPedido }: Pr
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (salvando || pedidoCriadoId) return;
     setError("");
 
     if (!dataEntrega) { setError("Data de entrega é obrigatória"); return; }
@@ -184,42 +240,61 @@ export function PedidoForm({ clientes, pedido, produtos = [], topperPedido }: Pr
       if (!telefoneCliente) { setError("Telefone do cliente é obrigatório"); return; }
     }
 
+    setSalvando(true);
     startTransition(async () => {
-      let result: { error?: string };
+      try {
+        const result = isEdit
+          ? await editarPedidoAction(pedido.id, {
+              tipo,
+              dataEntrega,
+              horaEntrega: horaEntrega || null,
+              horaRetirada: horaRetirada || null,
+              descricao,
+              topper,
+              topperDetalhes: topperDetalhesPayload(),
+              valorBrinde: isBrinde ? valorBrindeNum : null,
+              peso: needsPeso && peso ? parseFloat(peso) : null,
+              quantidade: needsQuantidade && quantidade ? parseInt(quantidade) : null,
+            })
+          : await criarPedidoAction({
+              // Em "Novo" vale o que foi digitado: reaproveitar um id escolhido
+              // antes de trocar de aba amarraria o pedido ao cliente errado.
+              clienteId: novoCliente ? undefined : clienteId || undefined,
+              novoClienteNome: nomeCliente || undefined,
+              novoClienteTelefone: telefoneCliente || undefined,
+              tipo,
+              dataEntrega,
+              horaEntrega: horaEntrega || null,
+              horaRetirada: horaRetirada || null,
+              descricao,
+              topper,
+              topperDetalhes: topperDetalhesPayload(),
+              valorBrinde: isBrinde ? valorBrindeNum : null,
+              peso: needsPeso && peso ? parseFloat(peso) : null,
+              quantidade: needsQuantidade && quantidade ? parseInt(quantidade) : null,
+              itens: itensLocais.map(({ _id: _, ...rest }) => rest),
+            });
 
-      if (isEdit) {
-        result = await editarPedidoAction(pedido.id, {
-          tipo,
-          dataEntrega,
-          horaEntrega: horaEntrega || null,
-          horaRetirada: horaRetirada || null,
-          descricao,
-          topper,
-          topperDetalhes: topperDetalhesPayload(),
-          valorBrinde: isBrinde ? valorBrindeNum : null,
-          peso: needsPeso && peso ? parseFloat(peso) : null,
-          quantidade: needsQuantidade && quantidade ? parseInt(quantidade) : null,
-        });
-      } else {
-        result = await criarPedidoAction({
-          clienteId: clienteId || undefined,
-          novoClienteNome: nomeCliente || undefined,
-          novoClienteTelefone: telefoneCliente || undefined,
-          tipo,
-          dataEntrega,
-          horaEntrega: horaEntrega || null,
-          horaRetirada: horaRetirada || null,
-          descricao,
-          topper,
-          topperDetalhes: topperDetalhesPayload(),
-          valorBrinde: isBrinde ? valorBrindeNum : null,
-          peso: needsPeso && peso ? parseFloat(peso) : null,
-          quantidade: needsQuantidade && quantidade ? parseInt(quantidade) : null,
-          itens: itensLocais.map(({ _id: _, ...rest }) => rest),
-        });
+        // Deu certo: o servidor redireciona e o que vem abaixo não chega a rodar.
+        const pedidoId = (result as { pedidoId?: string })?.pedidoId;
+        if (pedidoId) setPedidoCriadoId(pedidoId);
+        if (result?.error) setError(result.error);
+      } catch (err) {
+        // A promessa da action rejeita quando a requisição nem chega a
+        // completar — sinal caindo no meio, servidor demorando demais, função
+        // derrubada por tempo. Sem este catch a falha virava rejeição não
+        // tratada: o botão voltava ao normal, sem aviso nenhum e sem pedido,
+        // e parecia que o pedido tinha sumido ao salvar.
+        if (ehRedirecionamento(err)) return;
+        setError(
+          mensagemErro(
+            err,
+            "Não foi possível salvar o pedido. Confira na lista de Pedidos se ele foi criado antes de tentar de novo."
+          )
+        );
+      } finally {
+        setSalvando(false);
       }
-
-      if (result?.error) setError(result.error);
     });
   }
 
@@ -229,7 +304,7 @@ export function PedidoForm({ clientes, pedido, produtos = [], topperPedido }: Pr
       <div className="card p-4 space-y-3">
         <h2 className="font-semibold text-sm text-gray-700">Cliente</h2>
 
-        {!isEdit && clientes.length > 0 && (
+        {!isEdit && listaClientes.length > 0 && (
           <div className="flex gap-2">
             <button type="button" onClick={() => setNovoCliente(false)}
               className={`flex-1 py-1.5 text-xs rounded-lg border font-medium transition-colors ${!novoCliente ? "bg-brand-600 text-white border-brand-600" : "bg-white text-gray-600 border-gray-300"}`}>
@@ -243,13 +318,28 @@ export function PedidoForm({ clientes, pedido, produtos = [], topperPedido }: Pr
         )}
 
         {!novoCliente && !isEdit ? (
-          <div className="relative">
-            <select value={clienteId} onChange={(e) => setClienteId(e.target.value)} className="input appearance-none pr-8">
-              <option value="">Selecionar cliente...</option>
-              {clientes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-            </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          </div>
+          <>
+            <div className="relative">
+              <select value={clienteId} onChange={(e) => setClienteId(e.target.value)} className="input appearance-none pr-8">
+                <option value="">Selecionar cliente...</option>
+                {listaClientes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+              </select>
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] text-gray-400">
+                {carregandoClientes
+                  ? "Atualizando lista..."
+                  : `${listaClientes.length} cliente${listaClientes.length === 1 ? "" : "s"} cadastrado${listaClientes.length === 1 ? "" : "s"}`}
+              </p>
+              <button type="button" onClick={() => void recarregarClientes()} disabled={carregandoClientes}
+                className="flex items-center gap-1 text-[11px] font-medium text-brand-600 disabled:text-gray-300">
+                <RefreshCw size={11} className={carregandoClientes ? "animate-spin" : undefined} />
+                Recarregar
+              </button>
+            </div>
+            {erroClientes && <p className="text-[11px] text-yellow-700">{erroClientes}</p>}
+          </>
         ) : isEdit ? (
           <p className="text-sm text-gray-500">Cliente não pode ser alterado após criação</p>
         ) : (
@@ -531,9 +621,15 @@ export function PedidoForm({ clientes, pedido, produtos = [], topperPedido }: Pr
 
       <div className="flex gap-2">
         <button type="button" onClick={() => router.back()} className="btn-secondary flex-1">Cancelar</button>
-        <button type="submit" disabled={isPending} className="btn-primary flex-1">
-          {isPending ? "Salvando..." : isEdit ? "Salvar" : "Criar Pedido"}
-        </button>
+        {pedidoCriadoId ? (
+          <button type="button" onClick={() => router.push(`/pedidos/${pedidoCriadoId}`)} className="btn-primary flex-1">
+            Abrir pedido
+          </button>
+        ) : (
+          <button type="submit" disabled={salvando || isPending} className="btn-primary flex-1">
+            {salvando || isPending ? "Salvando..." : isEdit ? "Salvar" : "Criar Pedido"}
+          </button>
+        )}
       </div>
     </form>
   );

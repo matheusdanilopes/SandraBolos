@@ -3,12 +3,21 @@
 //     com handler de fetch — sem ele o menu cai no atalho comum do navegador;
 //  2. dá ao app uma casca offline em vez da tela de erro nativa.
 //
-// Estratégia: navegações via rede primeiro (dados de pedidos/financeiro nunca
-// podem vir velhos), com cache só como rede de segurança quando está offline.
-// Estáticos do Next e ícones vêm do cache primeiro (têm hash na URL ou nunca mudam).
+// Estratégia: navegação sempre da rede; o cache guarda só estáticos do Next e
+// ícones (têm hash na URL ou nunca mudam). Página de dados não entra no cache.
+//
+// Antes as navegações eram gravadas no cache e devolvidas de lá quando a rede
+// demorava mais que o prazo. Num aparelho lento isso mostrava a lista de
+// pedidos de horas atrás com cara de lista atual: quem acabava de salvar um
+// pedido não o encontrava e achava que ele havia sumido. Página velha calada é
+// pior que aviso de "sem conexão", então sobrou só o aviso.
+//
+// O prazo também subiu: 8s derrubava requisição que ia completar (celular em
+// 3G somado à função do servidor acordando), e cada derrubada dessas virava
+// uma tela de erro sem motivo.
 
-const CACHE_NAME = 'sandra-bolos-v1'
-const NAVIGATION_TIMEOUT_MS = 8000
+const CACHE_NAME = 'sandra-bolos-v2'
+const NAVIGATION_TIMEOUT_MS = 25000
 
 const OFFLINE_HTML =
   '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">' +
@@ -80,20 +89,9 @@ self.addEventListener('fetch', (event) => {
       // redirect:'manual' devolve uma resposta opaca que o próprio navegador segue —
       // evita o response.redirected que o WKWebView (iOS) rejeita em navegação.
       fetchWithTimeout(new Request(request, { redirect: 'manual' }), NAVIGATION_TIMEOUT_MS)
-        .then(response => {
-          if (response.type === 'opaqueredirect') return response
-          if (response.ok) {
-            const clone = response.clone()
-            caches.open(CACHE_NAME).then(cache => cache.put(request, clone))
-          }
-          return response
-        })
-        .catch(() =>
-          caches.match(request, { ignoreVary: true })
-            .then(cached => cached || caches.match('/', { ignoreVary: true }))
-            .then(cached => cached || offlineResponse())
-            .catch(() => offlineResponse())
-        )
+        // Sem rede vai a casca offline, que se recarrega sozinha. Ela não
+        // finge ter dado: o que não veio do servidor agora não aparece.
+        .catch(() => offlineResponse())
     )
   }
 })

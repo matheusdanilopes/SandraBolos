@@ -127,7 +127,7 @@ async function sincronizarTopperPedido(
 
 export async function criarPedidoAction(
   data: PedidoPayload
-): Promise<{ error?: string }> {
+): Promise<{ error?: string; pedidoId?: string }> {
   const supabase = createServerSupabaseClient();
   let resolvedClienteId: string | null = data.clienteId || null;
 
@@ -140,6 +140,8 @@ export async function criarPedidoAction(
     if (clienteError) return { error: mensagemErro(clienteError) };
     resolvedClienteId = clienteData.id;
     revalidatePath("/clientes");
+    // O seletor de cliente do próximo pedido lê a mesma lista.
+    revalidatePath("/pedidos/novo");
   }
 
   const { data: novoPedido, error } = await supabase
@@ -163,7 +165,7 @@ export async function criarPedidoAction(
   if (error) return { error: mensagemErro(error) };
 
   if (data.itens && data.itens.length > 0) {
-    await supabase.from("itens_pedido").insert(
+    const { error: itensError } = await supabase.from("itens_pedido").insert(
       data.itens.map((item) => ({
         pedido_id: novoPedido.id,
         produto_id: item.produtoId,
@@ -174,6 +176,19 @@ export async function criarPedidoAction(
         valor_total: Math.round(item.valorTotal * 100) / 100,
       }))
     );
+
+    // O pedido já está gravado. Seguir para a tela dele em silêncio faria os
+    // itens sumirem sem ninguém perceber — e o valor ficaria zerado, com cara
+    // de pedido perdido. O id volta junto para a tela levar até o pedido em
+    // vez de mandar tentar de novo, o que criaria um segundo pedido.
+    if (itensError) {
+      revalidatePath("/pedidos");
+      revalidatePath("/");
+      return {
+        pedidoId: novoPedido.id,
+        error: `O pedido foi criado, mas os itens não foram salvos (${mensagemErro(itensError)}). Abra o pedido e lance os itens por lá.`,
+      };
+    }
   }
 
   // Topper "sim" nasce com ficha própria, para o pedido já entrar na tela de
