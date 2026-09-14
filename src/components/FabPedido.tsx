@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus, X, ShoppingBag, Zap, ChevronLeft, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { criarPedidoRapidoAction } from "@/app/pedidos/actions";
+import { mensagemErro } from "@/lib/erros";
 
 type Mode = "closed" | "sheet" | "quickform";
 
@@ -15,6 +16,7 @@ export function FabPedido() {
   const [valorEstimado, setValorEstimado] = useState("");
   const [dataEntrega, setDataEntrega] = useState("");
   const [erro, setErro] = useState("");
+  const [salvando, setSalvando] = useState(false);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -25,6 +27,7 @@ export function FabPedido() {
     setValorEstimado("");
     setDataEntrega("");
     setErro("");
+    setSalvando(false);
   }
 
   function handleNavigate(path: string) {
@@ -33,29 +36,47 @@ export function FabPedido() {
   }
 
   function handleSubmitRapido() {
+    // Um segundo toque enquanto a gravação corre criaria um segundo rascunho:
+    // com função async o `isPending` da transição não cobre o await.
+    if (salvando) return;
     if (!nomeCliente.trim()) {
       setErro("Nome do cliente é obrigatório");
       return;
     }
     setErro("");
+    setSalvando(true);
 
     const valor = valorEstimado
       ? parseFloat(valorEstimado.replace(",", "."))
       : undefined;
 
     startTransition(async () => {
-      const result = await criarPedidoRapidoAction({
-        nomeCliente,
-        descricao: descricao.trim() || undefined,
-        valorEstimado: valor && !isNaN(valor) ? valor : undefined,
-        dataEntrega: dataEntrega || undefined,
-      });
-      if (result.error) {
-        setErro(result.error);
-        return;
+      try {
+        const result = await criarPedidoRapidoAction({
+          nomeCliente,
+          descricao: descricao.trim() || undefined,
+          valorEstimado: valor && !isNaN(valor) ? valor : undefined,
+          dataEntrega: dataEntrega || undefined,
+        });
+        if (result.error) {
+          setErro(result.error);
+          return;
+        }
+        close();
+        router.push(`/pedidos/${result.pedidoId}`);
+      } catch (err) {
+        // Sem este catch, a requisição que não completa (sinal caindo, servidor
+        // demorando demais) virava rejeição não tratada: o formulário ficava
+        // como estava, sem aviso e sem rascunho — parecia que sumiu ao salvar.
+        setErro(
+          mensagemErro(
+            err,
+            "Não foi possível salvar. Confira na lista de Pedidos se o rascunho foi criado antes de tentar de novo."
+          )
+        );
+      } finally {
+        setSalvando(false);
       }
-      close();
-      router.push(`/pedidos/${result.pedidoId}`);
     });
   }
 
@@ -214,10 +235,10 @@ export function FabPedido() {
 
               <button
                 onClick={handleSubmitRapido}
-                disabled={isPending}
+                disabled={salvando || isPending}
                 className="btn-primary w-full flex items-center justify-center gap-2"
               >
-                {isPending ? (
+                {salvando || isPending ? (
                   <>
                     <Loader2 size={15} className="animate-spin" />
                     Salvando...
