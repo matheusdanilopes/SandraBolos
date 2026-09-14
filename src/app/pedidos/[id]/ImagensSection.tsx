@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { removerImagemAction } from "./actions";
+import { mensagemErro } from "@/lib/erros";
 import type { ImagemPedido } from "@/types/database";
 import { ImageIcon, Plus, Trash2, ExternalLink, Upload } from "lucide-react";
 
@@ -54,12 +55,39 @@ export function ImagensSection({ pedidoId, imagens: initialImagens }: Props) {
 
   function removeImagem(id: string) {
     if (!confirm("Remover imagem?")) return;
+
+    const indice = imagens.findIndex((i) => i.id === id);
+    if (indice === -1) return;
+    const removida = imagens[indice];
+
+    setError("");
     setImagens((prev) => prev.filter((i) => i.id !== id));
-    // A action revalida a rota, então o refresh do router viria de graça junto
-    // com a resposta — não há chamada extra a fazer aqui.
+
+    // Em caso de sucesso a action revalida a rota, então o refresh do router
+    // vem de graça junto com a resposta — não há chamada extra a fazer aqui.
     startRemocaoTransition(async () => {
-      await removerImagemAction(id, pedidoId);
+      try {
+        const res = await removerImagemAction(id, pedidoId);
+        if (res.error) restaurar(res.error);
+      } catch (err) {
+        // Requisição que não completa (sinal caindo, servidor demorando demais)
+        // vira rejeição não tratada sem este catch.
+        restaurar(mensagemErro(err));
+      }
     });
+
+    // A remoção acima é otimista. Se a exclusão não foi gravada, a imagem
+    // continua no banco: devolvê-la à lista, na posição original, evita que ela
+    // suma da tela e reapareça só na próxima visita — com cara de exclusão que
+    // funcionou.
+    function restaurar(mensagem: string) {
+      setImagens((prev) =>
+        prev.some((i) => i.id === id)
+          ? prev
+          : [...prev.slice(0, indice), removida, ...prev.slice(indice)]
+      );
+      setError(mensagem);
+    }
   }
 
   return (
