@@ -8,6 +8,7 @@ import { type Cliente, type Pedido, type TipoPedido, type Topper, type TopperPed
 import { AlertTriangle, ChevronDown, Plus, Trash2, Package, Truck, Sparkles, Gift, RefreshCw } from "lucide-react";
 import { parseISO, isPast, isToday } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
+import { mensagemErro } from "@/lib/erros";
 
 interface Props {
   clientes: Pick<Cliente, "id" | "nome" | "telefone">[];
@@ -46,6 +47,21 @@ interface ItemLocal {
   precoUnitario: number;
   quantidade: number;
   valorTotal: number;
+}
+
+// Identificador só para a lista em tela — nunca vai para o banco.
+// `crypto.randomUUID` não existe em WebView e Safari mais antigos: lá a função
+// estourava dentro do clique, o item não entrava e ninguém via erro nenhum.
+let sequenciaItem = 0;
+function novoIdItem(): string {
+  sequenciaItem += 1;
+  return `item-${Date.now()}-${sequenciaItem}`;
+}
+
+/** O redirect do servidor chega ao cliente como erro — não é falha de gravação. */
+function ehRedirecionamento(erro: unknown): boolean {
+  const digest = (erro as { digest?: unknown } | null)?.digest;
+  return typeof digest === "string" && digest.startsWith("NEXT_REDIRECT");
 }
 
 function isDataPassada(data: string): boolean {
@@ -120,6 +136,15 @@ export function PedidoForm({ clientes, pedido, produtos = [], topperPedido }: Pr
   const [quantidade, setQuantidade] = useState(pedido?.quantidade?.toString() ?? "");
   const [error, setError] = useState("");
 
+  // Estado próprio de salvamento em vez do `isPending` da transição: com uma
+  // função async o React 18 só considera pendente o trecho antes do primeiro
+  // await, então o botão voltava ao normal enquanto a gravação corria e um
+  // segundo toque criava outro pedido.
+  const [salvando, setSalvando] = useState(false);
+  // Pedido que chegou a ser gravado mas terminou com aviso: tentar de novo
+  // duplicaria, então a tela oferece abrir o que já existe.
+  const [pedidoCriadoId, setPedidoCriadoId] = useState<string | null>(null);
+
   // ── Itens do pedido (somente no modo de criação) ──────────────────────────
   const [itensLocais, setItensLocais] = useState<ItemLocal[]>([]);
   const [produtoSelecionadoId, setProdutoSelecionadoId] = useState("");
@@ -155,7 +180,7 @@ export function PedidoForm({ clientes, pedido, produtos = [], topperPedido }: Pr
     setItensLocais((prev) => [
       ...prev,
       {
-        _id: crypto.randomUUID(),
+        _id: novoIdItem(),
         produtoId: produtoSelecionado.id,
         nomeProduto: produtoSelecionado.nome,
         unidadeMedida: unidadeItem,
@@ -203,6 +228,7 @@ export function PedidoForm({ clientes, pedido, produtos = [], topperPedido }: Pr
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (salvando || pedidoCriadoId) return;
     setError("");
 
     if (!dataEntrega) { setError("Data de entrega é obrigatória"); return; }
@@ -214,44 +240,61 @@ export function PedidoForm({ clientes, pedido, produtos = [], topperPedido }: Pr
       if (!telefoneCliente) { setError("Telefone do cliente é obrigatório"); return; }
     }
 
+    setSalvando(true);
     startTransition(async () => {
-      let result: { error?: string };
+      try {
+        const result = isEdit
+          ? await editarPedidoAction(pedido.id, {
+              tipo,
+              dataEntrega,
+              horaEntrega: horaEntrega || null,
+              horaRetirada: horaRetirada || null,
+              descricao,
+              topper,
+              topperDetalhes: topperDetalhesPayload(),
+              valorBrinde: isBrinde ? valorBrindeNum : null,
+              peso: needsPeso && peso ? parseFloat(peso) : null,
+              quantidade: needsQuantidade && quantidade ? parseInt(quantidade) : null,
+            })
+          : await criarPedidoAction({
+              // Em "Novo" vale o que foi digitado: reaproveitar um id escolhido
+              // antes de trocar de aba amarraria o pedido ao cliente errado.
+              clienteId: novoCliente ? undefined : clienteId || undefined,
+              novoClienteNome: nomeCliente || undefined,
+              novoClienteTelefone: telefoneCliente || undefined,
+              tipo,
+              dataEntrega,
+              horaEntrega: horaEntrega || null,
+              horaRetirada: horaRetirada || null,
+              descricao,
+              topper,
+              topperDetalhes: topperDetalhesPayload(),
+              valorBrinde: isBrinde ? valorBrindeNum : null,
+              peso: needsPeso && peso ? parseFloat(peso) : null,
+              quantidade: needsQuantidade && quantidade ? parseInt(quantidade) : null,
+              itens: itensLocais.map(({ _id: _, ...rest }) => rest),
+            });
 
-      if (isEdit) {
-        result = await editarPedidoAction(pedido.id, {
-          tipo,
-          dataEntrega,
-          horaEntrega: horaEntrega || null,
-          horaRetirada: horaRetirada || null,
-          descricao,
-          topper,
-          topperDetalhes: topperDetalhesPayload(),
-          valorBrinde: isBrinde ? valorBrindeNum : null,
-          peso: needsPeso && peso ? parseFloat(peso) : null,
-          quantidade: needsQuantidade && quantidade ? parseInt(quantidade) : null,
-        });
-      } else {
-        result = await criarPedidoAction({
-          // Em "Novo" vale o que foi digitado: reaproveitar um id escolhido
-          // antes de trocar de aba amarraria o pedido ao cliente errado.
-          clienteId: novoCliente ? undefined : clienteId || undefined,
-          novoClienteNome: nomeCliente || undefined,
-          novoClienteTelefone: telefoneCliente || undefined,
-          tipo,
-          dataEntrega,
-          horaEntrega: horaEntrega || null,
-          horaRetirada: horaRetirada || null,
-          descricao,
-          topper,
-          topperDetalhes: topperDetalhesPayload(),
-          valorBrinde: isBrinde ? valorBrindeNum : null,
-          peso: needsPeso && peso ? parseFloat(peso) : null,
-          quantidade: needsQuantidade && quantidade ? parseInt(quantidade) : null,
-          itens: itensLocais.map(({ _id: _, ...rest }) => rest),
-        });
+        // Deu certo: o servidor redireciona e o que vem abaixo não chega a rodar.
+        const pedidoId = (result as { pedidoId?: string })?.pedidoId;
+        if (pedidoId) setPedidoCriadoId(pedidoId);
+        if (result?.error) setError(result.error);
+      } catch (err) {
+        // A promessa da action rejeita quando a requisição nem chega a
+        // completar — sinal caindo no meio, servidor demorando demais, função
+        // derrubada por tempo. Sem este catch a falha virava rejeição não
+        // tratada: o botão voltava ao normal, sem aviso nenhum e sem pedido,
+        // e parecia que o pedido tinha sumido ao salvar.
+        if (ehRedirecionamento(err)) return;
+        setError(
+          mensagemErro(
+            err,
+            "Não foi possível salvar o pedido. Confira na lista de Pedidos se ele foi criado antes de tentar de novo."
+          )
+        );
+      } finally {
+        setSalvando(false);
       }
-
-      if (result?.error) setError(result.error);
     });
   }
 
@@ -578,9 +621,15 @@ export function PedidoForm({ clientes, pedido, produtos = [], topperPedido }: Pr
 
       <div className="flex gap-2">
         <button type="button" onClick={() => router.back()} className="btn-secondary flex-1">Cancelar</button>
-        <button type="submit" disabled={isPending} className="btn-primary flex-1">
-          {isPending ? "Salvando..." : isEdit ? "Salvar" : "Criar Pedido"}
-        </button>
+        {pedidoCriadoId ? (
+          <button type="button" onClick={() => router.push(`/pedidos/${pedidoCriadoId}`)} className="btn-primary flex-1">
+            Abrir pedido
+          </button>
+        ) : (
+          <button type="submit" disabled={salvando || isPending} className="btn-primary flex-1">
+            {salvando || isPending ? "Salvando..." : isEdit ? "Salvar" : "Criar Pedido"}
+          </button>
+        )}
       </div>
     </form>
   );

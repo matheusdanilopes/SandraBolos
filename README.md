@@ -10,7 +10,7 @@ O app é instalável de verdade — no Android o Chrome oferece "Instalar app"
 | Arquivo | Papel |
 | --- | --- |
 | `public/manifest.webmanifest` | nome, `display: standalone`, `start_url`, cores e ícones |
-| `public/sw.js` | service worker — requisito do Chrome para o WebAPK e casca offline |
+| `public/sw.js` | service worker — requisito do Chrome para o WebAPK e casca offline; **não** guarda página de dados em cache (ver "Salvar pedido") |
 | `src/components/InstalarApp.tsx` | registra o SW e mostra o convite de instalação |
 | `public/icon-*.png`, `public/apple-touch-icon.png` | ícones gerados a partir de `public/logo.jpg` |
 
@@ -50,3 +50,27 @@ primeira visita àquela rota.
 | --- | --- |
 | `src/app/clientes/actions.ts` | `revalidarTelasComClientes()` revalida `/clientes` **e** `/pedidos/novo` ao criar/editar; `listarClientesAction()` devolve a lista para o formulário |
 | `src/app/pedidos/PedidoForm.tsx` | relê a lista ao abrir o formulário e oferece "Recarregar" — cobre também o cadastro feito em outra aba ou outro celular |
+
+## Salvar pedido
+
+Sintoma relatado: em alguns aparelhos a pessoa salvava o pedido e ele sumia.
+Eram três causas somadas, todas invisíveis para quem usa:
+
+1. **Service worker devolvendo página velha.** As navegações eram gravadas no
+   cache e servidas de lá sempre que a rede passava de 8s. Num celular lento a
+   lista de pedidos vinha de horas atrás, com cara de lista atual — o pedido
+   estava gravado no banco, mas fora da tela. Hoje navegação vem sempre da
+   rede; sem rede aparece a casca offline, que não finge ter dado.
+2. **Falha de gravação sem aviso.** A action era chamada dentro de
+   `startTransition(async …)` sem `try/catch`: quando a requisição nem
+   completava (sinal caindo, função derrubada por tempo), a rejeição não era
+   tratada, o botão voltava ao normal e nada aparecia na tela.
+3. **Itens perdidos em silêncio.** O `insert` em `itens_pedido` não tinha o
+   erro conferido: o pedido nascia sem item nenhum e com valor zerado.
+
+| Arquivo | Papel |
+| --- | --- |
+| `public/sw.js` | navegação só da rede; cache apenas para estáticos com hash na URL |
+| `src/app/pedidos/PedidoForm.tsx` | `try/catch` com mensagem na tela, estado próprio de salvamento (o `isPending` da transição não cobre o `await`, então o botão não travava o segundo toque) e "Abrir pedido" quando o pedido existe mas terminou com aviso — tentar de novo criaria um segundo |
+| `src/components/FabPedido.tsx` | mesmo tratamento no "Pedido Rápido" |
+| `src/app/pedidos/actions.ts` | erro do `insert` dos itens devolvido junto com o id do pedido criado |
