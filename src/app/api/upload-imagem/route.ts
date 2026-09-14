@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
-import { createPedidoFolder, uploadFileToDrive } from "@/lib/googleDrive";
+import {
+  createPedidoFolder,
+  ehPastaInacessivel,
+  normalizarIdPasta,
+  uploadFileToDrive,
+} from "@/lib/googleDrive";
 import { isErroDeConexao, mensagemErro } from "@/lib/erros";
 import sharp from "sharp";
 
@@ -55,24 +60,28 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Lazy folder creation: create Drive folder now if not yet created.
-  // Treat falsy values AND suspiciously short strings (e.g. ".") as absent —
-  // real Drive folder IDs are always 25+ chars.
-  let folderId = pedido.drive_folder_id;
-  if (!folderId || folderId.length < 10) {
-    if (folderId && folderId.length < 10) {
-      // Bad ID stored in DB from a previous buggy run — clear it so it gets replaced.
-      await supabase.from("pedidos").update({ drive_folder_id: null }).eq("id", pedido.id);
-      folderId = null;
-    }
-    const clienteNome =
-      (pedido.clientes as { nome: string } | null)?.nome ??
-      pedido.nome_cliente ??
-      "pedido";
+  const clienteNome =
+    (pedido.clientes as { nome: string } | null)?.nome ?? pedido.nome_cliente ?? "pedido";
+  const pedidoUuid: string = pedido.id;
 
+  /** Cria a pasta do pedido no Drive e guarda o ID. `createPedidoFolder` reaproveita
+   *  uma pasta de mesmo nome, então chamar de novo não gera pasta duplicada. */
+  async function criarPasta(): Promise<string> {
+    const novoId = await createPedidoFolder(pedidoUuid, clienteNome);
+    await supabase.from("pedidos").update({ drive_folder_id: novoId }).eq("id", pedidoUuid);
+    return novoId;
+  }
+
+  // Criação preguiçosa: a pasta só nasce no primeiro upload. Valores estranhos
+  // salvos por execuções antigas (".", string vazia, URL) são descartados aqui —
+  // `normalizarIdPasta` devolve null para tudo que não é um ID de verdade.
+  let folderId = normalizarIdPasta(pedido.drive_folder_id);
+  if (!folderId) {
+    if (pedido.drive_folder_id) {
+      await supabase.from("pedidos").update({ drive_folder_id: null }).eq("id", pedidoUuid);
+    }
     try {
-      folderId = await createPedidoFolder(pedido.id, clienteNome);
-      await supabase.from("pedidos").update({ drive_folder_id: folderId }).eq("id", pedido.id);
+      folderId = await criarPasta();
     } catch (driveErr: unknown) {
       const e = driveErr as { code?: number };
       console.error("[Drive] createPedidoFolder failed:", driveErr);
@@ -93,19 +102,37 @@ export async function POST(req: NextRequest) {
 
   const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`;
 
-  // Upload to Drive
+  // Upload to Drive. A pasta gravada no banco pode ter sido apagada ou movida
+  // direto no Drive — nesse caso o upload volta 404 e a pasta é recriada uma vez,
+  // em vez de a importação ficar quebrada para sempre naquele pedido.
   let fileId: string;
   let url: string;
   try {
     ({ fileId, url } = await uploadFileToDrive(folderId, compressed, fileName, "image/jpeg"));
   } catch (driveErr: unknown) {
-    const e = driveErr as { code?: number };
-    console.error("[Drive] uploadFileToDrive failed:", driveErr);
-    const detalhe = mensagemErro(driveErr);
-    return NextResponse.json(
-      { error: isErroDeConexao(driveErr) ? detalhe : `Drive upload: ${detalhe}`, code: e.code },
-      { status: 502 }
-    );
+    if (ehPastaInacessivel(driveErr)) {
+      console.warn("[Drive] pasta do pedido inacessível, recriando:", folderId);
+      try {
+        folderId = await criarPasta();
+        ({ fileId, url } = await uploadFileToDrive(folderId, compressed, fileName, "image/jpeg"));
+      } catch (retryErr: unknown) {
+        const e = retryErr as { code?: number };
+        console.error("[Drive] uploadFileToDrive retry failed:", retryErr);
+        const detalhe = mensagemErro(retryErr);
+        return NextResponse.json(
+          { error: isErroDeConexao(retryErr) ? detalhe : `Drive: ${detalhe}`, code: e.code },
+          { status: 502 }
+        );
+      }
+    } else {
+      const e = driveErr as { code?: number };
+      console.error("[Drive] uploadFileToDrive failed:", driveErr);
+      const detalhe = mensagemErro(driveErr);
+      return NextResponse.json(
+        { error: isErroDeConexao(driveErr) ? detalhe : `Drive: ${detalhe}`, code: e.code },
+        { status: 502 }
+      );
+    }
   }
 
   // Persist reference in DB

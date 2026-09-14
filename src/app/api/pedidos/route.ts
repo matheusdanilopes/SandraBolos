@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
-import { createPedidoFolder } from "@/lib/googleDrive";
+import { createPedidoFolder, driveConfigurado } from "@/lib/googleDrive";
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -46,9 +46,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: dbError.message }, { status: 500 });
   }
 
-  // Create Drive folder (non-fatal if env vars not configured)
+  // Create Drive folder (non-fatal if env vars not configured).
+  // A checagem passa por `driveConfigurado()`: o guard anterior exigia
+  // GOOGLE_SERVICE_ACCOUNT_EMAIL e ignorava quem configurou a conta de serviço
+  // pelo JSON completo (GOOGLE_APPLICATION_CREDENTIALS_JSON), que é a opção 1 do
+  // .env.local.example — nesses casos a pasta nunca era criada aqui.
   let drive_folder_id: string | null = null;
-  if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID) {
+  if (driveConfigurado()) {
     try {
       drive_folder_id = await createPedidoFolder(pedido.id, nomeParaPasta);
       await supabase

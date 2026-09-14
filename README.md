@@ -99,3 +99,43 @@ sempre, e o cadastro de cliente não tinha como sair da lista.
 | --- | --- |
 | Pedido em **rascunho** ou **novo** pode ser excluído de vez (itens, imagens e ficha de topper vão junto). De "produzindo" em diante o caminho é cancelar, que preserva o histórico | `excluirPedidoAction()` em `src/app/pedidos/actions.ts`, botão em `src/app/pedidos/[id]/StatusActions.tsx` |
 | Cliente só pode ser excluído **sem nenhum pedido vinculado** — `pedidos.cliente_id` é `on delete set null`, então apagar um cliente com pedidos não daria erro: deixaria pedidos órfãos, sem histórico e sem telefone. Com pedidos, a ficha mostra o motivo no lugar do botão | `excluirClienteAction()` em `src/app/clientes/actions.ts`, botão em `src/app/clientes/[id]/ExcluirCliente.tsx` |
+
+## Importar imagens do pedido (Google Drive)
+
+Sintoma relatado: ao adicionar uma foto de referência, a tela mostrava
+`Drive: File not found: .` — um texto que não dizia nem qual pasta faltava nem
+o que fazer a respeito. O erro vinha de duas armadilhas somadas:
+
+1. **O 404 apontava o alvo errado.** `getOrCreateFolder()` procurava a pasta do
+   ano com `files.list`, e essa chamada **não falha quando a pasta pai é
+   inacessível** — devolve lista vazia. O código concluía "ainda não existe" e
+   seguia para o `files.create`, que aí sim estourava 404. O ID no texto do erro
+   era o da **pasta raiz**, não o do arquivo que se queria enviar.
+2. **O 404 do Drive é ambíguo de propósito.** Para não revelar a existência de
+   arquivos que você não pode ver, o Drive responde "não encontrado" tanto para
+   pasta inexistente quanto para pasta existente **sem permissão**. Os dois
+   problemas mais comuns — ID errado e pasta não compartilhada com a conta de
+   serviço — chegavam à tela com exatamente o mesmo texto.
+
+| Arquivo | Papel |
+| --- | --- |
+| `src/lib/googleDrive.ts` | `validarPastaRaiz()` confere a raiz com `files.get` **antes** de criar qualquer coisa, então a falha aparece na etapa certa; `descreveErroDrive()` traduz 404/403/401 e cota esgotada para instruções com o ID e o e-mail à vista; `normalizarIdPasta()` aceita URL colada, tira aspas e caracteres invisíveis, e rejeita `"."`/`""`/`"root"` |
+| `src/app/api/upload-imagem/route.ts` | pasta apagada direto no Drive não quebra o pedido para sempre: o 404 no upload dispara uma recriação e uma segunda tentativa |
+| `src/app/api/pedidos/route.ts` | o guard usava `GOOGLE_SERVICE_ACCOUNT_EMAIL` e ignorava quem configurou pelo JSON completo (a opção 1 do `.env.local.example`); agora usa `driveConfigurado()` |
+| `src/app/api/test-drive/route.ts` | mostra o ID **normalizado** que o app usa de fato e o `client_email` que precisa receber o compartilhamento |
+
+### Configurar
+
+1. Crie a pasta no seu Drive e copie a URL da barra de endereços.
+2. Coloque em `GOOGLE_DRIVE_ROOT_FOLDER_ID` — a URL inteira serve, o ID também.
+3. **Compartilhe a pasta com o `client_email` da conta de serviço, como Editor.**
+   Esse é o passo que costuma faltar: sem ele o Drive diz "File not found"
+   mesmo com o ID correto.
+4. Confira com `GET /api/test-drive?secret=<TEST_DRIVE_SECRET>`. A resposta traz
+   `contaDeServico` (o e-mail para compartilhar), `envCheck.idNormalizado` (o ID
+   realmente usado) e `diagnostico.podeCriarSubpastas`.
+
+`"root"` não é aceito como pasta raiz: é o Drive da própria conta de serviço,
+que não tem espaço de armazenamento — todo upload ali falharia com
+`storageQuotaExceeded`. Para usar um Drive compartilhado (Shared Drive), aponte
+para uma pasta dentro dele; as chamadas já mandam `supportsAllDrives`.
