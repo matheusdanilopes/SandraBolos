@@ -8,7 +8,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { AlertaBadge } from "@/components/AlertaBadge";
 import { cn, formatDate, isEntregaHoje, isEntregaSemana, pedidoAlerta } from "@/lib/utils";
 import { TIPO_LABELS, STATUS_LABELS, type PedidoComCliente, type StatusPedido } from "@/types/database";
-import { excluirRascunhoAction } from "./actions";
+import { excluirPedidoAction } from "./actions";
 import { PedidosCalendar } from "./PedidosCalendar";
 
 type Filtro = "todos" | "hoje" | "semana" | "atrasados" | StatusPedido;
@@ -106,7 +106,7 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
     setLocalDeleted((prev) => new Set(prev).add(pedidoId));
     setConfirmandoExclusaoId(null);
     startExclusaoTransition(async () => {
-      const result = await excluirRascunhoAction(pedidoId);
+      const result = await excluirPedidoAction(pedidoId);
       if (result.error) {
         setLocalDeleted((prev) => {
           const next = new Set(prev);

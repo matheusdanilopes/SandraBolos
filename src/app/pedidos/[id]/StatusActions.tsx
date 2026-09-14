@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { avancarStatusAction, voltarStatusAction, cancelarPedidoAction } from "./actions";
-import { excluirRascunhoAction } from "@/app/pedidos/actions";
+import { excluirPedidoAction } from "@/app/pedidos/actions";
 import { STATUS_LABELS, type StatusPedido } from "@/types/database";
 import {
   Check,
@@ -42,9 +42,9 @@ export function StatusActions({ pedidoId, currentStatus, proximoStatus }: Props)
 
   // ── Handlers definidos antes de qualquer early return ──────────────────────
 
-  const handleExcluirRascunho = () => {
+  const handleExcluirPedido = () => {
     startExclusaoTransition(async () => {
-      const result = await excluirRascunhoAction(pedidoId);
+      const result = await excluirPedidoAction(pedidoId);
       if (result.error) {
         setErro(result.error);
         setConfirmandoExclusao(false);
@@ -57,6 +57,10 @@ export function StatusActions({ pedidoId, currentStatus, proximoStatus }: Props)
   const currentIndex = STATUS_ORDER.indexOf(currentStatus);
   const statusAnterior = currentIndex > 0 ? STATUS_ORDER[currentIndex - 1] : null;
   const podeCancelar = CANCELAVEIS.includes(currentStatus);
+  // Pedido recém-lançado ainda pode ser apagado de vez: é aqui que aparecem o
+  // lançamento em duplicidade e o registro errado, que não têm por que ficar no
+  // histórico. Depois de entrar em produção só resta cancelar.
+  const podeExcluir = currentStatus === "novo";
 
   const showSuccess = (msg: string) => {
     setSuccessMsg(msg);
@@ -140,7 +144,7 @@ export function StatusActions({ pedidoId, currentStatus, proximoStatus }: Props)
                   Não
                 </button>
                 <button
-                  onClick={handleExcluirRascunho}
+                  onClick={handleExcluirPedido}
                   disabled={isPendingExclusao}
                   className="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm px-4 rounded-xl font-medium transition-colors disabled:opacity-50 min-h-[44px] flex items-center justify-center gap-2"
                 >
@@ -287,7 +291,7 @@ export function StatusActions({ pedidoId, currentStatus, proximoStatus }: Props)
       )}
 
       {/* Cancelar pedido */}
-      {podeCancelar && !confirmandoVoltar && (
+      {podeCancelar && !confirmandoVoltar && !confirmandoExclusao && (
         <div className="border-t border-gray-100 pt-3">
           {!confirmandoCancelamento ? (
             <button
@@ -335,6 +339,53 @@ export function StatusActions({ pedidoId, currentStatus, proximoStatus }: Props)
                   {isPendingCancelamento ? (
                     <><Loader2 size={13} className="animate-spin" /> Cancelando...</>
                   ) : "Confirmar cancelamento"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Excluir pedido — só no status "novo" */}
+      {podeExcluir && !confirmandoVoltar && !confirmandoCancelamento && (
+        <div className="border-t border-gray-100 pt-3">
+          {!confirmandoExclusao ? (
+            <button
+              onClick={() => { setConfirmandoExclusao(true); setErro(""); }}
+              className="w-full flex items-center justify-center gap-2 text-sm text-gray-400 hover:text-red-500 py-2 rounded-xl hover:bg-red-50 transition-colors font-medium"
+            >
+              <Trash2 size={14} />
+              Excluir pedido
+            </button>
+          ) : (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 space-y-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle size={15} className="text-red-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm text-red-800 font-semibold">Excluir este pedido definitivamente?</p>
+                  <p className="text-xs text-red-600 mt-0.5">
+                    Os itens, as imagens e a ficha de topper somem junto, sem como recuperar. Para
+                    manter o registro, use &quot;Cancelar pedido&quot;.
+                  </p>
+                </div>
+              </div>
+              {erro && <p className="text-xs text-red-700 font-medium">{erro}</p>}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setConfirmandoExclusao(false); setErro(""); }}
+                  disabled={isPendingExclusao}
+                  className="btn-secondary flex-1 text-sm"
+                >
+                  Voltar
+                </button>
+                <button
+                  onClick={handleExcluirPedido}
+                  disabled={isPendingExclusao}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm px-4 rounded-xl font-medium transition-colors disabled:opacity-50 min-h-[44px] flex items-center justify-center gap-2"
+                >
+                  {isPendingExclusao ? (
+                    <><Loader2 size={13} className="animate-spin" /> Excluindo...</>
+                  ) : "Sim, excluir"}
                 </button>
               </div>
             </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useState, useMemo, useTransition } from "react";
-import { ChevronDown, Plus, Pencil, Check, X, ToggleLeft, ToggleRight } from "lucide-react";
+import { ChevronDown, Plus, Pencil, Check, X, ToggleLeft, ToggleRight, Search } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import type { ProdutoComCategoria, UnidadeMedida, CategoriaProduto } from "@/types/database";
 import { UNIDADE_LABELS } from "@/types/database";
@@ -23,6 +23,33 @@ interface EditState {
   unidade_medida: UnidadeMedida;
   preco_padrao: string;
   categoria_id: string;
+}
+
+// ─── Filtro ───────────────────────────────────────────────────────────────────
+
+const SEM_CATEGORIA = "__sem_categoria__";
+
+/** Sem isso "acucar" não encontra "Açúcar" — e é assim que se digita no celular. */
+function normalizar(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function filtrarProdutos(
+  produtos: ProdutoComCategoria[],
+  busca: string,
+  categoriaId: string | null
+): ProdutoComCategoria[] {
+  const alvo = normalizar(busca);
+  return produtos.filter((p) => {
+    if (categoriaId && (p.categoria_id ?? SEM_CATEGORIA) !== categoriaId) return false;
+    if (!alvo) return true;
+    // A descrição entra na busca porque é onde fica o sabor do produto.
+    return normalizar(p.nome).includes(alvo) || normalizar(p.descricao ?? "").includes(alvo);
+  });
 }
 
 // ─── Grouping ─────────────────────────────────────────────────────────────────
@@ -327,13 +354,116 @@ const NovoProdutoForm = memo(function NovoProdutoForm({ categorias }: { categori
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export function ProdutosClient({ produtos, categorias, configCardapio }: Props) {
-  const ativos = useMemo(() => produtos.filter((p) => p.ativo), [produtos]);
-  const inativos = useMemo(() => produtos.filter((p) => !p.ativo), [produtos]);
+  const [busca, setBusca] = useState("");
+  const [categoriaId, setCategoriaId] = useState<string | null>(null);
+
+  const visiveis = useMemo(
+    () => filtrarProdutos(produtos, busca, categoriaId),
+    [produtos, busca, categoriaId]
+  );
+  const ativos = useMemo(() => visiveis.filter((p) => p.ativo), [visiveis]);
+  const inativos = useMemo(() => visiveis.filter((p) => !p.ativo), [visiveis]);
   const grupos = useMemo(() => buildGrupos(ativos, categorias), [ativos, categorias]);
+
+  // Chip só para categoria que tem produto — filtro que não acha nada só atrapalha.
+  const chips = useMemo(() => {
+    const usadas = new Set(produtos.map((p) => p.categoria_id ?? SEM_CATEGORIA));
+    const lista = categorias
+      .filter((c) => usadas.has(c.id))
+      .sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome))
+      .map((c) => ({ id: c.id, nome: c.nome }));
+    if (usadas.has(SEM_CATEGORIA) && lista.length > 0) {
+      lista.push({ id: SEM_CATEGORIA, nome: "Sem categoria" });
+    }
+    return lista;
+  }, [produtos, categorias]);
+
+  const filtrando = busca.trim() !== "" || categoriaId !== null;
+  const limparFiltros = () => { setBusca(""); setCategoriaId(null); };
 
   return (
     <div className="space-y-4">
       <NovoProdutoForm categorias={categorias} />
+
+      {/* Busca + categorias */}
+      {produtos.length > 0 && (
+        <div className="space-y-2">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar produto"
+              autoComplete="off"
+              className="input pl-9 pr-9"
+            />
+            {busca && (
+              <button
+                onClick={() => setBusca("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1.5"
+                aria-label="Limpar busca"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          {chips.length > 0 && (
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-none -mx-1 px-1 py-0.5">
+              <button
+                onClick={() => setCategoriaId(null)}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                  categoriaId === null
+                    ? "bg-brand-600 text-white border-brand-600"
+                    : "bg-white text-gray-600 border-gray-300"
+                }`}
+              >
+                Todos
+              </button>
+              {chips.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setCategoriaId((atual) => (atual === c.id ? null : c.id))}
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${
+                    categoriaId === c.id
+                      ? "bg-brand-600 text-white border-brand-600"
+                      : "bg-white text-gray-600 border-gray-300"
+                  }`}
+                >
+                  {c.nome}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {filtrando && (
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] text-gray-400">
+                {visiveis.length} de {produtos.length} produto{produtos.length === 1 ? "" : "s"}
+              </p>
+              <button
+                onClick={limparFiltros}
+                className="text-[11px] font-medium text-brand-600 py-1"
+              >
+                Limpar filtros
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Nada encontrado com o filtro em uso */}
+      {produtos.length > 0 && visiveis.length === 0 && (
+        <div className="card p-8 text-center space-y-2">
+          <p className="text-sm text-gray-500">
+            Nenhum produto {busca.trim() ? `com "${busca.trim()}"` : "nesta categoria"}
+          </p>
+          <button onClick={limparFiltros} className="text-xs font-medium text-brand-600 underline underline-offset-2 py-1">
+            Limpar filtros
+          </button>
+        </div>
+      )}
 
       {/* Active products grouped by category */}
       {ativos.length > 0 && (
