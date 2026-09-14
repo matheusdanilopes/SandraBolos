@@ -201,6 +201,12 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
             <dt className="text-xs text-gray-400 mb-0.5">Topper</dt>
             <dd className="font-medium text-gray-900">{TOPPER_LABELS[pedidoTyped.topper]}</dd>
           </div>
+          {pedidoTyped.valor_brinde != null && (
+            <div>
+              <dt className="text-xs text-gray-400 mb-0.5">Brinde (receita)</dt>
+              <dd className="font-medium text-gray-900">{formatCurrency(pedidoTyped.valor_brinde)}</dd>
+            </div>
+          )}
           {pedidoTyped.peso && (
             <div>
               <dt className="text-xs text-gray-400 mb-0.5">Peso</dt>
@@ -229,6 +235,13 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
             <div className="col-span-2">
               <dt className="text-xs text-gray-400 mb-0.5">Valor estimado</dt>
               <dd className="font-semibold text-emerald-700 text-base">{formatCurrency(valorFinal)}</dd>
+              {/* Sem esta nota o valor estimado parece divergir da precificação,
+                  que calcula só a produção. */}
+              {pedidoTyped.valor_brinde != null && (
+                <p className="text-[11px] text-gray-400 mt-0.5">
+                  Inclui {formatCurrency(pedidoTyped.valor_brinde)} do topper de brinde
+                </p>
+              )}
             </div>
           )}
         </dl>

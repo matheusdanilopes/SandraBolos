@@ -3,8 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { criarPedidoAction, editarPedidoAction } from "./actions";
-import { type Cliente, type Pedido, type TipoPedido, type Topper, type Produto, type UnidadeMedida, UNIDADE_LABELS } from "@/types/database";
-import { AlertTriangle, ChevronDown, Plus, Trash2, Package } from "lucide-react";
+import { type Cliente, type Pedido, type TipoPedido, type Topper, type TopperPedido, type Produto, type UnidadeMedida, UNIDADE_LABELS } from "@/types/database";
+import { AlertTriangle, ChevronDown, Plus, Trash2, Package, Truck, Sparkles, Gift } from "lucide-react";
 import { parseISO, isPast, isToday } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 
@@ -12,6 +12,8 @@ interface Props {
   clientes: Pick<Cliente, "id" | "nome" | "telefone">[];
   pedido?: Pedido;
   produtos?: Produto[];
+  /** Ficha do topper já registrada (edição) — os campos abrem preenchidos com ela. */
+  topperPedido?: TopperPedido | null;
 }
 
 // ─── Cálculo por unidade de medida ──────────────────────────────────────────
@@ -62,7 +64,7 @@ function ItensSection({ produtos }: { produtos: Produto[]; itens: ItemLocal[]; o
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 
-export function PedidoForm({ clientes, pedido, produtos = [] }: Props) {
+export function PedidoForm({ clientes, pedido, produtos = [], topperPedido }: Props) {
   const router = useRouter();
   const isEdit = !!pedido;
   const [isPending, startTransition] = useTransition();
@@ -79,6 +81,11 @@ export function PedidoForm({ clientes, pedido, produtos = [] }: Props) {
   const [horaRetirada, setHoraRetirada] = useState(pedido?.hora_retirada ?? "");
   const [descricao, setDescricao] = useState(pedido?.descricao ?? "");
   const [topper, setTopper] = useState<Topper>(pedido?.topper ?? "nao");
+  const [topperFornecedor, setTopperFornecedor] = useState(topperPedido?.fornecedor ?? "");
+  const [topperValor, setTopperValor] = useState(topperPedido?.valor ? topperPedido.valor.toString() : "");
+  const [topperFrete, setTopperFrete] = useState(topperPedido?.frete ? topperPedido.frete.toString() : "");
+  const [topperObservacoes, setTopperObservacoes] = useState(topperPedido?.observacoes ?? "");
+  const [valorBrinde, setValorBrinde] = useState(pedido?.valor_brinde ? pedido.valor_brinde.toString() : "");
   const [peso, setPeso] = useState(pedido?.peso?.toString() ?? "");
   const [quantidade, setQuantidade] = useState(pedido?.quantidade?.toString() ?? "");
   const [error, setError] = useState("");
@@ -137,6 +144,28 @@ export function PedidoForm({ clientes, pedido, produtos = [] }: Props) {
     setItensLocais((prev) => prev.filter((i) => i._id !== id));
   }
 
+  // ── Topper ─────────────────────────────────────────────────────────────────
+  // Marcar "sim" já alimenta a ficha da tela de Toppers: o que for informado
+  // aqui (fornecedor, valores, observações) vai junto no registro. Brinde não
+  // é compra de fornecedor e por isso não tem ficha aqui.
+  const temTopper = topper === "sim";
+  const topperTotal = (parseFloat(topperValor) || 0) + (parseFloat(topperFrete) || 0);
+
+  // Brinde é receita do pedido: o valor informado aqui soma ao valor do pedido,
+  // em vez de virar custo de fornecedor a pagar.
+  const isBrinde = topper === "brinde";
+  const valorBrindeNum = parseFloat(valorBrinde) || 0;
+
+  function topperDetalhesPayload() {
+    if (!temTopper) return undefined;
+    return {
+      fornecedor: topperFornecedor || null,
+      valor: parseFloat(topperValor) || 0,
+      frete: parseFloat(topperFrete) || 0,
+      observacoes: topperObservacoes || null,
+    };
+  }
+
   // ── Validação e envio ──────────────────────────────────────────────────────
   const needsPeso = tipo === "bolo" || tipo === "kit";
   const needsQuantidade = tipo === "doce" || tipo === "kit";
@@ -166,6 +195,8 @@ export function PedidoForm({ clientes, pedido, produtos = [] }: Props) {
           horaRetirada: horaRetirada || null,
           descricao,
           topper,
+          topperDetalhes: topperDetalhesPayload(),
+          valorBrinde: isBrinde ? valorBrindeNum : null,
           peso: needsPeso && peso ? parseFloat(peso) : null,
           quantidade: needsQuantidade && quantidade ? parseInt(quantidade) : null,
         });
@@ -180,6 +211,8 @@ export function PedidoForm({ clientes, pedido, produtos = [] }: Props) {
           horaRetirada: horaRetirada || null,
           descricao,
           topper,
+          topperDetalhes: topperDetalhesPayload(),
+          valorBrinde: isBrinde ? valorBrindeNum : null,
           peso: needsPeso && peso ? parseFloat(peso) : null,
           quantidade: needsQuantidade && quantidade ? parseInt(quantidade) : null,
           itens: itensLocais.map(({ _id: _, ...rest }) => rest),
@@ -400,6 +433,90 @@ export function PedidoForm({ clientes, pedido, produtos = [] }: Props) {
             ))}
           </div>
         </div>
+
+        {/* Ficha do topper — alimentada já no registro do pedido, é o que a tela
+            de Toppers acompanha (e o financeiro soma quando o topper é pago). */}
+        {temTopper && (
+          <div className="rounded-xl border border-purple-200 bg-purple-50/60 p-3 space-y-3">
+            <div className="flex items-center gap-1.5">
+              <Sparkles size={13} className="text-purple-600" />
+              <p className="text-xs font-semibold text-purple-700">Topper encomendado</p>
+            </div>
+            <p className="text-[11px] text-purple-600/80 -mt-1.5">
+              Já entra na tela de Toppers para acompanhar solicitação, recebimento e pagamento.
+              Os valores podem ficar em branco e ser preenchidos depois.
+            </p>
+
+            <div>
+              <label className="label text-xs">Fornecedor</label>
+              <input className="input text-sm" value={topperFornecedor}
+                onChange={(e) => setTopperFornecedor(e.target.value)} placeholder="Nome do fornecedor" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label text-xs flex items-center gap-1">
+                  <Package size={12} /> Valor do topper
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">R$</span>
+                  <input className="input text-sm pl-8" type="number" min="0" step="0.01" value={topperValor}
+                    onChange={(e) => setTopperValor(e.target.value)} placeholder="0,00" />
+                </div>
+              </div>
+              <div>
+                <label className="label text-xs flex items-center gap-1">
+                  <Truck size={12} /> Frete
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">R$</span>
+                  <input className="input text-sm pl-8" type="number" min="0" step="0.01" value={topperFrete}
+                    onChange={(e) => setTopperFrete(e.target.value)} placeholder="0,00" />
+                </div>
+              </div>
+            </div>
+
+            {topperTotal > 0 && (
+              <p className="text-xs text-center text-brand-600 font-medium bg-white rounded-lg py-1.5">
+                Custo do topper: <strong>{formatCurrency(topperTotal)}</strong>
+              </p>
+            )}
+
+            <div>
+              <label className="label text-xs">Observações do topper</label>
+              <textarea className="input text-sm resize-none" rows={2} value={topperObservacoes}
+                onChange={(e) => setTopperObservacoes(e.target.value)} placeholder="Cor, tema, nome, idade…" />
+            </div>
+          </div>
+        )}
+
+        {/* Brinde — entra como receita do pedido, não vai para a tela de Toppers */}
+        {isBrinde && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 space-y-3">
+            <div className="flex items-center gap-1.5">
+              <Gift size={13} className="text-emerald-600" />
+              <p className="text-xs font-semibold text-emerald-700">Topper de brinde</p>
+            </div>
+            <p className="text-[11px] text-emerald-700/80 -mt-1.5">
+              Registrado como receita: o valor soma ao valor do pedido. Não entra na tela de
+              Toppers, que acompanha só o topper encomendado de fornecedor.
+            </p>
+
+            <div>
+              <label className="label text-xs">Valor do brinde</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">R$</span>
+                <input className="input text-sm pl-8" type="number" min="0" step="0.01" value={valorBrinde}
+                  onChange={(e) => setValorBrinde(e.target.value)} placeholder="0,00" />
+              </div>
+              {valorBrindeNum > 0 && (
+                <p className="text-[11px] text-emerald-700 mt-1.5">
+                  Soma {formatCurrency(valorBrindeNum)} ao valor do pedido.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         <div>
           <label className="label">Descrição</label>

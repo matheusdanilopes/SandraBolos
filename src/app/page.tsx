@@ -5,6 +5,7 @@ import { DashboardClient } from "./DashboardClient";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { getPeriodoRange, isValidPreset } from "@/lib/periodo";
+import { calcularValorFinal } from "@/lib/utils";
 import { houveErroDeConexao } from "@/lib/erros";
 import { AvisoConexao } from "@/components/AvisoConexao";
 
@@ -35,7 +36,7 @@ export default async function DashboardPage() {
 
     supabase
       .from("pedidos")
-      .select("valor_calculado, preco_corrigido")
+      .select("valor_calculado, preco_corrigido, valor_brinde")
       .eq("status", "feito"),
   ]);
 
@@ -43,10 +44,7 @@ export default async function DashboardPage() {
     receitaResult.data?.reduce((acc, p) => acc + (p.valor_cobrado ?? 0), 0) ?? 0;
 
   const aReceber =
-    feitosResult.data?.reduce(
-      (acc, p) => acc + (p.preco_corrigido ?? p.valor_calculado ?? 0),
-      0
-    ) ?? 0;
+    feitosResult.data?.reduce((acc, p) => acc + (calcularValorFinal(p) ?? 0), 0) ?? 0;
 
   const semConexao = houveErroDeConexao(pedidosResult, receitaResult, feitosResult);
 

@@ -27,6 +27,8 @@ export interface Pedido {
   valor_calculado: number | null;
   preco_corrigido: number | null;
   valor_cobrado: number | null;
+  /** Topper de brinde: valor registrado como receita, somado ao valor do pedido. */
+  valor_brinde: number | null;
   hora_entrega: string | null;
   hora_retirada: string | null;
   created_at: string;
@@ -197,6 +199,7 @@ export type Database = {
           valor_calculado: number | null
           preco_corrigido: number | null
           valor_cobrado: number | null
+          valor_brinde: number | null
           hora_entrega: string | null
           hora_retirada: string | null
           created_at: string
@@ -217,6 +220,7 @@ export type Database = {
           valor_calculado?: number | null
           preco_corrigido?: number | null
           valor_cobrado?: number | null
+          valor_brinde?: number | null
           hora_entrega?: string | null
           hora_retirada?: string | null
           created_at?: string
@@ -237,6 +241,7 @@ export type Database = {
           valor_calculado?: number | null
           preco_corrigido?: number | null
           valor_cobrado?: number | null
+          valor_brinde?: number | null
           hora_entrega?: string | null
           hora_retirada?: string | null
           created_at?: string
