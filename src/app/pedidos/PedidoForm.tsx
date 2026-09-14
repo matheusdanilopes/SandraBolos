@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { criarPedidoAction, editarPedidoAction } from "./actions";
 import { listarClientesAction } from "@/app/clientes/actions";
-import { type Cliente, type Pedido, type TipoPedido, type Topper, type TopperPedido, type Produto, type UnidadeMedida, UNIDADE_LABELS } from "@/types/database";
-import { AlertTriangle, ChevronDown, Plus, Trash2, Package, Truck, Sparkles, Gift, RefreshCw } from "lucide-react";
+import { type CategoriaProduto, type Cliente, type Pedido, type ProdutoComCategoria, type TipoPedido, type Topper, type TopperPedido, type UnidadeMedida } from "@/types/database";
+import { AlertTriangle, Plus, Trash2, Package, Truck, Sparkles, Gift } from "lucide-react";
+import { SeletorCliente } from "./SeletorCliente";
+import { SeletorProduto } from "./SeletorProduto";
 import { parseISO, isPast, isToday } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import { mensagemErro } from "@/lib/erros";
@@ -13,7 +15,9 @@ import { mensagemErro } from "@/lib/erros";
 interface Props {
   clientes: Pick<Cliente, "id" | "nome" | "telefone">[];
   pedido?: Pedido;
-  produtos?: Produto[];
+  produtos?: ProdutoComCategoria[];
+  /** Categorias dos produtos — alimentam os filtros do seletor de item. */
+  categorias?: CategoriaProduto[];
   /** Ficha do topper já registrada (edição) — os campos abrem preenchidos com ela. */
   topperPedido?: TopperPedido | null;
 }
@@ -71,17 +75,9 @@ function isDataPassada(data: string): boolean {
   } catch { return false; }
 }
 
-// ─── Seção de itens do pedido (inline, sem pedido_id ainda) ─────────────────
-
-function ItensSection({ produtos }: { produtos: Produto[]; itens: ItemLocal[]; onChange: (itens: ItemLocal[]) => void }) {
-  // Este componente não usa os itens/onChange diretamente —
-  // eles ficam no estado do pai. Lida apenas com a lógica de adicionar.
-  return null; // placeholder — inline abaixo no form principal
-}
-
 // ─── Componente principal ─────────────────────────────────────────────────────
 
-export function PedidoForm({ clientes, pedido, produtos = [], topperPedido }: Props) {
+export function PedidoForm({ clientes, pedido, produtos = [], categorias = [], topperPedido }: Props) {
   const router = useRouter();
   const isEdit = !!pedido;
   const [isPending, startTransition] = useTransition();
@@ -113,7 +109,12 @@ export function PedidoForm({ clientes, pedido, produtos = [], topperPedido }: Pr
       return;
     }
     setErroClientes("");
-    setListaClientes(result.clientes);
+    const lista = result.clientes;
+    setListaClientes(lista);
+    // Cliente escolhido que sumiu da lista (excluído em outra tela) não pode
+    // continuar valendo em silêncio: o pedido nasceria amarrado a um cadastro
+    // que não existe mais.
+    setClienteId((atual) => (atual && !lista.some((c) => c.id === atual) ? "" : atual));
   }, []);
 
   useEffect(() => {
@@ -162,13 +163,23 @@ export function PedidoForm({ clientes, pedido, produtos = [], topperPedido }: Pr
       : null;
   const totalItens = itensLocais.reduce((s, i) => s + i.valorTotal, 0);
 
-  function handleProdutoChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const id = e.target.value;
-    setProdutoSelecionadoId(id);
-    const prod = produtos.find((p) => p.id === id);
-    setPrecoItem(prod ? prod.preco_padrao.toString() : "");
+  function handleProdutoChange(produto: ProdutoComCategoria | null) {
+    setProdutoSelecionadoId(produto?.id ?? "");
+    setPrecoItem(produto ? produto.preco_padrao.toString() : "");
     setQtdItem("");
     setErrorItem("");
+  }
+
+  /** Busca sem resultado vira cadastro: o que foi digitado já entra no campo. */
+  function irParaCadastroDeCliente(termo: string) {
+    const digitos = termo.replace(/\D/g, "");
+    // Só é telefone quando o que sobrou são praticamente os dígitos digitados —
+    // "Ana 2" não pode virar telefone, e "(11) 99999" não pode virar nome.
+    const ehTelefone = digitos.length >= 4 && digitos.length >= termo.replace(/[\s()\-+]/g, "").length;
+    if (ehTelefone) setTelefoneCliente(termo);
+    else if (termo) setNomeCliente(termo);
+    setClienteId("");
+    setNovoCliente(true);
   }
 
   function handleAdicionarItem() {
@@ -318,28 +329,15 @@ export function PedidoForm({ clientes, pedido, produtos = [], topperPedido }: Pr
         )}
 
         {!novoCliente && !isEdit ? (
-          <>
-            <div className="relative">
-              <select value={clienteId} onChange={(e) => setClienteId(e.target.value)} className="input appearance-none pr-8">
-                <option value="">Selecionar cliente...</option>
-                {listaClientes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-              </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[11px] text-gray-400">
-                {carregandoClientes
-                  ? "Atualizando lista..."
-                  : `${listaClientes.length} cliente${listaClientes.length === 1 ? "" : "s"} cadastrado${listaClientes.length === 1 ? "" : "s"}`}
-              </p>
-              <button type="button" onClick={() => void recarregarClientes()} disabled={carregandoClientes}
-                className="flex items-center gap-1 text-[11px] font-medium text-brand-600 disabled:text-gray-300">
-                <RefreshCw size={11} className={carregandoClientes ? "animate-spin" : undefined} />
-                Recarregar
-              </button>
-            </div>
-            {erroClientes && <p className="text-[11px] text-yellow-700">{erroClientes}</p>}
-          </>
+          <SeletorCliente
+            clientes={listaClientes}
+            clienteId={clienteId}
+            onSelecionar={setClienteId}
+            carregando={carregandoClientes}
+            erro={erroClientes}
+            onRecarregar={() => void recarregarClientes()}
+            onCadastrarNovo={irParaCadastroDeCliente}
+          />
         ) : isEdit ? (
           <p className="text-sm text-gray-500">Cliente não pode ser alterado após criação</p>
         ) : (
@@ -450,15 +448,12 @@ export function PedidoForm({ clientes, pedido, produtos = [], topperPedido }: Pr
           {/* Formulário de adição de item */}
           {produtos.length > 0 ? (
             <div className="border-t border-gray-100 pt-3 space-y-3">
-              <div className="relative">
-                <select className="input appearance-none pr-8" value={produtoSelecionadoId} onChange={handleProdutoChange}>
-                  <option value="">Selecionar produto...</option>
-                  {produtos.map((p) => (
-                    <option key={p.id} value={p.id}>{p.nome} — {UNIDADE_LABELS[p.unidade_medida]}</option>
-                  ))}
-                </select>
-                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
+              <SeletorProduto
+                produtos={produtos}
+                categorias={categorias}
+                produtoSelecionado={produtoSelecionado}
+                onSelecionar={handleProdutoChange}
+              />
 
               {produtoSelecionado && unidadeItem && (
                 <>

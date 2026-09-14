@@ -74,3 +74,37 @@ export async function editarClienteAction(
   revalidarTelasComClientes(clienteId);
   redirect(`/clientes/${clienteId}`);
 }
+
+/**
+ * Apaga um cliente — apenas enquanto nenhum pedido apontar para ele.
+ *
+ * A coluna `cliente_id` do pedido é `on delete set null`: apagar um cliente com
+ * pedidos não falha, ela só deixa os pedidos sem dono, com o histórico perdido
+ * e sem telefone para chamar. Por isso a contagem vem antes da exclusão, e o
+ * caminho para os demais é apagar ou cancelar os pedidos primeiro.
+ */
+export async function excluirClienteAction(
+  clienteId: string
+): Promise<{ error?: string }> {
+  const supabase = createServerSupabaseClient();
+
+  const { count, error: erroContagem } = await supabase
+    .from("pedidos")
+    .select("id", { count: "exact", head: true })
+    .eq("cliente_id", clienteId);
+
+  // Sem saber quantos pedidos existem não dá para apagar: o risco é justamente
+  // o de desamarrar pedidos de um cliente sem querer.
+  if (erroContagem) return { error: mensagemErro(erroContagem) };
+  if (count && count > 0) {
+    return {
+      error: `Este cliente tem ${count} pedido${count === 1 ? "" : "s"} vinculado${count === 1 ? "" : "s"}. Exclua ou cancele ${count === 1 ? "o pedido" : "os pedidos"} antes de excluir o cliente.`,
+    };
+  }
+
+  const { error } = await supabase.from("clientes").delete().eq("id", clienteId);
+  if (error) return { error: mensagemErro(error) };
+
+  revalidarTelasComClientes(clienteId);
+  return {};
+}

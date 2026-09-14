@@ -7,6 +7,7 @@ import { TIPO_LABELS, type Pedido } from "@/types/database";
 import { Edit, Phone, ShoppingBag } from "lucide-react";
 import { houveErroDeConexao } from "@/lib/erros";
 import { PainelSemConexao } from "@/components/PainelSemConexao";
+import { ExcluirCliente } from "./ExcluirCliente";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,15 @@ export default async function ClienteDetailPage({ params }: { params: { id: stri
             ))}
           </div>
         )}
+      </div>
+
+      {/* Exclusão — só faz sentido para cadastro sem pedido vinculado */}
+      <div className="card p-4">
+        <ExcluirCliente
+          clienteId={cliente.id}
+          nome={cliente.nome}
+          totalPedidos={pedidos?.length ?? 0}
+        />
       </div>
     </div>
   );
