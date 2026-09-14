@@ -30,23 +30,27 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
 
   const pedidoTyped = pedido as unknown as PedidoComCliente;
 
-  const { data: imagens } = await supabase
-    .from("imagens_pedido")
-    .select("*")
-    .eq("pedido_id", params.id)
-    .order("created_at");
+  // As três consultas são independentes entre si: em série cada uma pagava a
+  // latência da anterior (3 idas ao Supabase antes de a tela começar a montar).
+  const [{ data: imagens }, { data: itens }, { data: produtos }] = await Promise.all([
+    supabase
+      .from("imagens_pedido")
+      .select("*")
+      .eq("pedido_id", params.id)
+      .order("created_at"),
 
-  const { data: itens } = await supabase
-    .from("itens_pedido")
-    .select("*")
-    .eq("pedido_id", params.id)
-    .order("created_at");
+    supabase
+      .from("itens_pedido")
+      .select("*")
+      .eq("pedido_id", params.id)
+      .order("created_at"),
 
-  const { data: produtos } = await supabase
-    .from("produtos")
-    .select("*")
-    .eq("ativo", true)
-    .order("nome");
+    supabase
+      .from("produtos")
+      .select("*")
+      .eq("ativo", true)
+      .order("nome"),
+  ]);
 
   const cliente = pedidoTyped.clientes ?? null;
   const valorFinal = calcularValorFinal(pedidoTyped);

@@ -208,9 +208,13 @@ export async function excluirRascunhoAction(
   if (fetchError || !pedido) return { error: "Pedido não encontrado" };
   if (pedido.status !== "rascunho") return { error: "Apenas rascunhos podem ser excluídos" };
 
-  await supabase.from("itens_pedido").delete().eq("pedido_id", pedidoId);
-  await supabase.from("imagens_pedido").delete().eq("pedido_id", pedidoId);
-  await supabase.from("toppers_pedido").delete().eq("pedido_id", pedidoId);
+  // Três tabelas distintas, nenhuma depende do resultado da outra: em série
+  // eram três idas ao banco enfileiradas antes de apagar o pedido.
+  await Promise.all([
+    supabase.from("itens_pedido").delete().eq("pedido_id", pedidoId),
+    supabase.from("imagens_pedido").delete().eq("pedido_id", pedidoId),
+    supabase.from("toppers_pedido").delete().eq("pedido_id", pedidoId),
+  ]);
 
   const { error } = await supabase.from("pedidos").delete().eq("id", pedidoId);
   if (error) return { error: mensagemErro(error) };

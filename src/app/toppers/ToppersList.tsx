@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { memo, useCallback, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   ChevronDown,
@@ -55,10 +55,12 @@ interface TopperCardProps {
   pedido: PedidoComTopper;
   batchMode: boolean;
   selected: boolean;
-  onToggleSelect: () => void;
+  onToggleSelect: (pedidoId: string) => void;
 }
 
-function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardProps) {
+// memo + callback estável na lista: marcar um card em modo lote re-renderizava
+// todos os outros, cada um com seu próprio punhado de estados e transições.
+const TopperCard = memo(function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardProps) {
   const topper = pedido.toppers_pedido as TopperPedido | null | undefined;
   const [expanded, setExpanded] = useState(!topper);
   const [isPending, startTransition] = useTransition();
@@ -142,7 +144,7 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
           {batchMode ? (
             pagavel ? (
               <button
-                onClick={onToggleSelect}
+                onClick={() => onToggleSelect(pedido.id)}
                 className="mt-0.5 flex-shrink-0 text-brand-600 active:scale-90 transition-transform"
                 aria-label={selected ? "Desmarcar" : "Selecionar para pagamento"}
               >
@@ -415,7 +417,7 @@ function TopperCard({ pedido, batchMode, selected, onToggleSelect }: TopperCardP
       )}
     </div>
   );
-}
+});
 
 // ─── Lista principal ─────────────────────────────────────────────────────────
 
@@ -429,121 +431,147 @@ export function ToppersList({ pedidos }: Props) {
   const [isBatchPending, startBatchTransition] = useTransition();
   const [batchErro, setBatchErro] = useState<string | null>(null);
 
-  // Todos os pedidos elegíveis para pagamento (sem filtro de view)
-  const pagaveisTodos = pedidos.filter((p) => {
-    const t = p.toppers_pedido as TopperPedido | null;
-    return t && !t.pago_fornecedor && (t.valor + t.frete) > 0;
-  });
+  // Resumo, contagens dos filtros e elegíveis para pagamento saem de uma única
+  // passada. Antes eram ~10 varreduras completas da lista, refeitas a cada
+  // render — ou seja, a cada clique de filtro, seleção de card ou digitação.
+  const { pagaveisTodos, totalToppers, totalAReceber, totalAPagar, totalJaPago, contagens } =
+    useMemo(() => {
+      const pagaveis: PedidoComTopper[] = [];
+      let aReceber = 0;
+      let aPagar = 0;
+      let jaPago = 0;
+      let pendentes = 0;
+      let solicitados = 0;
+      let recebidos = 0;
+      let pagos = 0;
 
-  const totalToppers = pedidos.length;
-  const totalAReceber = pedidos.filter(
-    (p) => !(p.toppers_pedido as TopperPedido | null)?.recebido
-  ).length;
-  const totalAPagar = pagaveisTodos.reduce((acc, p) => {
-    const t = p.toppers_pedido as TopperPedido;
-    return acc + t.valor + t.frete;
-  }, 0);
-  const totalJaPago = pedidos
-    .filter((p) => (p.toppers_pedido as TopperPedido | null)?.pago_fornecedor)
-    .reduce((acc, p) => {
-      const t = p.toppers_pedido as TopperPedido;
-      return acc + t.valor + t.frete;
-    }, 0);
-
-  const pedidosFiltrados = pedidos.filter((p) => {
-    const t = p.toppers_pedido as TopperPedido | null;
-    if (filtro === "pendentes") return !t?.solicitado;
-    if (filtro === "solicitados") return t?.solicitado && !t?.recebido;
-    if (filtro === "recebidos") return t?.recebido;
-    if (filtro === "a_pagar") return t && !t.pago_fornecedor && (t.valor + t.frete) > 0;
-    if (filtro === "pagos") return t?.pago_fornecedor;
-    return true;
-  });
-
-  const filtros: { key: Filtro; label: string; count: number }[] = [
-    { key: "todos", label: "Todos", count: totalToppers },
-    {
-      key: "pendentes",
-      label: "Pendentes",
-      count: pedidos.filter((p) => !(p.toppers_pedido as TopperPedido | null)?.solicitado).length,
-    },
-    {
-      key: "solicitados",
-      label: "Solicitados",
-      count: pedidos.filter((p) => {
+      for (const p of pedidos) {
         const t = p.toppers_pedido as TopperPedido | null;
-        return t?.solicitado && !t?.recebido;
-      }).length,
-    },
-    {
-      key: "recebidos",
-      label: "Recebidos",
-      count: pedidos.filter((p) => (p.toppers_pedido as TopperPedido | null)?.recebido).length,
-    },
-    {
-      key: "a_pagar",
-      label: "A pagar",
-      count: pagaveisTodos.length,
-    },
-    {
-      key: "pagos",
-      label: "Pagos",
-      count: pedidos.filter((p) => (p.toppers_pedido as TopperPedido | null)?.pago_fornecedor).length,
-    },
-  ];
+        const total = t ? t.valor + t.frete : 0;
+
+        if (!t?.recebido) aReceber++;
+        if (!t?.solicitado) pendentes++;
+        if (t?.solicitado && !t?.recebido) solicitados++;
+        if (t?.recebido) recebidos++;
+
+        if (t?.pago_fornecedor) {
+          pagos++;
+          jaPago += total;
+        } else if (t && total > 0) {
+          pagaveis.push(p);
+          aPagar += total;
+        }
+      }
+
+      return {
+        pagaveisTodos: pagaveis,
+        totalToppers: pedidos.length,
+        totalAReceber: aReceber,
+        totalAPagar: aPagar,
+        totalJaPago: jaPago,
+        contagens: { pendentes, solicitados, recebidos, pagos },
+      };
+    }, [pedidos]);
+
+  const pedidosFiltrados = useMemo(
+    () =>
+      pedidos.filter((p) => {
+        const t = p.toppers_pedido as TopperPedido | null;
+        if (filtro === "pendentes") return !t?.solicitado;
+        if (filtro === "solicitados") return t?.solicitado && !t?.recebido;
+        if (filtro === "recebidos") return t?.recebido;
+        if (filtro === "a_pagar") return t && !t.pago_fornecedor && (t.valor + t.frete) > 0;
+        if (filtro === "pagos") return t?.pago_fornecedor;
+        return true;
+      }),
+    [pedidos, filtro]
+  );
+
+  const filtros: { key: Filtro; label: string; count: number }[] = useMemo(
+    () => [
+      { key: "todos", label: "Todos", count: totalToppers },
+      { key: "pendentes", label: "Pendentes", count: contagens.pendentes },
+      { key: "solicitados", label: "Solicitados", count: contagens.solicitados },
+      { key: "recebidos", label: "Recebidos", count: contagens.recebidos },
+      { key: "a_pagar", label: "A pagar", count: pagaveisTodos.length },
+      { key: "pagos", label: "Pagos", count: contagens.pagos },
+    ],
+    [totalToppers, contagens, pagaveisTodos.length]
+  );
 
   // Elegíveis visíveis na view atual
-  const pagaveisVisiveis = pedidosFiltrados.filter((p) => {
-    const t = p.toppers_pedido as TopperPedido | null;
-    return t && !t.pago_fornecedor && (t.valor + t.frete) > 0;
-  });
+  const pagaveisVisiveis = useMemo(
+    () =>
+      pedidosFiltrados.filter((p) => {
+        const t = p.toppers_pedido as TopperPedido | null;
+        return t && !t.pago_fornecedor && (t.valor + t.frete) > 0;
+      }),
+    [pedidosFiltrados]
+  );
   const todosVisiveis =
     pagaveisVisiveis.length > 0 &&
     pagaveisVisiveis.every((p) => selectedIds.has(p.id));
 
+  // Índice por id: o painel de revisão fazia um `find` na lista inteira para
+  // cada item selecionado (varredura por seleção, a cada render).
+  const pedidosPorId = useMemo(() => {
+    const map = new Map<string, PedidoComTopper>();
+    for (const p of pedidos) map.set(p.id, p);
+    return map;
+  }, [pedidos]);
+
   // Dados enriquecidos dos itens selecionados (para o painel de revisão)
-  const selectedItems = Array.from(selectedIds)
-    .map((id) => {
-      const pedido = pedidos.find((p) => p.id === id);
-      if (!pedido) return null;
-      const t = pedido.toppers_pedido as TopperPedido | null;
-      return {
-        id,
-        cliente: pedido.clientes?.nome ?? pedido.nome_cliente ?? "Sem cliente",
-        fornecedor: t?.fornecedor ?? null,
-        valor: t?.valor ?? 0,
-        frete: t?.frete ?? 0,
-        total: (t?.valor ?? 0) + (t?.frete ?? 0),
-        dataEntrega: pedido.data_entrega,
-      };
-    })
-    .filter(Boolean) as {
-      id: string;
-      cliente: string;
-      fornecedor: string | null;
-      valor: number;
-      frete: number;
-      total: number;
-      dataEntrega: string;
-    }[];
+  const selectedItems = useMemo(
+    () =>
+      Array.from(selectedIds)
+        .map((id) => {
+          const pedido = pedidosPorId.get(id);
+          if (!pedido) return null;
+          const t = pedido.toppers_pedido as TopperPedido | null;
+          return {
+            id,
+            cliente: pedido.clientes?.nome ?? pedido.nome_cliente ?? "Sem cliente",
+            fornecedor: t?.fornecedor ?? null,
+            valor: t?.valor ?? 0,
+            frete: t?.frete ?? 0,
+            total: (t?.valor ?? 0) + (t?.frete ?? 0),
+            dataEntrega: pedido.data_entrega,
+          };
+        })
+        .filter(Boolean) as {
+        id: string;
+        cliente: string;
+        fornecedor: string | null;
+        valor: number;
+        frete: number;
+        total: number;
+        dataEntrega: string;
+      }[],
+    [selectedIds, pedidosPorId]
+  );
 
   // Agrupados por fornecedor: fornecedores nomeados primeiro, "Sem fornecedor" no final
-  const gruposFornecedor = selectedItems.reduce(
-    (acc, item) => {
-      const key = item.fornecedor ?? "\x00sem";
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(item);
-      return acc;
-    },
-    {} as Record<string, typeof selectedItems>
-  );
-  const gruposOrdenados = Object.entries(gruposFornecedor).sort(([a], [b]) => {
-    if (a === "\x00sem") return 1;
-    if (b === "\x00sem") return -1;
-    return a.localeCompare(b);
-  });
+  const gruposOrdenados = useMemo(() => {
+    const gruposFornecedor = selectedItems.reduce(
+      (acc, item) => {
+        const key = item.fornecedor ?? "\x00sem";
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(item);
+        return acc;
+      },
+      {} as Record<string, typeof selectedItems>
+    );
+    return Object.entries(gruposFornecedor).sort(([a], [b]) => {
+      if (a === "\x00sem") return 1;
+      if (b === "\x00sem") return -1;
+      return a.localeCompare(b);
+    });
+  }, [selectedItems]);
 
-  const totalSelecionado = selectedItems.reduce((acc, i) => acc + i.total, 0);
+  const totalSelecionado = useMemo(
+    () => selectedItems.reduce((acc, i) => acc + i.total, 0),
+    [selectedItems]
+  );
 
   function enterBatchMode() {
     setFiltro("a_pagar");
@@ -573,13 +601,13 @@ export function ToppersList({ pedidos }: Props) {
     }
   }
 
-  function toggleSelect(id: string) {
+  const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-  }
+  }, []);
 
   function handlePagarLote() {
     setBatchErro(null);
@@ -741,7 +769,7 @@ export function ToppersList({ pedidos }: Props) {
               pedido={pedido}
               batchMode={batchMode}
               selected={selectedIds.has(pedido.id)}
-              onToggleSelect={() => toggleSelect(pedido.id)}
+              onToggleSelect={toggleSelect}
             />
           ))}
         </div>

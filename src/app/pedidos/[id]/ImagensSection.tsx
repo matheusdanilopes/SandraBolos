@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { removerImagemAction } from "./actions";
 import type { ImagemPedido } from "@/types/database";
 import { ImageIcon, Plus, Trash2, ExternalLink, Upload } from "lucide-react";
 
@@ -20,6 +20,7 @@ export function ImagensSection({ pedidoId, imagens: initialImagens }: Props) {
   const [imagens, setImagens] = useState(initialImagens);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [, startRemocaoTransition] = useTransition();
 
   const canAdd = imagens.length < MAX_IMAGENS;
 
@@ -51,11 +52,14 @@ export function ImagensSection({ pedidoId, imagens: initialImagens }: Props) {
     }
   }
 
-  async function removeImagem(id: string) {
+  function removeImagem(id: string) {
     if (!confirm("Remover imagem?")) return;
-    await supabase.from("imagens_pedido").delete().eq("id", id);
     setImagens((prev) => prev.filter((i) => i.id !== id));
-    router.refresh();
+    // A action revalida a rota, então o refresh do router viria de graça junto
+    // com a resposta — não há chamada extra a fazer aqui.
+    startRemocaoTransition(async () => {
+      await removerImagemAction(id, pedidoId);
+    });
   }
 
   return (

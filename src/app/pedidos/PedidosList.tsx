@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useTransition } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Search, X, ChevronRight, Calendar, FileEdit, Trash2, LayoutList, CalendarDays } from "lucide-react";
@@ -9,7 +10,19 @@ import { AlertaBadge } from "@/components/AlertaBadge";
 import { cn, formatDate, isEntregaHoje, isEntregaSemana, pedidoAlerta } from "@/lib/utils";
 import { TIPO_LABELS, STATUS_LABELS, type PedidoComCliente, type StatusPedido } from "@/types/database";
 import { excluirRascunhoAction } from "./actions";
-import { PedidosCalendar } from "./PedidosCalendar";
+
+// A lista abre sempre na visualização em lista: o calendário (grade do mês,
+// view semanal e o date-fns que ele usa) só é baixado quando alguém troca de
+// visualização, em vez de pesar em toda abertura da tela de Pedidos.
+const PedidosCalendar = dynamic(
+  () => import("./PedidosCalendar").then((m) => m.PedidosCalendar),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="card p-8 text-center text-sm text-gray-400">Carregando calendário…</div>
+    ),
+  }
+);
 
 type Filtro = "todos" | "hoje" | "semana" | "atrasados" | StatusPedido;
 
@@ -83,10 +96,16 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
     );
   }, [pedidosVisiveis, busca]);
 
+  // Uma passada pela lista testando os 10 filtros, em vez de 10 varreduras
+  // completas. `pedidoAlerta` (usado por "atrasados") compara datas e horas,
+  // então repetir a varredura não era de graça.
   const filterCounts = useMemo(() => {
     const counts: Partial<Record<Filtro, number>> = {};
-    for (const { value } of FILTROS) {
-      counts[value] = pedidosVisiveis.filter((p) => matchesFiltro(p, value)).length;
+    for (const { value } of FILTROS) counts[value] = 0;
+    for (const p of pedidosVisiveis) {
+      for (const { value } of FILTROS) {
+        if (matchesFiltro(p, value)) counts[value]!++;
+      }
     }
     return counts;
   }, [pedidosVisiveis]);

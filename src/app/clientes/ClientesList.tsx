@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Search, Phone, ChevronRight } from "lucide-react";
 import { formatPhone } from "@/lib/utils";
@@ -9,10 +9,14 @@ import type { Cliente } from "@/types/database";
 export function ClientesList({ clientes }: { clientes: Cliente[] }) {
   const [busca, setBusca] = useState("");
 
-  const filtered = clientes.filter((c) =>
-    c.nome.toLowerCase().includes(busca.toLowerCase()) ||
-    c.telefone.includes(busca)
-  );
+  // `busca.toLowerCase()` estava dentro do filtro: era refeito uma vez por
+  // cliente, a cada tecla digitada.
+  const filtered = useMemo(() => {
+    const q = busca.toLowerCase();
+    return clientes.filter(
+      (c) => c.nome.toLowerCase().includes(q) || c.telefone.includes(busca)
+    );
+  }, [clientes, busca]);
 
   return (
     <div className="space-y-3">
