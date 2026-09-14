@@ -8,6 +8,7 @@ import { TrendingUp, Banknote, AlertCircle, CheckCircle, TrendingDown, Tag, Arro
 import Link from "next/link";
 import { CustosSection } from "./CustosSection";
 import { getPeriodoRange, getMesesNoPeriodo, isValidPreset } from "@/lib/periodo";
+import { lerCategoriasCusto } from "@/lib/dadosDeApoio";
 import { houveErroDeConexao } from "@/lib/erros";
 import { AvisoConexao } from "@/components/AvisoConexao";
 
@@ -44,10 +45,8 @@ export default async function FinanceiroPage() {
         .lte("data", periodo.fim)
         .order("data", { ascending: false }),
 
-      supabase
-        .from("categorias_custo")
-        .select("*")
-        .order("nome"),
+      // Categorias mudam de longe em longe: vêm do cache, fora da espera.
+      lerCategoriasCusto(),
 
       supabase
         .from("toppers_pedido")

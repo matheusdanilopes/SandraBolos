@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { criarPedidoAction, editarPedidoAction } from "./actions";
-import { type Cliente, type Pedido, type TipoPedido, type Topper, type TopperPedido, type Produto, type UnidadeMedida, UNIDADE_LABELS } from "@/types/database";
+import { type Cliente, type Pedido, type TipoPedido, type Topper, type TopperPedido, type ProdutoParaSelecao, type UnidadeMedida, UNIDADE_LABELS } from "@/types/database";
 import { AlertTriangle, ChevronDown, Plus, Trash2, Package, Truck, Sparkles, Gift } from "lucide-react";
 import { parseISO, isPast, isToday } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
@@ -11,7 +11,7 @@ import { formatCurrency } from "@/lib/utils";
 interface Props {
   clientes: Pick<Cliente, "id" | "nome" | "telefone">[];
   pedido?: Pedido;
-  produtos?: Produto[];
+  produtos?: ProdutoParaSelecao[];
   /** Ficha do topper já registrada (edição) — os campos abrem preenchidos com ela. */
   topperPedido?: TopperPedido | null;
 }
@@ -56,7 +56,7 @@ function isDataPassada(data: string): boolean {
 
 // ─── Seção de itens do pedido (inline, sem pedido_id ainda) ─────────────────
 
-function ItensSection({ produtos }: { produtos: Produto[]; itens: ItemLocal[]; onChange: (itens: ItemLocal[]) => void }) {
+function ItensSection({ produtos }: { produtos: ProdutoParaSelecao[]; itens: ItemLocal[]; onChange: (itens: ItemLocal[]) => void }) {
   // Este componente não usa os itens/onChange diretamente —
   // eles ficam no estado do pai. Lida apenas com a lógica de adicionar.
   return null; // placeholder — inline abaixo no form principal

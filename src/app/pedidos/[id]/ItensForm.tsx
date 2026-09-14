@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, Package, ChevronDown } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import type { Produto, ItemPedido, UnidadeMedida } from "@/types/database";
+import type { ProdutoParaSelecao, ItemPedido, UnidadeMedida } from "@/types/database";
 import { UNIDADE_LABELS } from "@/types/database";
 import { adicionarItemAction, removerItemAction } from "./itensActions";
 
@@ -137,7 +137,7 @@ function CalcPreview({
 
 interface Props {
   pedidoId: string;
-  produtos: Produto[];
+  produtos: ProdutoParaSelecao[];
   itens: ItemPedido[];
 }
 

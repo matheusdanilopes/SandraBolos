@@ -3,6 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { mensagemErro } from "@/lib/erros";
+import {
+  invalidarDadosDeApoio,
+  TAG_CATEGORIAS_CUSTO,
+  TAG_CATEGORIAS_PRODUTO,
+  TAG_PRODUTOS,
+} from "@/lib/dadosDeApoio";
 
 export async function adicionarCategoriaAction(nome: string): Promise<{ error?: string }> {
   const nomeTrimmed = nome.trim();
@@ -12,6 +18,7 @@ export async function adicionarCategoriaAction(nome: string): Promise<{ error?: 
   const { error } = await supabase.from("categorias_custo").insert({ nome: nomeTrimmed });
   if (error) return { error: mensagemErro(error) };
 
+  invalidarDadosDeApoio(TAG_CATEGORIAS_CUSTO);
   revalidatePath("/configuracoes");
   revalidatePath("/financeiro");
   return {};
@@ -22,6 +29,7 @@ export async function excluirCategoriaAction(id: string): Promise<{ error?: stri
   const { error } = await supabase.from("categorias_custo").delete().eq("id", id);
   if (error) return { error: mensagemErro(error) };
 
+  invalidarDadosDeApoio(TAG_CATEGORIAS_CUSTO);
   revalidatePath("/configuracoes");
   revalidatePath("/financeiro");
   return {};
@@ -42,6 +50,7 @@ export async function adicionarCategoriaProdutoAction(
     .insert({ nome: nomeTrimmed, ordem: ordemAtual + 1 });
   if (error) return { error: mensagemErro(error) };
 
+  invalidarDadosDeApoio(TAG_CATEGORIAS_PRODUTO);
   revalidatePath("/configuracoes");
   revalidatePath("/produtos");
   return {};
@@ -61,6 +70,7 @@ export async function editarCategoriaProdutoAction(
     .eq("id", id);
   if (error) return { error: mensagemErro(error) };
 
+  invalidarDadosDeApoio(TAG_CATEGORIAS_PRODUTO);
   revalidatePath("/configuracoes");
   revalidatePath("/produtos");
   return {};
@@ -82,6 +92,10 @@ export async function excluirCategoriaProdutoAction(id: string): Promise<{ error
   const { error } = await supabase.from("categorias_produto").delete().eq("id", id);
   if (error) return { error: mensagemErro(error) };
 
+  // Também o cache de produtos: a checagem acima e o delete não são atômicos, e
+  // a FK é `on delete set null` — um produto que entrasse na categoria nesse
+  // intervalo teria o `categoria_id` zerado pelo banco, sem o app saber.
+  invalidarDadosDeApoio(TAG_CATEGORIAS_PRODUTO, TAG_PRODUTOS);
   revalidatePath("/configuracoes");
   revalidatePath("/produtos");
   return {};
@@ -98,6 +112,7 @@ export async function toggleCategoriaProdutoAtivoAction(
     .eq("id", id);
   if (error) return { error: mensagemErro(error) };
 
+  invalidarDadosDeApoio(TAG_CATEGORIAS_PRODUTO);
   revalidatePath("/configuracoes");
   revalidatePath("/produtos");
   return {};
@@ -115,6 +130,7 @@ export async function reordenarCategoriaProdutoAction(
     if (error) return { error: mensagemErro(error) };
   }
 
+  invalidarDadosDeApoio(TAG_CATEGORIAS_PRODUTO);
   revalidatePath("/configuracoes");
   revalidatePath("/produtos");
   return {};

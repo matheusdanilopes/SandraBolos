@@ -1,15 +1,17 @@
-import { supabase } from "@/lib/supabase";
 import { PedidoForm } from "../PedidoForm";
-import type { Produto } from "@/types/database";
+import type { ProdutoParaSelecao } from "@/types/database";
+import { lerClientesParaSelecao, lerProdutosAtivos } from "@/lib/dadosDeApoio";
 import { houveErroDeConexao } from "@/lib/erros";
 import { AvisoConexao } from "@/components/AvisoConexao";
 
 export const dynamic = "force-dynamic";
 
 export default async function NovoPedidoPage() {
+  // Clientes e catálogo vêm do cache: o formulário abre sem esperar duas idas
+  // ao Supabase que devolvem quase sempre a mesma coisa.
   const [clientesResult, produtosResult] = await Promise.all([
-    supabase.from("clientes").select("id, nome, telefone").order("nome"),
-    supabase.from("produtos").select("*").eq("ativo", true).order("nome"),
+    lerClientesParaSelecao(),
+    lerProdutosAtivos(),
   ]);
 
   const { data: clientes } = clientesResult;
@@ -25,7 +27,7 @@ export default async function NovoPedidoPage() {
         <AvisoConexao detalhe="As listas de clientes e produtos podem estar incompletas." />
       )}
 
-      <PedidoForm clientes={clientes ?? []} produtos={(produtos ?? []) as Produto[]} />
+      <PedidoForm clientes={clientes ?? []} produtos={(produtos ?? []) as ProdutoParaSelecao[]} />
     </div>
   );
 }

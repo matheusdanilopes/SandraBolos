@@ -4,25 +4,46 @@ import { supabase } from "@/lib/supabase";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AlertaBadge } from "@/components/AlertaBadge";
 import { formatDate, formatTime, formatPhone, calcularValorFinal, formatCurrency, pedidoNumero } from "@/lib/utils";
-import { TIPO_LABELS, TOPPER_LABELS, STATUS_FLOW, type PedidoComClienteContato, type ItemPedido, type Produto } from "@/types/database";
+import { TIPO_LABELS, TOPPER_LABELS, STATUS_FLOW, type PedidoComClienteContato, type ItemPedido, type ProdutoParaSelecao } from "@/types/database";
 import { Edit, CheckCircle, AlertCircle, MessageCircle, Phone, ArrowLeft, Lock, FileEdit, XCircle } from "lucide-react";
 import { StatusActions } from "./StatusActions";
 import { PrecificacaoForm } from "./PrecificacaoForm";
 import { EntregaForm } from "./EntregaForm";
 import { ImagensSection } from "./ImagensSection";
 import { ItensForm } from "./ItensForm";
-import { COLUNAS_PRODUTO } from "@/lib/consultas";
+import { lerProdutosAtivos } from "@/lib/dadosDeApoio";
 import { isErroDeConexao } from "@/lib/erros";
 import { PainelSemConexao } from "@/components/PainelSemConexao";
 
 export const dynamic = "force-dynamic";
 
 export default async function PedidoDetailPage({ params }: { params: { id: string } }) {
-  const { data: pedido, error } = await supabase
-    .from("pedidos")
-    .select("*, clientes(nome, telefone)")
-    .eq("id", params.id)
-    .single();
+  // Tudo numa rodada só. Imagens e itens são buscados por `params.id` e o
+  // catálogo por `ativo = true`: nenhum deles depende da linha do pedido, então
+  // esperar o pedido chegar antes de disparar os outros custava uma ida inteira
+  // ao Supabase na tela mais aberta do app. O catálogo ainda vem do cache.
+  const [{ data: pedido, error }, { data: imagens }, { data: itens }, { data: produtos }] =
+    await Promise.all([
+      supabase
+        .from("pedidos")
+        .select("*, clientes(nome, telefone)")
+        .eq("id", params.id)
+        .single(),
+
+      supabase
+        .from("imagens_pedido")
+        .select("*")
+        .eq("pedido_id", params.id)
+        .order("created_at"),
+
+      supabase
+        .from("itens_pedido")
+        .select("*")
+        .eq("pedido_id", params.id)
+        .order("created_at"),
+
+      lerProdutosAtivos(),
+    ]);
 
   // Falha de rede não é pedido inexistente: mandar para o 404 faria parecer
   // que o pedido foi apagado.
@@ -30,28 +51,6 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
   if (!pedido) notFound();
 
   const pedidoTyped = pedido as unknown as PedidoComClienteContato;
-
-  // As três consultas são independentes entre si: em série cada uma pagava a
-  // latência da anterior (3 idas ao Supabase antes de a tela começar a montar).
-  const [{ data: imagens }, { data: itens }, { data: produtos }] = await Promise.all([
-    supabase
-      .from("imagens_pedido")
-      .select("*")
-      .eq("pedido_id", params.id)
-      .order("created_at"),
-
-    supabase
-      .from("itens_pedido")
-      .select("*")
-      .eq("pedido_id", params.id)
-      .order("created_at"),
-
-    supabase
-      .from("produtos")
-      .select(COLUNAS_PRODUTO)
-      .eq("ativo", true)
-      .order("nome"),
-  ]);
 
   const cliente = pedidoTyped.clientes ?? null;
   const valorFinal = calcularValorFinal(pedidoTyped);
@@ -261,7 +260,7 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
       {/* Itens */}
       <ItensForm
         pedidoId={pedidoTyped.id}
-        produtos={(produtos ?? []) as Produto[]}
+        produtos={(produtos ?? []) as ProdutoParaSelecao[]}
         itens={(itens ?? []) as ItemPedido[]}
       />
 

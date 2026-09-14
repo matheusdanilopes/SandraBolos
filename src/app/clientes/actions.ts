@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { mensagemErro } from "@/lib/erros";
+import { invalidarDadosDeApoio, TAG_CLIENTES } from "@/lib/dadosDeApoio";
 
 export async function criarClienteAction(
   nome: string,
@@ -18,6 +19,7 @@ export async function criarClienteAction(
 
   if (error) return { error: mensagemErro(error) };
 
+  invalidarDadosDeApoio(TAG_CLIENTES);
   revalidatePath("/clientes");
   redirect(`/clientes/${data.id}`);
 }
@@ -36,6 +38,7 @@ export async function editarClienteAction(
   if (error) return { error: mensagemErro(error) };
 
   revalidatePath(`/clientes/${clienteId}`);
+  invalidarDadosDeApoio(TAG_CLIENTES);
   revalidatePath("/clientes");
   redirect(`/clientes/${clienteId}`);
 }

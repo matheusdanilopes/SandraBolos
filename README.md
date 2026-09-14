@@ -85,3 +85,61 @@ A contagem abaixo dos filtros diz qual recorte está valendo e o link
 A tela de Toppers ficou **sem** recorte de propósito: o total "a pagar
 fornecedores" é operacional e vale para sempre, então esconder toppers antigos
 não pagos apagaria dívida da tela.
+
+## Tempo até o dado aparecer
+
+Três mecanismos trabalham juntos para a tela não ficar esperando. Medido contra
+um Supabase falso com 120 ms de latência por consulta.
+
+### Uma única rodada de consultas por tela
+
+Nenhuma página espera uma consulta para disparar a próxima. O caso que mais
+doía era a tela de detalhe do pedido, que buscava o pedido e só então imagens,
+itens e catálogo — mas nenhuma dessas três depende da linha do pedido (duas
+filtram por `params.id`, a outra por `ativo = true`).
+
+| | consultas | rodadas | tempo |
+| --- | --- | --- | --- |
+| antes | 4 | 2 | 264 ms |
+| depois | 3 | 1 | 141 ms |
+
+Ao mexer aqui, a pergunta é sempre: esta consulta **precisa** do resultado da
+anterior? Se não, ela entra no mesmo `Promise.all`.
+
+### Cache dos dados de apoio (`src/lib/dadosDeApoio.ts`)
+
+Catálogo, clientes, categorias e configuração do cardápio aparecem em quase toda
+tela e mudam de longe em longe. Passam pelo Data Cache do Next, com `revalidateTag`
+nas actions que gravam.
+
+| Tela | 1ª visita | Revisita |
+| --- | --- | --- |
+| `/produtos` | 3 consultas · 149 ms | **0 consultas · 16 ms** |
+| `/configuracoes` | 145 ms | **0 consultas · 18 ms** |
+| `/pedidos/novo` | 140 ms | **0 consultas · 14 ms** |
+| `/financeiro` | 5 consultas | 4 consultas |
+
+Duas regras ao mexer:
+
+- **toda escrita numa tabela cacheada precisa chamar `invalidarDadosDeApoio`**
+  com a tag correspondente, senão a tela abre com dado velho. As tags derrubam
+  só o que devem — invalidar `produtos` não rebusca categorias nem o cardápio;
+- a leitura cacheada **lança** em caso de erro em vez de devolver `{ error }`.
+  É de propósito: `unstable_cache` não guarda o que lançou, e uma falha de rede
+  cacheada deixaria o aviso de "sem conexão" preso na tela por cinco minutos
+  depois de a internet voltar. O `revalidate` de 5 min é só rede de segurança
+  para alteração feita fora do app (no painel do Supabase, por exemplo).
+
+### Cache de navegação (`staleTimes` em `next.config.mjs`)
+
+O padrão do App Router para rota dinâmica é 0: voltar para a tela anterior, ou
+alternar entre as abas de Comercial, refazia a requisição inteira. Com 30 s a
+volta é instantânea. As actions chamam `revalidatePath`, que limpa esse cache,
+então gravação feita no app derruba a entrada na hora — o prazo só cobre ir e
+voltar em poucos segundos.
+
+### Esqueletos por tela
+
+Cada rota tem o `loading.tsx` com a forma do que vai chegar. Sem ele a tela
+herda o esqueleto do segmento pai — detalhe de pedido piscava a lista, Toppers
+piscava a grade do dashboard — e a troca de forma faz parecer mais lento do que é.

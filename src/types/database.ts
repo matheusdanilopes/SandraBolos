@@ -42,6 +42,12 @@ export interface PedidoComCliente extends Pedido {
   clientes?: { nome: string } | null;
 }
 
+/** Linha do histórico na ficha do cliente — só o que o atalho mostra. */
+export type PedidoDoCliente = Pick<
+  Pedido,
+  "id" | "tipo" | "status" | "data_entrega" | "descricao"
+>;
+
 /** Pedido da tela de detalhe, onde o telefone vira link de ligação e WhatsApp. */
 export interface PedidoComClienteContato extends Pedido {
   clientes?: { nome: string; telefone: string } | null;
@@ -97,7 +103,10 @@ export interface Produto {
   created_at: string;
 }
 
-export interface ProdutoComCategoria extends Produto {
+/** Produto como as telas o consomem — sem o carimbo de criação, que ninguém usa. */
+export type ProdutoParaSelecao = Omit<Produto, "created_at">;
+
+export interface ProdutoComCategoria extends ProdutoParaSelecao {
   categorias_produto?: { nome: string; ordem: number } | null;
 }
 

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { isErroDeConexao, mensagemErro } from "@/lib/erros";
+import { invalidarDadosDeApoio, TAG_CLIENTES } from "@/lib/dadosDeApoio";
 import type { TipoPedido, Topper, TopperPedido } from "@/types/database";
 
 interface ItemPayload {
@@ -139,6 +140,9 @@ export async function criarPedidoAction(
       .single();
     if (clienteError) return { error: mensagemErro(clienteError) };
     resolvedClienteId = clienteData.id;
+    // Cliente nasce aqui quando o nome é digitado direto no pedido — sem isto
+    // ele não apareceria no seletor do próximo pedido enquanto o cache durasse.
+    invalidarDadosDeApoio(TAG_CLIENTES);
     revalidatePath("/clientes");
   }
 

@@ -40,6 +40,9 @@ export const COLUNAS_PRODUTO =
 
 export const COLUNAS_CLIENTE = "id, nome, telefone";
 
+/** Histórico do cliente: cada linha é só um atalho para o pedido. */
+export const COLUNAS_PEDIDO_DO_CLIENTE = "id, tipo, status, data_entrega, descricao";
+
 // ─── Recorte de histórico da tela de Pedidos ─────────────────────────────────
 
 /** Meses de histórico já encerrado que a tela de Pedidos carrega por padrão. */
