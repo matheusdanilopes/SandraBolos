@@ -17,6 +17,10 @@ export default async function ToppersPage() {
     // Brinde não é compra de fornecedor: fica fora desta tela, que existe para
     // acompanhar solicitação, recebimento e pagamento do topper encomendado.
     .eq("topper", "sim")
+    // Pedido cancelado não tem topper a solicitar, receber ou pagar. Ele fica
+    // de fora aqui, na origem, para sumir junto dos contadores, dos filtros e
+    // dos totais — todos saem desta mesma lista.
+    .neq("status", "cancelado")
     .order("data_entrega", { ascending: true });
 
   const lista = (pedidos ?? []) as unknown as PedidoComTopper[];

@@ -9,7 +9,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { AlertaBadge } from "@/components/AlertaBadge";
 import { cn, formatDate, isEntregaHoje, isEntregaSemana, pedidoAlerta } from "@/lib/utils";
 import { TIPO_LABELS, STATUS_LABELS, type PedidoComCliente, type StatusPedido } from "@/types/database";
-import { excluirRascunhoAction } from "./actions";
+import { excluirPedidoAction } from "./actions";
 
 // A lista abre sempre na visualização em lista: o calendário (grade do mês,
 // view semanal e o date-fns que ele usa) só é baixado quando alguém troca de
@@ -133,7 +133,7 @@ export function PedidosList({ pedidos, historicoCompleto, mesesDeHistorico }: Pr
     setLocalDeleted((prev) => new Set(prev).add(pedidoId));
     setConfirmandoExclusaoId(null);
     startExclusaoTransition(async () => {
-      const result = await excluirRascunhoAction(pedidoId);
+      const result = await excluirPedidoAction(pedidoId);
       if (result.error) {
         setLocalDeleted((prev) => {
           const next = new Set(prev);

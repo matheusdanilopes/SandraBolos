@@ -75,6 +75,31 @@ Eram três causas somadas, todas invisíveis para quem usa:
 | `src/components/FabPedido.tsx` | mesmo tratamento no "Pedido Rápido" |
 | `src/app/pedidos/actions.ts` | erro do `insert` dos itens devolvido junto com o id do pedido criado |
 
+## Escolher cliente e produto no lançamento
+
+Os dois campos do formulário de pedido eram `<select>` nativos: no celular
+viravam uma roda com dezenas de nomes em ordem alfabética, sem busca e sem o
+telefone à vista para distinguir dois clientes de mesmo nome. Agora os dois são
+seletores com busca, e o que foi escolhido fica resumido em um cartão com botão
+de "Trocar" — o resto da lista sai da frente da quantidade e do preço.
+
+| Arquivo | Papel |
+| --- | --- |
+| `src/app/pedidos/SeletorCliente.tsx` | busca por nome **ou** telefone no mesmo campo (acentos ignorados); lista sem busca mostra os 30 primeiros; sem resultado leva ao cadastro já com o que foi digitado |
+| `src/app/pedidos/SeletorProduto.tsx` | busca por nome e descrição (é na descrição que fica o sabor) mais chips de categoria; cada linha mostra unidade e preço padrão |
+| `src/app/pedidos/novo/page.tsx` | passa produtos com a categoria (`categorias_produto(nome, ordem)`) e a lista de categorias para os chips |
+| `src/app/produtos/ProdutosClient.tsx` | mesma busca e chips no catálogo, que não tinha filtro nenhum |
+
+## Excluir pedido e cliente
+
+Antes só o rascunho podia ser apagado; o pedido lançado por engano ficava para
+sempre, e o cadastro de cliente não tinha como sair da lista.
+
+| Regra | Onde |
+| --- | --- |
+| Pedido em **rascunho** ou **novo** pode ser excluído de vez (itens, imagens e ficha de topper vão junto). De "produzindo" em diante o caminho é cancelar, que preserva o histórico | `excluirPedidoAction()` em `src/app/pedidos/actions.ts`, botão em `src/app/pedidos/[id]/StatusActions.tsx` |
+| Cliente só pode ser excluído **sem nenhum pedido vinculado** — `pedidos.cliente_id` é `on delete set null`, então apagar um cliente com pedidos não daria erro: deixaria pedidos órfãos, sem histórico e sem telefone. Com pedidos, a ficha mostra o motivo no lugar do botão | `excluirClienteAction()` em `src/app/clientes/actions.ts`, botão em `src/app/clientes/[id]/ExcluirCliente.tsx` |
+
 ## Peso das telas
 
 O app é usado no celular, muitas vezes no 4G da loja. Duas decisões de

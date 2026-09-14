@@ -210,7 +210,17 @@ export async function criarPedidoAction(
   redirect(`/pedidos/${novoPedido.id}`);
 }
 
-export async function excluirRascunhoAction(
+/**
+ * Status que ainda podem ser apagados de vez.
+ *
+ * Rascunho nunca virou pedido de verdade, e "novo" é o pedido recém-lançado —
+ * o registro errado, o duplicado, o teste. A partir de "produzindo" já existe
+ * trabalho e histórico ligados a ele: aí o caminho é cancelar, que preserva o
+ * registro.
+ */
+const EXCLUIVEIS = ["rascunho", "novo"];
+
+export async function excluirPedidoAction(
   pedidoId: string
 ): Promise<{ error?: string }> {
   const supabase = createServerSupabaseClient();
@@ -225,7 +235,8 @@ export async function excluirRascunhoAction(
   // faria parecer que o pedido sumiu do banco.
   if (isErroDeConexao(fetchError)) return { error: mensagemErro(fetchError) };
   if (fetchError || !pedido) return { error: "Pedido não encontrado" };
-  if (pedido.status !== "rascunho") return { error: "Apenas rascunhos podem ser excluídos" };
+  if (!EXCLUIVEIS.includes(pedido.status))
+    return { error: "Só dá para excluir rascunho ou pedido novo. Use o cancelamento para os demais." };
 
   // Três tabelas distintas, nenhuma depende do resultado da outra: em série
   // eram três idas ao banco enfileiradas antes de apagar o pedido.
@@ -238,7 +249,13 @@ export async function excluirRascunhoAction(
   const { error } = await supabase.from("pedidos").delete().eq("id", pedidoId);
   if (error) return { error: mensagemErro(error) };
 
+  revalidatePath(`/pedidos/${pedidoId}`);
   revalidatePath("/pedidos");
+  revalidatePath("/toppers");
+  revalidatePath("/financeiro");
+  // O cliente do pedido deixa de ter esse vínculo — e pode ficar sem nenhum,
+  // o que muda o que a ficha dele oferece.
+  revalidatePath("/clientes");
   revalidatePath("/");
   return {};
 }
