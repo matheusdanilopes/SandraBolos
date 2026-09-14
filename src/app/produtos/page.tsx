@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { ProdutosClient } from "./ProdutosClient";
 import type { ProdutoComCategoria, CategoriaProduto, CardapioConfig } from "@/types/database";
+import { COLUNAS_PRODUTO } from "@/lib/consultas";
 import { houveErroDeConexao } from "@/lib/erros";
 import { AvisoConexao } from "@/components/AvisoConexao";
 
@@ -12,7 +13,7 @@ export default async function ProdutosPage() {
     await Promise.all([
       supabase
         .from("produtos")
-        .select("*, categorias_produto(nome, ordem)")
+        .select(`${COLUNAS_PRODUTO}, categorias_produto(nome, ordem)`)
         .order("ativo", { ascending: false })
         .order("nome"),
       supabase

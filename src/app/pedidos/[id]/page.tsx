@@ -4,13 +4,14 @@ import { supabase } from "@/lib/supabase";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AlertaBadge } from "@/components/AlertaBadge";
 import { formatDate, formatTime, formatPhone, calcularValorFinal, formatCurrency, pedidoNumero } from "@/lib/utils";
-import { TIPO_LABELS, TOPPER_LABELS, STATUS_FLOW, type PedidoComCliente, type ItemPedido, type Produto } from "@/types/database";
+import { TIPO_LABELS, TOPPER_LABELS, STATUS_FLOW, type PedidoComClienteContato, type ItemPedido, type Produto } from "@/types/database";
 import { Edit, CheckCircle, AlertCircle, MessageCircle, Phone, ArrowLeft, Lock, FileEdit, XCircle } from "lucide-react";
 import { StatusActions } from "./StatusActions";
 import { PrecificacaoForm } from "./PrecificacaoForm";
 import { EntregaForm } from "./EntregaForm";
 import { ImagensSection } from "./ImagensSection";
 import { ItensForm } from "./ItensForm";
+import { COLUNAS_PRODUTO } from "@/lib/consultas";
 import { isErroDeConexao } from "@/lib/erros";
 import { PainelSemConexao } from "@/components/PainelSemConexao";
 
@@ -28,7 +29,7 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
   if (isErroDeConexao(error)) return <PainelSemConexao titulo="Não foi possível carregar o pedido" />;
   if (!pedido) notFound();
 
-  const pedidoTyped = pedido as unknown as PedidoComCliente;
+  const pedidoTyped = pedido as unknown as PedidoComClienteContato;
 
   // As três consultas são independentes entre si: em série cada uma pagava a
   // latência da anterior (3 idas ao Supabase antes de a tela começar a montar).
@@ -47,7 +48,7 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
 
     supabase
       .from("produtos")
-      .select("*")
+      .select(COLUNAS_PRODUTO)
       .eq("ativo", true)
       .order("nome"),
   ]);

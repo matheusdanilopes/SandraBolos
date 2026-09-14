@@ -6,7 +6,10 @@ import { Search, Phone, ChevronRight } from "lucide-react";
 import { formatPhone } from "@/lib/utils";
 import type { Cliente } from "@/types/database";
 
-export function ClientesList({ clientes }: { clientes: Cliente[] }) {
+// Só os campos que a lista desenha — a consulta não traz o resto.
+type ClienteDaLista = Pick<Cliente, "id" | "nome" | "telefone">;
+
+export function ClientesList({ clientes }: { clientes: ClienteDaLista[] }) {
   const [busca, setBusca] = useState("");
 
   // `busca.toLowerCase()` estava dentro do filtro: era refeito uma vez por

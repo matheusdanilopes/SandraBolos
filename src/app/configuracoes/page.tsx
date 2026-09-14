@@ -4,6 +4,7 @@ import { CategoriasSection } from "./CategoriasSection";
 import { CategoriasProdutoSection } from "./CategoriasProdutoSection";
 import { CardapioVisual } from "../produtos/CardapioVisual";
 import type { CategoriaCusto, CategoriaProduto, ProdutoComCategoria, CardapioConfig } from "@/types/database";
+import { COLUNAS_PRODUTO } from "@/lib/consultas";
 import { houveErroDeConexao } from "@/lib/erros";
 import { AvisoConexao } from "@/components/AvisoConexao";
 
@@ -20,7 +21,7 @@ export default async function ConfiguracoesPage() {
     supabase.from("categorias_produto").select("*").order("ordem").order("nome"),
     supabase
       .from("produtos")
-      .select("*, categorias_produto(nome, ordem)")
+      .select(`${COLUNAS_PRODUTO}, categorias_produto(nome, ordem)`)
       .eq("ativo", true)
       .order("nome"),
     createServerSupabaseClient()

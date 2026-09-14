@@ -34,7 +34,16 @@ export interface Pedido {
   created_at: string;
 }
 
+/**
+ * Pedido das telas de lista. O join traz só o nome: telefone é usado apenas na
+ * tela de detalhe, e o tipo diz isso para ninguém ler um campo que não veio.
+ */
 export interface PedidoComCliente extends Pedido {
+  clientes?: { nome: string } | null;
+}
+
+/** Pedido da tela de detalhe, onde o telefone vira link de ligação e WhatsApp. */
+export interface PedidoComClienteContato extends Pedido {
   clientes?: { nome: string; telefone: string } | null;
 }
 
@@ -73,7 +82,7 @@ export interface TopperPedidoComPedido extends TopperPedido {
 }
 
 export interface PedidoComTopper extends Pedido {
-  clientes?: { nome: string; telefone: string } | null;
+  clientes?: { nome: string } | null;
   toppers_pedido?: TopperPedido | null;
 }
 
