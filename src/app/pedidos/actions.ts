@@ -140,6 +140,8 @@ export async function criarPedidoAction(
     if (clienteError) return { error: mensagemErro(clienteError) };
     resolvedClienteId = clienteData.id;
     revalidatePath("/clientes");
+    // O seletor de cliente do próximo pedido lê a mesma lista.
+    revalidatePath("/pedidos/novo");
   }
 
   const { data: novoPedido, error } = await supabase

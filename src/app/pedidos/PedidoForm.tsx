@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { criarPedidoAction, editarPedidoAction } from "./actions";
+import { listarClientesAction } from "@/app/clientes/actions";
 import { type Cliente, type Pedido, type TipoPedido, type Topper, type TopperPedido, type Produto, type UnidadeMedida, UNIDADE_LABELS } from "@/types/database";
-import { AlertTriangle, ChevronDown, Plus, Trash2, Package, Truck, Sparkles, Gift } from "lucide-react";
+import { AlertTriangle, ChevronDown, Plus, Trash2, Package, Truck, Sparkles, Gift, RefreshCw } from "lucide-react";
 import { parseISO, isPast, isToday } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 
@@ -74,6 +75,35 @@ export function PedidoForm({ clientes, pedido, produtos = [], topperPedido }: Pr
   const [novoCliente, setNovoCliente] = useState(!pedido?.cliente_id);
   const [nomeCliente, setNomeCliente] = useState("");
   const [telefoneCliente, setTelefoneCliente] = useState("");
+
+  // ── Lista de clientes do seletor ───────────────────────────────────────────
+  // A lista chega pronta do servidor, mas esse payload pode vir do cache do
+  // roteador do Next (a rota fica guardada no navegador depois da primeira
+  // visita). Quem cadastrava um cliente em /clientes e voltava para cá não o
+  // encontrava no seletor. Por isso ela é relida ao abrir o formulário — e o
+  // botão de recarregar resolve o caso de cadastrar em outra aba ou celular.
+  const [listaClientes, setListaClientes] = useState(clientes);
+  const [carregandoClientes, setCarregandoClientes] = useState(false);
+  const [erroClientes, setErroClientes] = useState("");
+
+  const recarregarClientes = useCallback(async () => {
+    setCarregandoClientes(true);
+    const result = await listarClientesAction();
+    setCarregandoClientes(false);
+    if (result.error || !result.clientes) {
+      // Sem lista nova a que veio do servidor continua valendo: trocar por uma
+      // lista vazia faria parecer que não há cliente cadastrado.
+      setErroClientes(result.error ?? "Não foi possível atualizar a lista de clientes");
+      return;
+    }
+    setErroClientes("");
+    setListaClientes(result.clientes);
+  }, []);
+
+  useEffect(() => {
+    if (isEdit) return;
+    void recarregarClientes();
+  }, [isEdit, recarregarClientes]);
 
   const [tipo, setTipo] = useState<TipoPedido>(pedido?.tipo ?? "bolo");
   const [dataEntrega, setDataEntrega] = useState(pedido?.data_entrega ?? "");
@@ -202,7 +232,9 @@ export function PedidoForm({ clientes, pedido, produtos = [], topperPedido }: Pr
         });
       } else {
         result = await criarPedidoAction({
-          clienteId: clienteId || undefined,
+          // Em "Novo" vale o que foi digitado: reaproveitar um id escolhido
+          // antes de trocar de aba amarraria o pedido ao cliente errado.
+          clienteId: novoCliente ? undefined : clienteId || undefined,
           novoClienteNome: nomeCliente || undefined,
           novoClienteTelefone: telefoneCliente || undefined,
           tipo,
@@ -229,7 +261,7 @@ export function PedidoForm({ clientes, pedido, produtos = [], topperPedido }: Pr
       <div className="card p-4 space-y-3">
         <h2 className="font-semibold text-sm text-gray-700">Cliente</h2>
 
-        {!isEdit && clientes.length > 0 && (
+        {!isEdit && listaClientes.length > 0 && (
           <div className="flex gap-2">
             <button type="button" onClick={() => setNovoCliente(false)}
               className={`flex-1 py-1.5 text-xs rounded-lg border font-medium transition-colors ${!novoCliente ? "bg-brand-600 text-white border-brand-600" : "bg-white text-gray-600 border-gray-300"}`}>
@@ -243,13 +275,28 @@ export function PedidoForm({ clientes, pedido, produtos = [], topperPedido }: Pr
         )}
 
         {!novoCliente && !isEdit ? (
-          <div className="relative">
-            <select value={clienteId} onChange={(e) => setClienteId(e.target.value)} className="input appearance-none pr-8">
-              <option value="">Selecionar cliente...</option>
-              {clientes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-            </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          </div>
+          <>
+            <div className="relative">
+              <select value={clienteId} onChange={(e) => setClienteId(e.target.value)} className="input appearance-none pr-8">
+                <option value="">Selecionar cliente...</option>
+                {listaClientes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+              </select>
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] text-gray-400">
+                {carregandoClientes
+                  ? "Atualizando lista..."
+                  : `${listaClientes.length} cliente${listaClientes.length === 1 ? "" : "s"} cadastrado${listaClientes.length === 1 ? "" : "s"}`}
+              </p>
+              <button type="button" onClick={() => void recarregarClientes()} disabled={carregandoClientes}
+                className="flex items-center gap-1 text-[11px] font-medium text-brand-600 disabled:text-gray-300">
+                <RefreshCw size={11} className={carregandoClientes ? "animate-spin" : undefined} />
+                Recarregar
+              </button>
+            </div>
+            {erroClientes && <p className="text-[11px] text-yellow-700">{erroClientes}</p>}
+          </>
         ) : isEdit ? (
           <p className="text-sm text-gray-500">Cliente não pode ser alterado após criação</p>
         ) : (
