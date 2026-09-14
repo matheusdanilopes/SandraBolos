@@ -42,6 +42,9 @@ export async function cancelarPedidoAction(
 
   revalidatePath(`/pedidos/${pedidoId}`);
   revalidatePath("/pedidos");
+  // O pedido cancelado sai da tela de Toppers; sem esta linha ele continuaria
+  // lá, contado nos totais, até a próxima revalidação daquela rota.
+  revalidatePath("/toppers");
   revalidatePath("/");
   return {};
 }
