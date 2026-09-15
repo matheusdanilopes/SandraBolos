@@ -2,22 +2,18 @@
 
 import { memo, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
-import {
-  startOfMonth,
-  endOfMonth,
-  startOfWeek,
-  endOfWeek,
-  eachDayOfInterval,
-  format,
-  isSameMonth,
-  isToday,
-  isSameDay,
-  addMonths,
-  subMonths,
-  addWeeks,
-  subWeeks,
-} from "date-fns";
+import { format, isSameMonth, isToday, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import {
+  agruparPorDataEntrega,
+  chaveDia,
+  diasDaSemana,
+  diasDoMes,
+  navegarPeriodo,
+  rotuloPeriodo,
+  WEEK_HEADER,
+  type CalView,
+} from "@/lib/calendario";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import {
   type PedidoComCliente,
@@ -45,9 +41,6 @@ const STATUS_CARD: Record<StatusPedido, string> = {
   cancelado: "border-l-red-300 bg-red-50",
 };
 
-type CalView = "mes" | "semana";
-const WEEK_HEADER = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
-
 interface Props {
   pedidos: PedidoComCliente[];
 }
@@ -57,35 +50,20 @@ export function PedidosCalendar({ pedidos }: Props) {
   const [calView, setCalView] = useState<CalView>("mes");
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
 
-  const pedidosPorDia = useMemo(() => {
-    const map = new Map<string, PedidoComCliente[]>();
-    for (const p of pedidos) {
-      if (!map.has(p.data_entrega)) map.set(p.data_entrega, []);
-      map.get(p.data_entrega)!.push(p);
-    }
-    return map;
-  }, [pedidos]);
+  const pedidosPorDia = useMemo(() => agruparPorDataEntrega(pedidos), [pedidos]);
 
-  const monthDays = useMemo(() => {
-    const start = startOfWeek(startOfMonth(currentDate), { weekStartsOn: 1 });
-    const end = endOfWeek(endOfMonth(currentDate), { weekStartsOn: 1 });
-    return eachDayOfInterval({ start, end });
-  }, [currentDate]);
+  const monthDays = useMemo(() => diasDoMes(currentDate), [currentDate]);
 
-  const weekDays = useMemo(() => {
-    const start = startOfWeek(currentDate, { weekStartsOn: 1 });
-    const end = endOfWeek(currentDate, { weekStartsOn: 1 });
-    return eachDayOfInterval({ start, end });
-  }, [currentDate]);
+  const weekDays = useMemo(() => diasDaSemana(currentDate), [currentDate]);
 
   const navPrev = useCallback(() => {
     setSelectedDay(null);
-    setCurrentDate((d) => (calView === "mes" ? subMonths(d, 1) : subWeeks(d, 1)));
+    setCurrentDate((d) => navegarPeriodo(d, calView, -1));
   }, [calView]);
 
   const navNext = useCallback(() => {
     setSelectedDay(null);
-    setCurrentDate((d) => (calView === "mes" ? addMonths(d, 1) : addWeeks(d, 1)));
+    setCurrentDate((d) => navegarPeriodo(d, calView, 1));
   }, [calView]);
 
   const switchView = useCallback((v: CalView) => {
@@ -97,16 +75,9 @@ export function PedidosCalendar({ pedidos }: Props) {
     setSelectedDay((prev) => (prev && isSameDay(prev, day) ? null : day));
   }, []);
 
-  const navLabel =
-    calView === "mes"
-      ? format(currentDate, "MMMM 'de' yyyy", { locale: ptBR })
-      : (() => {
-          const ws = startOfWeek(currentDate, { weekStartsOn: 1 });
-          const we = endOfWeek(currentDate, { weekStartsOn: 1 });
-          return `${format(ws, "dd")}–${format(we, "dd/MM")}`;
-        })();
+  const navLabel = rotuloPeriodo(currentDate, calView);
 
-  const selectedKey = selectedDay ? format(selectedDay, "yyyy-MM-dd") : null;
+  const selectedKey = selectedDay ? chaveDia(selectedDay) : null;
   const selectedPedidos = selectedKey ? (pedidosPorDia.get(selectedKey) ?? []) : [];
 
   return (
@@ -120,7 +91,7 @@ export function PedidosCalendar({ pedidos }: Props) {
         >
           <ChevronLeft size={15} className="text-gray-500" />
         </button>
-        <span className="flex-1 text-center text-sm font-semibold text-gray-800 capitalize">
+        <span className="flex-1 text-center text-sm font-semibold text-gray-800 first-letter:uppercase">
           {navLabel}
         </span>
         <button
@@ -172,7 +143,7 @@ export function PedidosCalendar({ pedidos }: Props) {
             {/* Células mensais */}
             <div className="grid grid-cols-7">
               {monthDays.map((day, i) => {
-                const key = format(day, "yyyy-MM-dd");
+                const key = chaveDia(day);
                 const dayPedidos = pedidosPorDia.get(key) ?? [];
                 const inMonth = isSameMonth(day, currentDate);
                 const today = isToday(day);
@@ -266,7 +237,7 @@ export function PedidosCalendar({ pedidos }: Props) {
           /* View semanal */
           <div className="divide-y divide-gray-100">
             {weekDays.map((day) => {
-              const key = format(day, "yyyy-MM-dd");
+              const key = chaveDia(day);
               const dayPedidos = pedidosPorDia.get(key) ?? [];
               const today = isToday(day);
               const isSelected = selectedDay ? isSameDay(day, selectedDay) : false;
@@ -345,7 +316,7 @@ export function PedidosCalendar({ pedidos }: Props) {
       {calView === "mes" && selectedDay && (
         <div className="card p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-gray-800 capitalize">
+            <p className="text-sm font-semibold text-gray-800 first-letter:uppercase">
               {format(selectedDay, "EEEE, dd 'de' MMMM", { locale: ptBR })}
             </p>
             <button

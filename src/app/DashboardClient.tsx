@@ -16,9 +16,11 @@ import { AlertaBadge } from "@/components/AlertaBadge";
 import {
   TIPO_LABELS,
   STATUS_LABELS,
+  type PedidoCalendario,
   type PedidoComCliente,
   type StatusPedido,
 } from "@/types/database";
+import { DashboardCalendario } from "./DashboardCalendario";
 import {
   Package,
   Loader,
@@ -57,6 +59,7 @@ interface Props {
   receitaPeriodo: number;
   periodoLabel: string;
   aReceber: number;
+  pedidosCalendario: PedidoCalendario[];
 }
 
 function getDayLabel(dateStr: string): { label: string; variant: "atrasado" | "hoje" | "amanha" | "normal" } {
@@ -74,7 +77,13 @@ const DAY_VARIANT_CLASSES = {
   normal: "text-gray-600 bg-gray-100 border border-gray-200",
 };
 
-export function DashboardClient({ pedidos, receitaPeriodo, periodoLabel, aReceber }: Props) {
+export function DashboardClient({
+  pedidos,
+  receitaPeriodo,
+  periodoLabel,
+  aReceber,
+  pedidosCalendario,
+}: Props) {
   const [filtro, setFiltro] = useState<Filtro>("todos");
 
   const rascunhos = useMemo(() => pedidos.filter((p) => p.status === "rascunho"), [pedidos]);
@@ -230,6 +239,9 @@ export function DashboardClient({ pedidos, receitaPeriodo, periodoLabel, aRecebe
           </div>
         </div>
       </div>
+
+      {/* Calendário de entregas */}
+      <DashboardCalendario pedidos={pedidosCalendario} />
 
       {/* Lista filtrada */}
       <div>

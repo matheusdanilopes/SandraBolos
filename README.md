@@ -99,3 +99,23 @@ sempre, e o cadastro de cliente não tinha como sair da lista.
 | --- | --- |
 | Pedido em **rascunho** ou **novo** pode ser excluído de vez (itens, imagens e ficha de topper vão junto). De "produzindo" em diante o caminho é cancelar, que preserva o histórico | `excluirPedidoAction()` em `src/app/pedidos/actions.ts`, botão em `src/app/pedidos/[id]/StatusActions.tsx` |
 | Cliente só pode ser excluído **sem nenhum pedido vinculado** — `pedidos.cliente_id` é `on delete set null`, então apagar um cliente com pedidos não daria erro: deixaria pedidos órfãos, sem histórico e sem telefone. Com pedidos, a ficha mostra o motivo no lugar do botão | `excluirClienteAction()` em `src/app/clientes/actions.ts`, botão em `src/app/clientes/[id]/ExcluirCliente.tsx` |
+
+## Calendário do dashboard
+
+O dashboard mostrava a agenda só como lista de dias com pedido — para saber
+quanto trabalho cai numa semana era preciso rolar a tela e contar. A "Agenda de
+Entregas" põe mês e semana em grade, com a quantidade de pedidos em cada dia;
+tocar num dia abre quem é e em que etapa está.
+
+| Decisão | Por quê |
+| --- | --- |
+| Busca própria no `page.tsx`, com `.neq("status", "cancelado")` | a lista do dashboard traz só pedidos ativos (sem entregue nem cancelado). Reaproveitá-la deixaria os dias já entregues com contagem zero, que parece dia livre. Só cancelado fica de fora — não é trabalho a fazer nem histórico de entrega |
+| Recorte `PedidoCalendario` em vez de `select("*")` | a grade precisa de data, etapa, tipo, hora e nome; a busca não tem recorte de data (a pessoa navega para qualquer mês), então vale trazer poucas colunas de todos os pedidos |
+| Tom do número cresce com o volume (1–2, 3–4, 5+) e a semana ganha barra proporcional | a carga do período aparece antes de ler número por número |
+| Contagem do rodapé ignora as sobras das semanas vizinhas | "53 pedidos no mês" conta o mês, não os dias de outro mês que completam a primeira e a última linha da grade |
+
+| Arquivo | Papel |
+| --- | --- |
+| `src/lib/calendario.ts` | dias do mês/semana, navegação, rótulo do período e agrupamento por `data_entrega` — dividido com o calendário da tela de Pedidos, que fazia as mesmas contas inline |
+| `src/app/DashboardCalendario.tsx` | a grade em si: alternância mês/semana, atalho "Hoje" quando o período não contém o dia atual e o painel do dia escolhido |
+| `src/app/page.tsx` | busca do calendário junto das outras (mesmo `Promise.all`, mesmo aviso de falha de conexão) |
