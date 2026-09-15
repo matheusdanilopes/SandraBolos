@@ -38,6 +38,22 @@ export interface PedidoComCliente extends Pedido {
   clientes?: { nome: string; telefone: string } | null;
 }
 
+/**
+ * Recorte de pedido que o calendário do dashboard usa: só o que a grade precisa
+ * para contar os pedidos do dia e listá-los, sem trazer a linha inteira de
+ * todos os pedidos do histórico.
+ */
+export interface PedidoCalendario {
+  id: string;
+  data_entrega: string;
+  status: StatusPedido;
+  tipo: TipoPedido;
+  hora_entrega: string | null;
+  hora_retirada: string | null;
+  nome_cliente: string | null;
+  clientes?: { nome: string } | null;
+}
+
 export interface ImagemPedido {
   id: string;
   pedido_id: string;
