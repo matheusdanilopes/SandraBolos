@@ -144,24 +144,52 @@ OAuth faltarem — assim dá para voltar atrás sem mexer no código.
 
 #### Configurar o OAuth (uma vez)
 
-1. No Google Cloud, crie um **client OAuth** do tipo "Aplicativo para
-   computador" e adicione `http://localhost:53682/` como URI de redirecionamento.
+1. No Google Cloud, crie um **client OAuth** do tipo **"Aplicativo Web"** e
+   cadastre as URIs de redirecionamento que for usar:
+
+   | URI | Para que serve |
+   | --- | --- |
+   | `https://<seu-app>/api/drive/autorizar` | autorizar pelo navegador |
+   | `http://localhost:53682/` | autorizar pelo terminal (opcional) |
+
+   Precisa ser "Aplicativo Web": o tipo "Aplicativo para computador" só aceita
+   redirecionamento para `localhost`, e aí a página no navegador não funciona.
+
 2. Na tela de consentimento, **publique o app como "In production"**. Em
    "Testing" o Google expira o refresh token a cada 7 dias e a importação volta
    a quebrar toda semana. Publicar é um botão; *verificação* é outra coisa, só
    exigida para tirar o aviso de "app não verificado" e para passar de 100
    usuários.
-3. Rode a autorização, logado na conta dona do Drive:
 
-   ```bash
-   GOOGLE_OAUTH_CLIENT_ID=... GOOGLE_OAUTH_CLIENT_SECRET=... \
-     node scripts/autorizar-drive.mjs
+3. Guarde `GOOGLE_OAUTH_CLIENT_ID` e `GOOGLE_OAUTH_CLIENT_SECRET` no ambiente do
+   app e faça o deploy.
+
+4. Gere o refresh token, logado na conta **dona do Drive**. O token não existe
+   no Google Cloud: ele só nasce no consentimento, e o Google o entrega uma
+   única vez. Dois caminhos:
+
+   **Pelo navegador** (não exige terminal) — abra:
+
+   ```
+   https://<seu-app>/api/drive/autorizar?secret=<TEST_DRIVE_SECRET>
    ```
 
-   O script sobe um servidor local, abre o consentimento e imprime o
-   `GOOGLE_OAUTH_REFRESH_TOKEN`. O aviso de app não verificado é esperado:
-   "Avançado" → "Acessar ... (não seguro)".
-4. Guarde as três variáveis `GOOGLE_OAUTH_*` no ambiente do app.
+   A rota `src/app/api/drive/autorizar/route.ts` atende ida e volta do fluxo,
+   para que exista só uma URI para cadastrar. O `secret` viaja no `state`
+   porque o Google não repassa parâmetros próprios na volta — e é ele que
+   impede que qualquer um dispare o fluxo e veja o token.
+
+   **Pelo terminal** — `node scripts/autorizar-drive.mjs`, que sobe um servidor
+   local em `localhost:53682`.
+
+   Nos dois casos o aviso "O Google não verificou este app" é esperado:
+   "Avançado" -> "Acessar ... (não seguro)".
+
+5. Guarde o `GOOGLE_OAUTH_REFRESH_TOKEN` no ambiente e faça novo deploy.
+
+`GOOGLE_OAUTH_REDIRECT_URI` existe como escape: por padrão a rota deduz a URI do
+endereço da requisição, o que basta na Vercel; defina a variável se o app estiver
+atrás de um proxy que mude o host.
 
 O escopo é o `drive` completo, e não `drive.file`, porque `drive.file` só
 enxerga o que o próprio app criou — com ele a pasta raiz que já existe ficaria
