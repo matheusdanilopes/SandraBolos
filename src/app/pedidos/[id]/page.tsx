@@ -4,14 +4,14 @@ import { supabase } from "@/lib/supabase";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AlertaBadge } from "@/components/AlertaBadge";
 import { formatDate, formatTime, formatPhone, calcularValorFinal, formatCurrency, pedidoNumero } from "@/lib/utils";
-import { TIPO_LABELS, TOPPER_LABELS, STATUS_FLOW, type PedidoComClienteContato, type ItemPedido, type ProdutoParaSelecao } from "@/types/database";
+import { TIPO_LABELS, TOPPER_LABELS, STATUS_FLOW, type PedidoComClienteContato, type ItemPedido, type ProdutoComCategoria, type CategoriaProduto } from "@/types/database";
 import { Edit, CheckCircle, AlertCircle, MessageCircle, Phone, ArrowLeft, Lock, FileEdit, XCircle } from "lucide-react";
 import { StatusActions } from "./StatusActions";
 import { PrecificacaoForm } from "./PrecificacaoForm";
 import { EntregaForm } from "./EntregaForm";
 import { ImagensSection } from "./ImagensSection";
 import { ItensForm } from "./ItensForm";
-import { lerProdutosAtivos } from "@/lib/dadosDeApoio";
+import { lerCategoriasProduto, lerProdutosAtivosComCategoria } from "@/lib/dadosDeApoio";
 import { isErroDeConexao } from "@/lib/erros";
 import { PainelSemConexao } from "@/components/PainelSemConexao";
 
@@ -22,28 +22,36 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
   // catálogo por `ativo = true`: nenhum deles depende da linha do pedido, então
   // esperar o pedido chegar antes de disparar os outros custava uma ida inteira
   // ao Supabase na tela mais aberta do app. O catálogo ainda vem do cache.
-  const [{ data: pedido, error }, { data: imagens }, { data: itens }, { data: produtos }] =
-    await Promise.all([
-      supabase
-        .from("pedidos")
-        .select("*, clientes(nome, telefone)")
-        .eq("id", params.id)
-        .single(),
+  const [
+    { data: pedido, error },
+    { data: imagens },
+    { data: itens },
+    { data: produtos },
+    { data: categorias },
+  ] = await Promise.all([
+    supabase
+      .from("pedidos")
+      .select("*, clientes(nome, telefone)")
+      .eq("id", params.id)
+      .single(),
 
-      supabase
-        .from("imagens_pedido")
-        .select("*")
-        .eq("pedido_id", params.id)
-        .order("created_at"),
+    supabase
+      .from("imagens_pedido")
+      .select("*")
+      .eq("pedido_id", params.id)
+      .order("created_at"),
 
-      supabase
-        .from("itens_pedido")
-        .select("*")
-        .eq("pedido_id", params.id)
-        .order("created_at"),
+    supabase
+      .from("itens_pedido")
+      .select("*")
+      .eq("pedido_id", params.id)
+      .order("created_at"),
 
-      lerProdutosAtivos(),
-    ]);
+    // Catálogo com a categoria de cada produto e a lista de categorias: são o
+    // que o seletor de item usa para busca e chips. Ambos do cache.
+    lerProdutosAtivosComCategoria(),
+    lerCategoriasProduto(),
+  ]);
 
   // Falha de rede não é pedido inexistente: mandar para o 404 faria parecer
   // que o pedido foi apagado.
@@ -51,6 +59,9 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
   if (!pedido) notFound();
 
   const pedidoTyped = pedido as unknown as PedidoComClienteContato;
+
+  // A leitura cacheada traz todas as categorias; os chips mostram só as ativas.
+  const categoriasAtivas = (categorias ?? []).filter((c) => c.ativo);
 
   const cliente = pedidoTyped.clientes ?? null;
   const valorFinal = calcularValorFinal(pedidoTyped);
@@ -260,7 +271,8 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
       {/* Itens */}
       <ItensForm
         pedidoId={pedidoTyped.id}
-        produtos={(produtos ?? []) as ProdutoParaSelecao[]}
+        produtos={(produtos ?? []) as unknown as ProdutoComCategoria[]}
+        categorias={categoriasAtivas as CategoriaProduto[]}
         itens={(itens ?? []) as ItemPedido[]}
       />
 

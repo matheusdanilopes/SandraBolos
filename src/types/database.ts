@@ -76,6 +76,22 @@ export interface TopperPedido {
   created_at: string;
 }
 
+/**
+ * Em que ponto do caminho o topper encomendado está: ainda não foi pedido ao
+ * fornecedor, já foi pedido e está a caminho, ou já chegou em mãos.
+ *
+ * `solicitado` e `recebido` são dois booleanos no banco, mas uma coisa só para
+ * quem usa a tela — derivar a etapa a partir deles evita que a tela trate como
+ * pendente um topper que chegou sem ninguém ter marcado a solicitação.
+ */
+export type EtapaTopper = "pendente" | "solicitado" | "recebido";
+
+export function etapaDoTopper(topper?: TopperPedido | null): EtapaTopper {
+  if (topper?.recebido) return "recebido";
+  if (topper?.solicitado) return "solicitado";
+  return "pendente";
+}
+
 export interface TopperPedidoComPedido extends TopperPedido {
   pedidos: {
     id: string;

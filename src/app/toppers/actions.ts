@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { mensagemErro } from "@/lib/erros";
+import type { EtapaTopper } from "@/types/database";
 
 interface TopperPayload {
   pedidoId: string;
@@ -33,11 +34,28 @@ export async function salvarTopperAction(data: TopperPayload): Promise<{ error?:
   return {};
 }
 
-export async function toggleSolicitadoAction(
+/**
+ * Etapas do topper encomendado, na ordem em que acontecem na vida real:
+ * pedir ao fornecedor → receber em mãos.
+ *
+ * Antes cada etapa era um booleano solto, ligado/desligado por conta própria —
+ * dava para marcar "recebido" um topper que nunca foi solicitado, e a tela
+ * ficava contando esse pedido como pendente. Gravar as duas de uma vez mantém o
+ * estado sempre coerente: avançar marca tudo que veio antes, voltar desmarca
+ * tudo que vem depois.
+ */
+const FLAGS_POR_ETAPA: Record<EtapaTopper, { solicitado: boolean; recebido: boolean }> = {
+  pendente: { solicitado: false, recebido: false },
+  solicitado: { solicitado: true, recebido: false },
+  recebido: { solicitado: true, recebido: true },
+};
+
+export async function definirEtapaTopperAction(
   pedidoId: string,
-  solicitado: boolean
+  etapa: EtapaTopper
 ): Promise<{ error?: string }> {
   const supabase = createServerSupabaseClient();
+  const flags = FLAGS_POR_ETAPA[etapa];
 
   const { data: existing } = await supabase
     .from("toppers_pedido")
@@ -48,41 +66,12 @@ export async function toggleSolicitadoAction(
   if (!existing) {
     const { error } = await supabase
       .from("toppers_pedido")
-      .insert({ pedido_id: pedidoId, solicitado, valor: 0, frete: 0 });
+      .insert({ pedido_id: pedidoId, ...flags, valor: 0, frete: 0 });
     if (error) return { error: mensagemErro(error) };
   } else {
     const { error } = await supabase
       .from("toppers_pedido")
-      .update({ solicitado })
-      .eq("pedido_id", pedidoId);
-    if (error) return { error: mensagemErro(error) };
-  }
-
-  revalidatePath("/toppers");
-  return {};
-}
-
-export async function toggleRecebidoAction(
-  pedidoId: string,
-  recebido: boolean
-): Promise<{ error?: string }> {
-  const supabase = createServerSupabaseClient();
-
-  const { data: existing } = await supabase
-    .from("toppers_pedido")
-    .select("id")
-    .eq("pedido_id", pedidoId)
-    .single();
-
-  if (!existing) {
-    const { error } = await supabase
-      .from("toppers_pedido")
-      .insert({ pedido_id: pedidoId, recebido, valor: 0, frete: 0 });
-    if (error) return { error: mensagemErro(error) };
-  } else {
-    const { error } = await supabase
-      .from("toppers_pedido")
-      .update({ recebido })
+      .update(flags)
       .eq("pedido_id", pedidoId);
     if (error) return { error: mensagemErro(error) };
   }

@@ -2,10 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Package, ChevronDown } from "lucide-react";
+import { Plus, Trash2, Package } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import type { ProdutoParaSelecao, ItemPedido, UnidadeMedida } from "@/types/database";
-import { UNIDADE_LABELS } from "@/types/database";
+import type {
+  CategoriaProduto,
+  ItemPedido,
+  ProdutoComCategoria,
+  UnidadeMedida,
+} from "@/types/database";
+import { SeletorProduto } from "../SeletorProduto";
 import { adicionarItemAction, removerItemAction } from "./itensActions";
 
 // ─── Cálculo por unidade de medida ──────────────────────────────────────────
@@ -137,20 +142,21 @@ function CalcPreview({
 
 interface Props {
   pedidoId: string;
-  produtos: ProdutoParaSelecao[];
+  produtos: ProdutoComCategoria[];
+  /** Categorias dos produtos — alimentam os chips de filtro do seletor. */
+  categorias?: CategoriaProduto[];
   itens: ItemPedido[];
 }
 
-export function ItensForm({ pedidoId, produtos, itens }: Props) {
+export function ItensForm({ pedidoId, produtos, categorias = [], itens }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  const [produtoId, setProdutoId] = useState("");
+  const [produtoSelecionado, setProdutoSelecionado] = useState<ProdutoComCategoria | null>(null);
   const [quantidade, setQuantidade] = useState("");
   const [precoUnitario, setPrecoUnitario] = useState("");
   const [error, setError] = useState("");
 
-  const produtoSelecionado = produtos.find((p) => p.id === produtoId) ?? null;
   const unidade = produtoSelecionado?.unidade_medida ?? null;
 
   const qtdNum = quantidade !== "" ? parseFloat(quantidade) : null;
@@ -164,11 +170,9 @@ export function ItensForm({ pedidoId, produtos, itens }: Props) {
   const totalItens = itens.reduce((sum, item) => sum + item.valor_total, 0);
   const inputCfg = unidade ? quantidadeInputConfig(unidade) : null;
 
-  function handleProdutoChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const id = e.target.value;
-    setProdutoId(id);
-    const prod = produtos.find((p) => p.id === id);
-    setPrecoUnitario(prod ? prod.preco_padrao.toString() : "");
+  function handleProdutoChange(produto: ProdutoComCategoria | null) {
+    setProdutoSelecionado(produto);
+    setPrecoUnitario(produto ? produto.preco_padrao.toString() : "");
     setQuantidade("");
     setError("");
   }
@@ -205,7 +209,7 @@ export function ItensForm({ pedidoId, produtos, itens }: Props) {
         setError(result.error);
         return;
       }
-      setProdutoId("");
+      setProdutoSelecionado(null);
       setQuantidade("");
       setPrecoUnitario("");
       router.refresh();
@@ -253,29 +257,17 @@ export function ItensForm({ pedidoId, produtos, itens }: Props) {
       <div className="border-t border-gray-100 pt-4 space-y-3">
         <p className="text-xs font-semibold text-gray-600">Adicionar item</p>
 
-        {/* Seleção de produto */}
+        {/* Seleção de produto — mesma busca e chips do lançamento do pedido */}
         <div>
           <label className="label">Produto</label>
-          <div className="relative">
-            <select
-              className="input appearance-none pr-8"
-              value={produtoId}
-              onChange={handleProdutoChange}
-              disabled={isPending}
-            >
-              <option value="">Selecionar produto...</option>
-              {produtosAtivos.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nome} — {UNIDADE_LABELS[p.unidade_medida]}
-                </option>
-              ))}
-            </select>
-            <ChevronDown
-              size={14}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+          {produtosAtivos.length > 0 ? (
+            <SeletorProduto
+              produtos={produtosAtivos}
+              categorias={categorias}
+              produtoSelecionado={produtoSelecionado}
+              onSelecionar={handleProdutoChange}
             />
-          </div>
-          {produtosAtivos.length === 0 && (
+          ) : (
             <p className="text-[11px] text-amber-600 mt-1">
               Nenhum produto ativo. Cadastre produtos em{" "}
               <a href="/produtos" className="underline">Produtos</a>.
