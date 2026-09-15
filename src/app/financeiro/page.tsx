@@ -114,7 +114,7 @@ export default async function FinanceiroPage() {
     <div className="py-4 space-y-5">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Financeiro</h1>
-        <p className="text-sm text-gray-400 capitalize mt-0.5">{periodo.label}</p>
+        <p className="text-sm text-gray-400 mt-0.5">{periodo.label}</p>
       </div>
 
       {semConexao && <AvisoConexao detalhe="Os valores abaixo podem estar incompletos." />}
@@ -233,7 +233,7 @@ export default async function FinanceiroPage() {
 
           {entregues.length > 0 && (
             <div className="space-y-2">
-              <h2 className="font-semibold text-sm text-gray-700 capitalize">
+              <h2 className="font-semibold text-sm text-gray-700">
                 Entregas — {periodo.label}
               </h2>
               <div className="space-y-1">
@@ -294,7 +294,7 @@ export default async function FinanceiroPage() {
             )}
             {totalToppersPagosPeriodo > 0 && (
               <div className="flex items-center justify-between py-1.5">
-                <span className="text-sm text-gray-600 capitalize">Pago — {periodo.label}</span>
+                <span className="text-sm text-gray-600">Pago — {periodo.label}</span>
                 <span className="text-sm font-semibold text-gray-500">{formatCurrency(totalToppersPagosPeriodo)}</span>
               </div>
             )}
@@ -307,7 +307,7 @@ export default async function FinanceiroPage() {
       {/* Histórico mensal adaptado ao período */}
       {mesesResumo.length > 0 && (
         <div className="card p-4 space-y-4">
-          <h2 className="font-semibold text-sm text-gray-700 capitalize">
+          <h2 className="font-semibold text-sm text-gray-700">
             {mesesResumo.length === 1 ? "Resumo do Período" : `Evolução — ${periodo.label}`}
           </h2>
           <div className="space-y-3">
@@ -317,7 +317,7 @@ export default async function FinanceiroPage() {
               return (
                 <div key={mes.chave} className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className={`text-xs capitalize ${isMesAtual ? "font-semibold text-gray-800" : "text-gray-500"}`}>
+                    <span className={`text-xs ${isMesAtual ? "font-semibold text-gray-800" : "text-gray-500"}`}>
                       {mes.label}
                       {isMesAtual && (
                         <span className="ml-1.5 text-[10px] bg-brand-100 text-brand-700 px-1.5 py-0.5 rounded-full font-medium">

@@ -20,9 +20,8 @@ export function PeriodoBar({ preset, de, ate }: Props) {
 
   return (
     <div className="sticky top-[52px] z-30 bg-white border-b border-gray-100 shadow-sm">
-      <div className="max-w-2xl mx-auto px-4 py-2.5">
+      <div className="max-w-2xl mx-auto px-4 py-2">
         <PeriodoSeletor
-          key={`${preset}-${de ?? ""}-${ate ?? ""}`}
           currentPreset={preset}
           currentDe={de}
           currentAte={ate}

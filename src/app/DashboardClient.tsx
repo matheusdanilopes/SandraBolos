@@ -221,7 +221,7 @@ export function DashboardClient({
             <div className="p-1 bg-emerald-50 rounded-md">
               <TrendingUp size={12} className="text-emerald-600" />
             </div>
-            <span className="capitalize truncate">{periodoLabel}</span>
+            <span className="truncate">{periodoLabel}</span>
           </div>
           <div className="text-lg font-bold text-emerald-600 leading-tight">
             {formatCurrency(receitaPeriodo)}
