@@ -46,10 +46,22 @@ function pagina(titulo: string, corpo: string, status = 200): NextResponse {
   );
 }
 
-/** A URI que o Google precisa ter cadastrada — esta mesma rota. */
+/**
+ * A URI que o Google precisa ter cadastrada — esta mesma rota.
+ *
+ * Deduz do cabeçalho encaminhado, e não de `nextUrl.origin`: atrás do proxy da
+ * Vercel o origin pode sair com o host interno, e qualquer diferença de uma
+ * letra vira `redirect_uri_mismatch` no Google.
+ */
 function uriDeRetorno(req: NextRequest): string {
   const configurada = process.env.GOOGLE_OAUTH_REDIRECT_URI?.trim();
   if (configurada) return configurada;
+
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  if (host) {
+    const proto = req.headers.get("x-forwarded-proto") ?? "https";
+    return `${proto}://${host}/api/drive/autorizar`;
+  }
   return `${req.nextUrl.origin}/api/drive/autorizar`;
 }
 
@@ -168,5 +180,25 @@ export async function GET(req: NextRequest) {
     state: segredo,
   });
 
-  return NextResponse.redirect(url, { headers: { "Cache-Control": "no-store" } });
+  // Mostra a URI antes de sair daqui, em vez de redirecionar direto. Quando ela
+  // não está cadastrada, o Google barra com `redirect_uri_mismatch` na tela dele
+  // e nunca volta para cá — então esta é a única chance de dizer, na tela, qual
+  // valor exato precisa ser cadastrado.
+  return pagina(
+    "Autorizar o Google Drive",
+    `<p>Esta é a URI de redirecionamento que o app vai usar. Ela precisa estar ` +
+      `cadastrada <b>exatamente assim</b> no seu client OAuth, em "URIs de ` +
+      `redirecionamento autorizados":</p>` +
+      `<pre>${redirectUri}</pre>` +
+      `<div class="aviso">Confira caractere por caractere: barra no final, ` +
+      `<code>http</code> vs <code>https</code> e o endereço do site precisam ` +
+      `bater. Qualquer diferença vira <code>redirect_uri_mismatch</code>.<br><br>` +
+      `O client também precisa ser do tipo <b>Aplicativo Web</b> — o tipo ` +
+      `"Aplicativo para computador" não aceita endereço de site.</div>` +
+      `<p><b>Faça login na conta dona do Drive</b>, e não em outra: o token sai ` +
+      `no nome de quem autorizar, e é o espaço dessa conta que será usado.</p>` +
+      `<p style="margin-top:24px"><a href="${url}" style="display:inline-block;` +
+      `background:#111827;color:#fff;padding:12px 20px;border-radius:8px;` +
+      `text-decoration:none;font-weight:600">Continuar para o Google</a></p>`
+  );
 }
