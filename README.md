@@ -139,3 +139,22 @@ o que fazer a respeito. O erro vinha de duas armadilhas somadas:
 que não tem espaço de armazenamento — todo upload ali falharia com
 `storageQuotaExceeded`. Para usar um Drive compartilhado (Shared Drive), aponte
 para uma pasta dentro dele; as chamadas já mandam `supportsAllDrives`.
+
+### O limite da conta de serviço
+
+Conta de serviço **não tem espaço de armazenamento próprio**, e o arquivo que
+ela envia fica no nome dela. Isso separa as duas operações de um jeito que
+confunde: criar pastas funciona (pasta não ocupa bytes), e só o upload do
+arquivo falha. Dá a impressão de problema de permissão — a pasta do pedido
+aparece no Drive, mas a foto nunca chega.
+
+Compartilhar a pasta como Editor **não resolve** esse caso: a permissão é sobre
+a pasta, o espaço é sobre quem envia. As saídas reais são um Drive compartilhado
+(exige Google Workspace — um Drive pessoal `@gmail.com` não cria) ou enviar em
+nome de um usuário de verdade, via OAuth.
+
+Por isso `descreveErroDrive()` detecta falta de cota por `reason` **e** pelo
+texto da resposta, e lê tanto o topo do erro quanto `response.data.error` — o
+googleapis nem sempre promove `errors` para o topo, e ler um só dos dois lugares
+fazia a falha de cota cair no ramo genérico de 403 e sair na tela como
+"compartilhe a pasta", mandando arrumar uma permissão que já estava correta.

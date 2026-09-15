@@ -33,10 +33,24 @@ const PADROES_URL_DRIVE = [
   /[?&]id=([A-Za-z0-9_-]{25,})/,
 ];
 
+type DetalheErro = { reason?: string; message?: string };
+
+/**
+ * O googleapis nem sempre promove `errors`/`message` da resposta para o topo do
+ * erro — dependendo da versão eles só existem em `response.data.error`. Ler um
+ * só dos dois lugares foi o que fez uma falha de cota de armazenamento cair no
+ * ramo genérico de 403 e sair na tela como "compartilhe a pasta", mandando
+ * resolver uma permissão que já estava correta.
+ */
 type ErroDrive = {
   code?: number | string;
+  status?: number;
   message?: string;
-  errors?: Array<{ reason?: string; message?: string }>;
+  errors?: DetalheErro[];
+  response?: {
+    status?: number;
+    data?: { error?: { code?: number; message?: string; errors?: DetalheErro[] } };
+  };
 };
 
 /**
@@ -121,14 +135,32 @@ function getDriveClient(): { drive: drive_v3.Drive; contaDeServico: string } {
 
 function razaoDoErro(erro: unknown): string {
   const e = erro as ErroDrive;
-  return e?.errors?.[0]?.reason ?? "";
+  return e?.errors?.[0]?.reason ?? e?.response?.data?.error?.errors?.[0]?.reason ?? "";
+}
+
+/** O texto que o próprio Drive mandou — a pista mais confiável quando `reason` falta. */
+function mensagemDoDrive(erro: unknown): string {
+  const e = erro as ErroDrive;
+  return (e?.response?.data?.error?.message ?? e?.message ?? "").trim();
 }
 
 function statusDoErro(erro: unknown): number | undefined {
-  const code = (erro as ErroDrive)?.code;
-  if (typeof code === "number") return code;
-  if (typeof code === "string" && /^\d+$/.test(code)) return Number(code);
+  const e = erro as ErroDrive;
+  for (const bruto of [e?.code, e?.status, e?.response?.status, e?.response?.data?.error?.code]) {
+    if (typeof bruto === "number") return bruto;
+    if (typeof bruto === "string" && /^\d+$/.test(bruto)) return Number(bruto);
+  }
   return undefined;
+}
+
+/**
+ * Conta de serviço não tem espaço próprio no Drive: ela cria pastas (não ocupam
+ * bytes), mas o primeiro upload de arquivo bate na cota. Checa `reason` e também
+ * o texto, porque o `reason` nem sempre chega.
+ */
+function ehFaltaDeCota(erro: unknown): boolean {
+  if (razaoDoErro(erro) === "storageQuotaExceeded") return true;
+  return /storage quota|storagequotaexceeded|do not have storage/i.test(mensagemDoDrive(erro));
 }
 
 /**
@@ -156,18 +188,28 @@ export function descreveErroDrive(
     );
   }
 
-  if (status === 403 && razao === "storageQuotaExceeded") {
+  if (ehFaltaDeCota(erro)) {
     return (
-      `${contexto.etapa}: a conta de serviço ${conta} não tem espaço próprio no ` +
-      `Drive. Use uma pasta dentro de um Drive compartilhado (Shared Drive), ` +
-      `onde o espaço é da organização.`
+      `${contexto.etapa}: a conta de serviço ${conta} não tem espaço de ` +
+      `armazenamento próprio, e arquivos que ela envia ficam no nome dela. ` +
+      `Criar pastas funciona (não ocupam espaço), mas o arquivo não sobe. ` +
+      `A saída é um Drive compartilhado (Shared Drive) ou enviar em nome de um ` +
+      `usuário de verdade, via OAuth.`
     );
   }
 
   if (status === 403) {
+    // Sem `reason` conhecido não dá para afirmar a causa. A versão anterior
+    // chutava "compartilhe a pasta" para todo 403 e mandava arrumar uma
+    // permissão que já estava certa — então aqui vai o texto do próprio Drive,
+    // com a hipótese mais comum como sugestão, não como diagnóstico.
+    const original = mensagemDoDrive(erro);
     return (
-      `${contexto.etapa}: ${conta} não tem permissão na pasta ${alvo}. ` +
-      `Compartilhe a pasta com esse e-mail no nível Editor.`
+      `${contexto.etapa}: o Google Drive recusou a operação na pasta ${alvo}` +
+      `${razao ? ` (${razao})` : ""}. ` +
+      `${original ? `Resposta do Drive: "${original}". ` : ""}` +
+      `Se ${conta} ainda não tem acesso de Editor a essa pasta, esse é o ` +
+      `primeiro lugar para conferir.`
     );
   }
 
@@ -355,7 +397,7 @@ export async function createPedidoFolder(
  * recriar só trocaria a mensagem útil por uma tentativa inútil.
  */
 export function devePastaSerRecriada(erro: unknown): boolean {
-  if (razaoDoErro(erro) === "storageQuotaExceeded") return false;
+  if (ehFaltaDeCota(erro)) return false;
   const status = statusDoErro(erro);
   return status === 404 || status === 403 || razaoDoErro(erro) === "notFound";
 }
