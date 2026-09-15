@@ -58,12 +58,22 @@ export async function GET(req: NextRequest) {
   const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID?.trim();
   const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET?.trim();
 
+  // Variável ausente quase nunca é "esqueci de criar" — é uma das duas
+  // pegadinhas de ambiente abaixo, que custam uma rodada inteira para descobrir.
+  const PEGADINHAS =
+    `<p>Se você já criou a variável, o problema é um destes:</p><ul>` +
+    `<li><b>Falta reimplantar.</b> Variável nova não entra numa implantação que ` +
+    `já está no ar. Na Vercel: Deployments → ⋯ → Redeploy.</li>` +
+    `<li><b>Ambiente errado.</b> Variável marcada só como <i>Production</i> não ` +
+    `vale em URL de <i>Preview</i> (as que têm o nome da branch no endereço). ` +
+    `Marque também Preview, ou abra pelo domínio de produção.</li></ul>`;
+
   if (!segredo) {
     return pagina(
       "Falta configurar TEST_DRIVE_SECRET",
       `<div class="erro">Defina <code>TEST_DRIVE_SECRET</code> no ambiente do app. ` +
         `É ele que protege esta página — sem isso qualquer pessoa poderia gerar ` +
-        `um token de acesso ao seu Drive.</div>`,
+        `um token de acesso ao seu Drive.</div>` + PEGADINHAS,
       500
     );
   }
@@ -71,7 +81,8 @@ export async function GET(req: NextRequest) {
     return pagina(
       "Falta configurar o client OAuth",
       `<div class="erro">Defina <code>GOOGLE_OAUTH_CLIENT_ID</code> e ` +
-        `<code>GOOGLE_OAUTH_CLIENT_SECRET</code> no ambiente do app antes de autorizar.</div>`,
+        `<code>GOOGLE_OAUTH_CLIENT_SECRET</code> no ambiente do app antes de ` +
+        `autorizar.</div>` + PEGADINHAS,
       500
     );
   }
