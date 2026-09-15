@@ -341,9 +341,23 @@ export async function createPedidoFolder(
   return folderId;
 }
 
-/** O erro é "essa pasta sumiu/ficou inacessível"? Dispara a recriação da pasta do pedido. */
-export function ehPastaInacessivel(erro: unknown): boolean {
-  return statusDoErro(erro) === 404 || razaoDoErro(erro) === "notFound";
+/**
+ * A pasta gravada em `pedidos.drive_folder_id` ficou inutilizável e vale a pena
+ * recriá-la sob a raiz configurada hoje?
+ *
+ * Cobre 404 (pasta apagada ou movida) e 403 (pasta de uma configuração antiga,
+ * em que a conta de serviço escrevia em outro lugar). O 403 importa tanto
+ * quanto o 404: trocar GOOGLE_DRIVE_ROOT_FOLDER_ID não apaga o ID que os
+ * pedidos já têm salvo, e sem isso cada pedido antigo ficaria preso à pasta
+ * velha para sempre.
+ *
+ * Cota estourada fica de fora de propósito — o problema não é a pasta, e
+ * recriar só trocaria a mensagem útil por uma tentativa inútil.
+ */
+export function devePastaSerRecriada(erro: unknown): boolean {
+  if (razaoDoErro(erro) === "storageQuotaExceeded") return false;
+  const status = statusDoErro(erro);
+  return status === 404 || status === 403 || razaoDoErro(erro) === "notFound";
 }
 
 export async function uploadFileToDrive(

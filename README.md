@@ -120,7 +120,7 @@ o que fazer a respeito. O erro vinha de duas armadilhas somadas:
 | Arquivo | Papel |
 | --- | --- |
 | `src/lib/googleDrive.ts` | `validarPastaRaiz()` confere a raiz com `files.get` **antes** de criar qualquer coisa, então a falha aparece na etapa certa; `descreveErroDrive()` traduz 404/403/401 e cota esgotada para instruções com o ID e o e-mail à vista; `normalizarIdPasta()` aceita URL colada, tira aspas e caracteres invisíveis, e rejeita `"."`/`""`/`"root"` |
-| `src/app/api/upload-imagem/route.ts` | pasta apagada direto no Drive não quebra o pedido para sempre: o 404 no upload dispara uma recriação e uma segunda tentativa |
+| `src/app/api/upload-imagem/route.ts` | o ID salvo em `pedidos.drive_folder_id` é usado como está e pode ter envelhecido — pasta apagada no Drive (404) ou criada quando a raiz apontava para outro lugar (403). Nos dois casos a pasta é recriada sob a raiz atual e o envio repetido uma vez, senão trocar `GOOGLE_DRIVE_ROOT_FOLDER_ID` deixaria todo pedido antigo preso à configuração velha |
 | `src/app/api/pedidos/route.ts` | o guard usava `GOOGLE_SERVICE_ACCOUNT_EMAIL` e ignorava quem configurou pelo JSON completo (a opção 1 do `.env.local.example`); agora usa `driveConfigurado()` |
 | `src/app/api/test-drive/route.ts` | mostra o ID **normalizado** que o app usa de fato e o `client_email` que precisa receber o compartilhamento |
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import {
   createPedidoFolder,
-  ehPastaInacessivel,
+  devePastaSerRecriada,
   normalizarIdPasta,
   uploadFileToDrive,
 } from "@/lib/googleDrive";
@@ -102,16 +102,19 @@ export async function POST(req: NextRequest) {
 
   const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`;
 
-  // Upload to Drive. A pasta gravada no banco pode ter sido apagada ou movida
-  // direto no Drive — nesse caso o upload volta 404 e a pasta é recriada uma vez,
-  // em vez de a importação ficar quebrada para sempre naquele pedido.
+  // Upload to Drive. O ID salvo em `pedidos.drive_folder_id` é usado como está,
+  // e pode ter envelhecido: a pasta foi apagada no Drive (404), ou foi criada
+  // quando GOOGLE_DRIVE_ROOT_FOLDER_ID apontava para outro lugar e hoje a conta
+  // de serviço não escreve mais nela (403). Nos dois casos a pasta é recriada
+  // sob a raiz configurada agora e o envio é repetido uma vez — senão trocar a
+  // pasta raiz deixaria todo pedido antigo preso à configuração velha.
   let fileId: string;
   let url: string;
   try {
     ({ fileId, url } = await uploadFileToDrive(folderId, compressed, fileName, "image/jpeg"));
   } catch (driveErr: unknown) {
-    if (ehPastaInacessivel(driveErr)) {
-      console.warn("[Drive] pasta do pedido inacessível, recriando:", folderId);
+    if (devePastaSerRecriada(driveErr)) {
+      console.warn("[Drive] pasta do pedido inutilizável, recriando:", folderId, driveErr);
       try {
         folderId = await criarPasta();
         ({ fileId, url } = await uploadFileToDrive(folderId, compressed, fileName, "image/jpeg"));
