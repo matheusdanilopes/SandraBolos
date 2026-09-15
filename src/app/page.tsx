@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { supabase } from "@/lib/supabase";
-import { type PedidoComCliente } from "@/types/database";
+import { type PedidoCalendario, type PedidoComCliente } from "@/types/database";
 import { DashboardClient } from "./DashboardClient";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -20,7 +20,7 @@ export default async function DashboardPage() {
   const ate = cookieStore.get("sb_periodo_ate")?.value;
   const periodo = getPeriodoRange(preset, de, ate);
 
-  const [pedidosResult, receitaResult, feitosResult] = await Promise.all([
+  const [pedidosResult, receitaResult, feitosResult, calendarioResult] = await Promise.all([
     supabase
       .from("pedidos")
       .select(`${COLUNAS_PEDIDO_PAINEL}, clientes(nome)`)
@@ -39,6 +39,14 @@ export default async function DashboardPage() {
       .from("pedidos")
       .select("valor_calculado, preco_corrigido, valor_brinde")
       .eq("status", "feito"),
+
+    // Calendário: os entregues também contam, então esta busca não pode se
+    // apoiar na lista de pedidos ativos acima.
+    supabase
+      .from("pedidos")
+      .select("id, data_entrega, status, tipo, hora_entrega, hora_retirada, nome_cliente, clientes(nome)")
+      .neq("status", "cancelado")
+      .order("data_entrega", { ascending: true }),
   ]);
 
   const receitaPeriodo =
@@ -47,7 +55,12 @@ export default async function DashboardPage() {
   const aReceber =
     feitosResult.data?.reduce((acc, p) => acc + (calcularValorFinal(p) ?? 0), 0) ?? 0;
 
-  const semConexao = houveErroDeConexao(pedidosResult, receitaResult, feitosResult);
+  const semConexao = houveErroDeConexao(
+    pedidosResult,
+    receitaResult,
+    feitosResult,
+    calendarioResult
+  );
 
   const hoje = format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR });
 
@@ -65,6 +78,7 @@ export default async function DashboardPage() {
         receitaPeriodo={receitaPeriodo}
         periodoLabel={periodo.label}
         aReceber={aReceber}
+        pedidosCalendario={(calendarioResult.data ?? []) as unknown as PedidoCalendario[]}
       />
     </div>
   );
