@@ -1,5 +1,6 @@
 import { google } from "googleapis";
 import type { drive_v3 } from "googleapis";
+import type { OAuth2Client } from "google-auth-library";
 import { PassThrough } from "stream";
 
 /**
@@ -113,15 +114,67 @@ function credenciaisDoAmbiente(): { client_email: string; private_key: string } 
   return { client_email: email, private_key: rawKey.replace(/\\n/g, "\n") };
 }
 
+/**
+ * Credenciais OAuth de um usuário de verdade. É o modo preferido: a conta de
+ * serviço não tem espaço de armazenamento próprio, então ela cria pastas mas
+ * nenhum arquivo sobe. Autenticando como a dona do Drive, cada foto nasce no
+ * nome dela e ocupa o espaço que ela já paga.
+ */
+function autenticacaoOAuth(): OAuth2Client | null {
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID?.trim();
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET?.trim();
+  const refreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN?.trim();
+  if (!clientId || !clientSecret || !refreshToken) return null;
+
+  const client = new google.auth.OAuth2(clientId, clientSecret);
+  client.setCredentials({ refresh_token: refreshToken });
+  return client;
+}
+
+function temCredencialOAuth(): boolean {
+  return (
+    !!process.env.GOOGLE_OAUTH_CLIENT_ID &&
+    !!process.env.GOOGLE_OAUTH_CLIENT_SECRET &&
+    !!process.env.GOOGLE_OAUTH_REFRESH_TOKEN
+  );
+}
+
+function temCredencialContaDeServico(): boolean {
+  return (
+    !!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON ||
+    (!!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && !!process.env.GOOGLE_PRIVATE_KEY)
+  );
+}
+
 /** A configuração do Drive está completa? Usado para pular a integração sem quebrar o pedido. */
 export function driveConfigurado(): boolean {
-  const temCredencial =
-    !!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON ||
-    (!!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && !!process.env.GOOGLE_PRIVATE_KEY);
+  const temCredencial = temCredencialOAuth() || temCredencialContaDeServico();
   return temCredencial && !!normalizarIdPasta(process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID);
 }
 
-function getDriveClient(): { drive: drive_v3.Drive; contaDeServico: string } {
+export type ClienteDrive = {
+  drive: drive_v3.Drive;
+  /** Como chamar quem está autenticado nas mensagens de erro. */
+  identidade: string;
+  /** Conta de serviço tem limitações que um usuário de verdade não tem (ver `ehFaltaDeCota`). */
+  ehContaDeServico: boolean;
+};
+
+/**
+ * OAuth tem precedência sobre a conta de serviço: com as duas configuradas, o
+ * app envia como o usuário. A conta de serviço fica como caminho de volta, para
+ * não quebrar um ambiente que ainda não migrou.
+ */
+function getDriveClient(): ClienteDrive {
+  const oauth = autenticacaoOAuth();
+  if (oauth) {
+    return {
+      drive: google.drive({ version: "v3", auth: oauth }),
+      identidade: "a conta Google autorizada",
+      ehContaDeServico: false,
+    };
+  }
+
   const credentials = credenciaisDoAmbiente();
   const auth = new google.auth.GoogleAuth({
     credentials,
@@ -129,7 +182,8 @@ function getDriveClient(): { drive: drive_v3.Drive; contaDeServico: string } {
   });
   return {
     drive: google.drive({ version: "v3", auth }),
-    contaDeServico: credentials.client_email,
+    identidade: credentials.client_email,
+    ehContaDeServico: true,
   };
 }
 
@@ -138,9 +192,25 @@ function razaoDoErro(erro: unknown): string {
   return e?.errors?.[0]?.reason ?? e?.response?.data?.error?.errors?.[0]?.reason ?? "";
 }
 
-/** O texto que o próprio Drive mandou — a pista mais confiável quando `reason` falta. */
+type DadosToken = { error?: string; error_description?: string };
+
+/**
+ * Código de erro do endpoint de token (invalid_grant, invalid_client...).
+ * Ali `data.error` é uma string, enquanto na API do Drive é um objeto — ler só
+ * um dos formatos deixava a falha de autorização sair com o texto errado.
+ */
+function erroOAuth(erro: unknown): string {
+  const dados = (erro as ErroDrive)?.response?.data as DadosToken | undefined;
+  return typeof dados?.error === "string" ? dados.error : "";
+}
+
+/** O texto que o próprio Google mandou — a pista mais confiável quando `reason` falta. */
 function mensagemDoDrive(erro: unknown): string {
   const e = erro as ErroDrive;
+  const dados = e?.response?.data as DadosToken | undefined;
+  if (typeof dados?.error === "string") {
+    return (dados.error_description ?? dados.error).trim();
+  }
   return (e?.response?.data?.error?.message ?? e?.message ?? "").trim();
 }
 
@@ -151,6 +221,11 @@ function statusDoErro(erro: unknown): number | undefined {
     if (typeof bruto === "string" && /^\d+$/.test(bruto)) return Number(bruto);
   }
   return undefined;
+}
+
+/** Refresh token expirado (app em "Testing") ou revogado pelo usuário. */
+function ehTokenInvalido(erro: unknown): boolean {
+  return erroOAuth(erro) === "invalid_grant" || /invalid_grant/i.test(mensagemDoDrive(erro));
 }
 
 /**
@@ -171,12 +246,22 @@ function ehFaltaDeCota(erro: unknown): boolean {
  */
 export function descreveErroDrive(
   erro: unknown,
-  contexto: { etapa: string; id?: string; contaDeServico?: string }
+  contexto: { etapa: string; id?: string; identidade?: string; ehContaDeServico?: boolean }
 ): string {
   const status = statusDoErro(erro);
   const razao = razaoDoErro(erro);
   const alvo = contexto.id ? `"${contexto.id}"` : "(ID vazio)";
-  const conta = contexto.contaDeServico ?? "a conta de serviço";
+  const conta = contexto.identidade ?? "a conta autenticada";
+
+  if (ehTokenInvalido(erro)) {
+    return (
+      `${contexto.etapa}: a autorização do Google expirou ou foi revogada ` +
+      `(invalid_grant). Rode \`node scripts/autorizar-drive.mjs\` para autorizar ` +
+      `de novo e atualize GOOGLE_OAUTH_REFRESH_TOKEN. Se isso se repetir a cada ` +
+      `7 dias, o app está como "Testing" no Google Cloud — publique como ` +
+      `"In production" para o token parar de expirar.`
+    );
+  }
 
   if (status === 404 || razao === "notFound") {
     return (
@@ -189,12 +274,18 @@ export function descreveErroDrive(
   }
 
   if (ehFaltaDeCota(erro)) {
+    if (contexto.ehContaDeServico === false) {
+      return (
+        `${contexto.etapa}: o Google Drive da conta autorizada está sem espaço. ` +
+        `Libere espaço ou amplie o plano de armazenamento dessa conta.`
+      );
+    }
     return (
       `${contexto.etapa}: a conta de serviço ${conta} não tem espaço de ` +
       `armazenamento próprio, e arquivos que ela envia ficam no nome dela. ` +
       `Criar pastas funciona (não ocupam espaço), mas o arquivo não sobe. ` +
-      `A saída é um Drive compartilhado (Shared Drive) ou enviar em nome de um ` +
-      `usuário de verdade, via OAuth.`
+      `Configure GOOGLE_OAUTH_* para enviar como um usuário de verdade ` +
+      `(veja o README), ou use um Drive compartilhado.`
     );
   }
 
@@ -213,10 +304,23 @@ export function descreveErroDrive(
     );
   }
 
-  if (status === 401) {
+  if (erroOAuth(erro) === "invalid_client") {
     return (
-      `${contexto.etapa}: as credenciais do Google Drive foram recusadas. ` +
-      `Confira GOOGLE_APPLICATION_CREDENTIALS_JSON (ou o par e-mail + chave privada).`
+      `${contexto.etapa}: o Google não reconheceu o client OAuth. Confira ` +
+      `GOOGLE_OAUTH_CLIENT_ID e GOOGLE_OAUTH_CLIENT_SECRET — eles precisam ser ` +
+      `do mesmo client que gerou o refresh token.`
+    );
+  }
+
+  if (status === 401) {
+    const ondeConferir =
+      contexto.ehContaDeServico === false
+        ? "Confira as variáveis GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET e GOOGLE_OAUTH_REFRESH_TOKEN."
+        : "Confira GOOGLE_APPLICATION_CREDENTIALS_JSON (ou o par e-mail + chave privada).";
+    const original = mensagemDoDrive(erro);
+    return (
+      `${contexto.etapa}: as credenciais do Google foram recusadas. ${ondeConferir}` +
+      `${original ? ` Resposta do Google: "${original}".` : ""}`
     );
   }
 
@@ -232,7 +336,8 @@ export function descreveErroDrive(
 async function validarPastaRaiz(
   drive: drive_v3.Drive,
   rootId: string,
-  contaDeServico: string
+  identidade: string,
+  ehContaDeServico: boolean
 ): Promise<void> {
   let pasta: drive_v3.Schema$File;
   try {
@@ -247,7 +352,8 @@ async function validarPastaRaiz(
       descreveErroDrive(erro, {
         etapa: "Pasta raiz do Drive",
         id: rootId,
-        contaDeServico,
+        identidade,
+        ehContaDeServico,
       })
     );
   }
@@ -266,7 +372,7 @@ async function validarPastaRaiz(
   }
   if (pasta.capabilities?.canAddChildren === false) {
     throw new Error(
-      `${contaDeServico} enxerga a pasta "${pasta.name ?? rootId}", mas só como ` +
+      `${identidade} enxerga a pasta "${pasta.name ?? rootId}", mas só como ` +
         `leitor — não consegue criar pastas dentro dela. Troque o ` +
         `compartilhamento para Editor.`
     );
@@ -295,7 +401,8 @@ async function getOrCreateFolder(
   drive: drive_v3.Drive,
   name: string,
   parentId: string,
-  contaDeServico: string
+  identidade: string,
+  ehContaDeServico: boolean
 ): Promise<string> {
   try {
     const res = await drive.files.list({
@@ -316,7 +423,8 @@ async function getOrCreateFolder(
       descreveErroDrive(erro, {
         etapa: `Buscar a pasta '${name}' no Drive`,
         id: parentId,
-        contaDeServico,
+        identidade,
+        ehContaDeServico,
       })
     );
   }
@@ -341,7 +449,8 @@ async function getOrCreateFolder(
       descreveErroDrive(erro, {
         etapa: `Criar a pasta '${name}' no Drive`,
         id: parentId,
-        contaDeServico,
+        identidade,
+        ehContaDeServico,
       })
     );
   }
@@ -352,20 +461,20 @@ export async function createPedidoFolder(
   nomeCliente: string
 ): Promise<string> {
   const rootId = idRaizConfigurado();
-  const { drive, contaDeServico } = getDriveClient();
+  const { drive, identidade, ehContaDeServico } = getDriveClient();
 
-  await validarPastaRaiz(drive, rootId, contaDeServico);
+  await validarPastaRaiz(drive, rootId, identidade, ehContaDeServico);
 
   const now = new Date();
   const ano = now.getFullYear().toString();
   const mes = String(now.getMonth() + 1).padStart(2, "0");
 
-  const anoId = await getOrCreateFolder(drive, ano, rootId, contaDeServico);
-  const mesId = await getOrCreateFolder(drive, mes, anoId, contaDeServico);
+  const anoId = await getOrCreateFolder(drive, ano, rootId, identidade, ehContaDeServico);
+  const mesId = await getOrCreateFolder(drive, mes, anoId, identidade, ehContaDeServico);
 
   const safeName = nomeCliente.replace(/[^a-zA-Z0-9À-ÿ\s\-]/g, "").trim() || "pedido";
   const folderName = `${safeName}-${pedidoId.slice(0, 8)}`;
-  const folderId = await getOrCreateFolder(drive, folderName, mesId, contaDeServico);
+  const folderId = await getOrCreateFolder(drive, folderName, mesId, identidade, ehContaDeServico);
 
   // Link de leitura para quem abrir a imagem pelo app. Não é fatal: a pasta já
   // existe e o upload funciona mesmo se o compartilhamento público for barrado
@@ -411,7 +520,7 @@ export async function uploadFileToDrive(
   const pastaId = normalizarIdPasta(folderId);
   if (!pastaId) throw new Error(`folderId inválido para upload no Drive: "${folderId}"`);
 
-  const { drive, contaDeServico } = getDriveClient();
+  const { drive, identidade, ehContaDeServico } = getDriveClient();
 
   const body = new PassThrough();
   body.end(buffer);
@@ -433,7 +542,8 @@ export async function uploadFileToDrive(
       descreveErroDrive(erro, {
         etapa: "Enviar a imagem para o Drive",
         id: pastaId,
-        contaDeServico,
+        identidade,
+        ehContaDeServico,
       })
     );
     Object.assign(traduzido, {
@@ -454,4 +564,119 @@ export async function uploadFileToDrive(
   }
 
   return { fileId, url: `https://drive.google.com/uc?id=${fileId}` };
+}
+
+export type DiagnosticoDrive = {
+  ok: boolean;
+  modo: "oauth" | "conta-de-servico";
+  identidade: string;
+  idNormalizado: string | null;
+  idBruto: string;
+  pastaRaiz?: { id?: string | null; nome?: string | null; podeCriarSubpastas: boolean };
+  armazenamento?: { usado: string; limite: string };
+  error?: string;
+};
+
+/** Formata bytes do Drive (vêm como string) em algo legível. */
+function emGB(valor: string | null | undefined): string {
+  const n = Number(valor);
+  if (!Number.isFinite(n)) return "desconhecido";
+  return `${(n / 1024 ** 3).toFixed(1)} GB`;
+}
+
+/**
+ * Checagem de ponta a ponta usada por `/api/test-drive`. Vive aqui, e não na
+ * rota, para não haver duas leituras de credencial que possam divergir — foi o
+ * que aconteceu antes, quando a rota checava variáveis que o app não usava.
+ */
+export async function diagnosticarDrive(): Promise<DiagnosticoDrive> {
+  const idBruto = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID ?? "";
+  const idNormalizado = normalizarIdPasta(idBruto);
+  const modo: "oauth" | "conta-de-servico" = temCredencialOAuth() ? "oauth" : "conta-de-servico";
+
+  const base = { modo, idNormalizado, idBruto } as const;
+
+  if (!idNormalizado) {
+    return {
+      ...base,
+      ok: false,
+      identidade: "—",
+      error:
+        `GOOGLE_DRIVE_ROOT_FOLDER_ID não contém um ID de pasta válido: "${idBruto}". ` +
+        "Use o trecho depois de /folders/ na URL do Drive, ou cole a URL inteira.",
+    };
+  }
+  if (modo === "conta-de-servico" && !temCredencialContaDeServico()) {
+    return {
+      ...base,
+      ok: false,
+      identidade: "—",
+      error:
+        "Nenhuma credencial configurada. Defina GOOGLE_OAUTH_CLIENT_ID + " +
+        "GOOGLE_OAUTH_CLIENT_SECRET + GOOGLE_OAUTH_REFRESH_TOKEN (recomendado), " +
+        "ou as variáveis da conta de serviço.",
+    };
+  }
+
+  let cliente: ClienteDrive;
+  try {
+    cliente = getDriveClient();
+  } catch (erro) {
+    return { ...base, ok: false, identidade: "—", error: mensagemDoDrive(erro) };
+  }
+
+  const { drive, identidade, ehContaDeServico } = cliente;
+  let identidadeReal = identidade;
+  let armazenamento: DiagnosticoDrive["armazenamento"];
+
+  // `about.get` confirma de quem é a sessão e quanto espaço ela tem — o dado que
+  // faltava quando o upload falhava por cota sem ninguém saber de quem era a cota.
+  try {
+    const about = await drive.about.get({ fields: "user(emailAddress),storageQuota(usage,limit)" });
+    if (about.data.user?.emailAddress) identidadeReal = about.data.user.emailAddress;
+    const cota = about.data.storageQuota;
+    if (cota) {
+      armazenamento = {
+        usado: emGB(cota.usage),
+        limite: cota.limit ? emGB(cota.limit) : "sem limite declarado",
+      };
+    }
+  } catch (erro) {
+    return {
+      ...base,
+      ok: false,
+      identidade: identidadeReal,
+      error: descreveErroDrive(erro, { etapa: "Autenticar no Drive", identidade, ehContaDeServico }),
+    };
+  }
+
+  try {
+    await validarPastaRaiz(drive, idNormalizado, identidadeReal, ehContaDeServico);
+  } catch (erro) {
+    return {
+      ...base,
+      ok: false,
+      identidade: identidadeReal,
+      armazenamento,
+      error: erro instanceof Error ? erro.message : String(erro),
+    };
+  }
+
+  const res = await drive.files.get({
+    fileId: idNormalizado,
+    fields: "id,name,capabilities(canAddChildren)",
+    supportsAllDrives: true,
+  });
+
+  return {
+    ...base,
+    ok: true,
+    identidade: identidadeReal,
+    armazenamento,
+    pastaRaiz: {
+      id: res.data.id,
+      nome: res.data.name,
+      podeCriarSubpastas: res.data.capabilities?.canAddChildren !== false,
+    },
+  };
 }

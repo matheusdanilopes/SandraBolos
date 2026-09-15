@@ -124,37 +124,61 @@ o que fazer a respeito. O erro vinha de duas armadilhas somadas:
 | `src/app/api/pedidos/route.ts` | o guard usava `GOOGLE_SERVICE_ACCOUNT_EMAIL` e ignorava quem configurou pelo JSON completo (a opção 1 do `.env.local.example`); agora usa `driveConfigurado()` |
 | `src/app/api/test-drive/route.ts` | mostra o ID **normalizado** que o app usa de fato e o `client_email` que precisa receber o compartilhamento |
 
-### Configurar
-
-1. Crie a pasta no seu Drive e copie a URL da barra de endereços.
-2. Coloque em `GOOGLE_DRIVE_ROOT_FOLDER_ID` — a URL inteira serve, o ID também.
-3. **Compartilhe a pasta com o `client_email` da conta de serviço, como Editor.**
-   Esse é o passo que costuma faltar: sem ele o Drive diz "File not found"
-   mesmo com o ID correto.
-4. Confira com `GET /api/test-drive?secret=<TEST_DRIVE_SECRET>`. A resposta traz
-   `contaDeServico` (o e-mail para compartilhar), `envCheck.idNormalizado` (o ID
-   realmente usado) e `diagnostico.podeCriarSubpastas`.
-
-`"root"` não é aceito como pasta raiz: é o Drive da própria conta de serviço,
-que não tem espaço de armazenamento — todo upload ali falharia com
-`storageQuotaExceeded`. Para usar um Drive compartilhado (Shared Drive), aponte
-para uma pasta dentro dele; as chamadas já mandam `supportsAllDrives`.
-
-### O limite da conta de serviço
+### Autenticar como um usuário, não como a conta de serviço
 
 Conta de serviço **não tem espaço de armazenamento próprio**, e o arquivo que
 ela envia fica no nome dela. Isso separa as duas operações de um jeito que
 confunde: criar pastas funciona (pasta não ocupa bytes), e só o upload do
-arquivo falha. Dá a impressão de problema de permissão — a pasta do pedido
-aparece no Drive, mas a foto nunca chega.
+arquivo falha com 403. Dá a impressão de problema de permissão — a pasta do
+pedido aparece no Drive, mas a foto nunca chega.
 
-Compartilhar a pasta como Editor **não resolve** esse caso: a permissão é sobre
-a pasta, o espaço é sobre quem envia. As saídas reais são um Drive compartilhado
-(exige Google Workspace — um Drive pessoal `@gmail.com` não cria) ou enviar em
-nome de um usuário de verdade, via OAuth.
+Compartilhar a pasta como Editor **não resolve**: permissão é sobre a pasta,
+cota é sobre quem envia. As saídas são um Drive compartilhado (exige Google
+Workspace — um Drive pessoal `@gmail.com` não cria) ou autenticar como um
+usuário de verdade, via OAuth. É o que o app faz quando as variáveis
+`GOOGLE_OAUTH_*` estão presentes: cada foto nasce no nome da pessoa autorizada e
+ocupa o espaço que ela já paga.
 
-Por isso `descreveErroDrive()` detecta falta de cota por `reason` **e** pelo
-texto da resposta, e lê tanto o topo do erro quanto `response.data.error` — o
-googleapis nem sempre promove `errors` para o topo, e ler um só dos dois lugares
-fazia a falha de cota cair no ramo genérico de 403 e sair na tela como
-"compartilhe a pasta", mandando arrumar uma permissão que já estava correta.
+`getDriveClient()` prefere OAuth e cai na conta de serviço só se as variáveis
+OAuth faltarem — assim dá para voltar atrás sem mexer no código.
+
+#### Configurar o OAuth (uma vez)
+
+1. No Google Cloud, crie um **client OAuth** do tipo "Aplicativo para
+   computador" e adicione `http://localhost:53682/` como URI de redirecionamento.
+2. Na tela de consentimento, **publique o app como "In production"**. Em
+   "Testing" o Google expira o refresh token a cada 7 dias e a importação volta
+   a quebrar toda semana. Publicar é um botão; *verificação* é outra coisa, só
+   exigida para tirar o aviso de "app não verificado" e para passar de 100
+   usuários.
+3. Rode a autorização, logado na conta dona do Drive:
+
+   ```bash
+   GOOGLE_OAUTH_CLIENT_ID=... GOOGLE_OAUTH_CLIENT_SECRET=... \
+     node scripts/autorizar-drive.mjs
+   ```
+
+   O script sobe um servidor local, abre o consentimento e imprime o
+   `GOOGLE_OAUTH_REFRESH_TOKEN`. O aviso de app não verificado é esperado:
+   "Avançado" → "Acessar ... (não seguro)".
+4. Guarde as três variáveis `GOOGLE_OAUTH_*` no ambiente do app.
+
+O escopo é o `drive` completo, e não `drive.file`, porque `drive.file` só
+enxerga o que o próprio app criou — com ele a pasta raiz que já existe ficaria
+invisível.
+
+### Configurar a pasta raiz
+
+1. Crie a pasta no Drive e copie a URL da barra de endereços.
+2. Coloque em `GOOGLE_DRIVE_ROOT_FOLDER_ID` — a URL inteira serve, o ID também.
+3. Confira com `GET /api/test-drive?secret=<TEST_DRIVE_SECRET>`. A resposta traz
+   `modo` (`oauth` ou `conta-de-servico`), `identidade` (o e-mail que o Google
+   confirmou), `armazenamento` (usado/limite) e `pastaRaiz.podeCriarSubpastas`.
+
+Esse diagnóstico vive em `diagnosticarDrive()`, junto do código que o app usa de
+verdade. Quando morava na rota, ele conferia variáveis que o app não lia mais e
+dizia "tudo certo" enquanto o upload falhava.
+
+`"root"` não é aceito como pasta raiz: com conta de serviço é o Drive dela
+própria, que não tem espaço. Para usar um Drive compartilhado, aponte para uma
+pasta dentro dele; as chamadas já mandam `supportsAllDrives`.
