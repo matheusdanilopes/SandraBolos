@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, X, ChevronUp } from "lucide-react";
+import { Plus, X, ChevronUp, AlertTriangle } from "lucide-react";
 import { adicionarCustoAction, excluirCustoAction } from "./actions";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import type { CustoComCategoria, CategoriaCusto } from "@/types/database";
+import type { PeriodoRange } from "@/lib/periodo";
 
 const BADGE_COLORS = [
   "bg-purple-100 text-purple-700",
@@ -27,21 +28,38 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
+/**
+ * Data que o formulário abre preenchida.
+ *
+ * Hoje, quando hoje cai dentro do período que está na tela. Fora dele o custo
+ * lançado "hoje" sumia no instante em que era salvo — a lista só mostra o que
+ * está no período —, e parecia que a gravação tinha falhado. Nesse caso abre no
+ * último dia do período, que é onde o lançamento vai aparecer.
+ */
+function dataInicial(periodo: PeriodoRange) {
+  const hoje = todayISO();
+  return hoje >= periodo.inicio && hoje <= periodo.fim ? hoje : periodo.fim;
+}
+
 interface Props {
   custos: CustoComCategoria[];
   categorias: CategoriaCusto[];
+  periodo: PeriodoRange;
 }
 
-export function CustosSection({ custos, categorias }: Props) {
+export function CustosSection({ custos, categorias, periodo }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
-  const [data, setData] = useState(todayISO());
+  const [data, setData] = useState(() => dataInicial(periodo));
   const [categoriaId, setCategoriaId] = useState<string>("");
   const [erro, setErro] = useState("");
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState<string | null>(null);
+  const [erroExclusao, setErroExclusao] = useState("");
   const [isPending, startTransition] = useTransition();
 
-  const totalMes = custos.reduce((acc, c) => acc + c.valor, 0);
+  const totalPeriodo = custos.reduce((acc, c) => acc + c.valor, 0);
+  const foraDoPeriodo = data < periodo.inicio || data > periodo.fim;
 
   const porCategoria = custos.reduce<Record<string, number>>((acc, c) => {
     const cat = c.categorias_custo?.nome ?? "Sem categoria";
@@ -69,7 +87,7 @@ export function CustosSection({ custos, categorias }: Props) {
       } else {
         setDescricao("");
         setValor("");
-        setData(todayISO());
+        setData(dataInicial(periodo));
         setCategoriaId("");
         setShowForm(false);
       }
@@ -77,28 +95,34 @@ export function CustosSection({ custos, categorias }: Props) {
   }
 
   function handleExcluir(id: string) {
+    setErroExclusao("");
     startTransition(async () => {
-      await excluirCustoAction(id);
+      const res = await excluirCustoAction(id);
+      // Antes o retorno era descartado: a falha de rede deixava o lançamento na
+      // tela sem nenhum aviso, e o próximo toque tentava excluir de novo.
+      if (res.error) setErroExclusao(res.error);
+      else setConfirmandoExclusao(null);
     });
   }
 
   return (
     <div className="card p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-semibold text-sm text-gray-700">Custos do Mês</h2>
-          {totalMes > 0 && (
-            <p className="text-xs text-gray-400 mt-0.5">
-              {custos.length} lançamento{custos.length !== 1 ? "s" : ""}
-            </p>
-          )}
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="font-semibold text-sm text-gray-700">Custos lançados</h2>
+          {/* O título era fixo em "Custos do Mês", mas a lista obedece ao período
+              escolhido lá em cima — num recorte de 6 meses o rótulo mentia. */}
+          <p className="text-xs text-gray-400 mt-0.5 truncate">
+            {periodo.label}
+            {custos.length > 0 && ` · ${custos.length} lançamento${custos.length !== 1 ? "s" : ""}`}
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          {totalMes > 0 && (
-            <span className="text-sm font-bold text-rose-600">{formatCurrency(totalMes)}</span>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          {totalPeriodo > 0 && (
+            <span className="text-sm font-bold text-rose-600">{formatCurrency(totalPeriodo)}</span>
           )}
           <button
-            onClick={() => { setShowForm((v) => !v); setErro(""); }}
+            onClick={() => { setShowForm((v) => !v); setErro(""); if (!showForm) setData(dataInicial(periodo)); }}
             className={
               showForm
                 ? "flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
@@ -132,6 +156,7 @@ export function CustosSection({ custos, categorias }: Props) {
                 type="number"
                 min="0.01"
                 step="0.01"
+                inputMode="decimal"
                 className="input text-sm"
                 placeholder="0,00"
                 value={valor}
@@ -161,6 +186,19 @@ export function CustosSection({ custos, categorias }: Props) {
               </select>
             </div>
           </div>
+
+          {/* Aviso, não bloqueio: lançar um gasto de outro mês é legítimo — o que
+              não pode é ele sumir da tela sem explicação. */}
+          {foraDoPeriodo && (
+            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-2">
+              <AlertTriangle size={13} className="text-amber-500 mt-0.5 flex-shrink-0" />
+              <p className="text-[11px] text-amber-700">
+                Esta data está fora de {periodo.label}. O custo será salvo, mas só aparece ao
+                escolher o período em que ele caiu.
+              </p>
+            </div>
+          )}
+
           {erro && <p className="text-xs text-red-600">{erro}</p>}
           <button
             onClick={handleAdicionar}
@@ -173,16 +211,19 @@ export function CustosSection({ custos, categorias }: Props) {
         </div>
       )}
 
+      {erroExclusao && <p className="text-xs text-red-600">{erroExclusao}</p>}
+
       {/* Lista de custos */}
       {custos.length === 0 ? (
         <div className="text-center py-4 space-y-1">
-          <p className="text-sm text-gray-400">Nenhum custo registrado este mês.</p>
+          <p className="text-sm text-gray-400">Nenhum custo em {periodo.label}.</p>
           <p className="text-xs text-gray-300">Adicione ingredientes, embalagens e outros gastos.</p>
         </div>
       ) : (
         <div className="space-y-1.5">
           {custos.map((custo) => {
             const catNome = custo.categorias_custo?.nome ?? null;
+            const confirmando = confirmandoExclusao === custo.id;
             return (
               <div
                 key={custo.id}
@@ -199,17 +240,42 @@ export function CustosSection({ custos, categorias }: Props) {
                   </div>
                   <span className="text-xs text-gray-400">{formatDate(custo.data)}</span>
                 </div>
-                <span className="text-sm font-semibold text-rose-600 flex-shrink-0">
-                  {formatCurrency(custo.valor)}
-                </span>
-                <button
-                  onClick={() => handleExcluir(custo.id)}
-                  disabled={isPending}
-                  className="text-gray-300 hover:text-red-400 transition-colors p-1 flex-shrink-0"
-                  aria-label="Excluir custo"
-                >
-                  <X size={14} />
-                </button>
+
+                {confirmando ? (
+                  /* Um toque no × apagava o lançamento na hora, sem volta. No celular
+                     esse alvo fica ao lado do valor e é fácil de acertar sem querer. */
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <span className="text-xs text-gray-500">Excluir?</span>
+                    <button
+                      onClick={() => { setConfirmandoExclusao(null); setErroExclusao(""); }}
+                      disabled={isPending}
+                      className="text-xs font-medium text-gray-500 px-2 py-1 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                    >
+                      Não
+                    </button>
+                    <button
+                      onClick={() => handleExcluir(custo.id)}
+                      disabled={isPending}
+                      className="text-xs font-semibold text-white bg-red-600 px-2 py-1 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                    >
+                      {isPending ? "…" : "Sim"}
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <span className="text-sm font-semibold text-rose-600 flex-shrink-0">
+                      {formatCurrency(custo.valor)}
+                    </span>
+                    <button
+                      onClick={() => { setConfirmandoExclusao(custo.id); setErroExclusao(""); }}
+                      disabled={isPending}
+                      className="text-gray-300 hover:text-red-400 transition-colors p-1 flex-shrink-0"
+                      aria-label={`Excluir custo ${custo.descricao}`}
+                    >
+                      <X size={14} />
+                    </button>
+                  </>
+                )}
               </div>
             );
           })}
