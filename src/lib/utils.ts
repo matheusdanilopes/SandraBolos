@@ -1,6 +1,7 @@
-import { format, isToday, isTomorrow, isPast, parseISO, startOfWeek, endOfWeek, isWithinInterval, set } from "date-fns";
+import { format, isToday, isTomorrow, isPast, parseISO, isWithinInterval, set } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { clsx, type ClassValue } from "clsx";
+import { semanaDe } from "./calendario";
 
 export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);
@@ -63,9 +64,8 @@ export function isEntregaHoje(dataEntrega: string) {
 }
 
 export function isEntregaSemana(dataEntrega: string) {
-  const date = parseISO(dataEntrega);
-  const now = new Date();
-  return isWithinInterval(date, { start: startOfWeek(now, { locale: ptBR }), end: endOfWeek(now, { locale: ptBR }) });
+  const { inicio, fim } = semanaDe(new Date());
+  return isWithinInterval(parseISO(dataEntrega), { start: inicio, end: fim });
 }
 
 export function pedidoNumero(createdAt: string, id: string) {

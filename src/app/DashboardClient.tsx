@@ -10,7 +10,7 @@ import {
   parseISO,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { formatDate, isEntregaHoje, pedidoAlerta, formatCurrency, calcularValorFinal, pedidoNumero } from "@/lib/utils";
+import { isEntregaHoje, isEntregaSemana, pedidoAlerta, formatCurrency, calcularValorFinal, pedidoNumero } from "@/lib/utils";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AlertaBadge } from "@/components/AlertaBadge";
 import {
@@ -21,10 +21,9 @@ import {
   type StatusPedido,
 } from "@/types/database";
 import { DashboardCalendario } from "./DashboardCalendario";
+import { DashboardResumo } from "./DashboardResumo";
+import { resumoDaSemana, resumoDeHoje } from "@/lib/resumoDashboard";
 import {
-  Package,
-  Loader,
-  CheckCircle,
   AlertTriangle,
   X,
   TrendingUp,
@@ -33,15 +32,28 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-type Filtro = "todos" | "hoje" | "produzindo" | "feito" | "atrasados";
+type Filtro = "todos" | "hoje" | "semana" | "produzindo" | "feito" | "atrasados";
 
 const FILTRO_LABELS: Record<Filtro, string> = {
   todos: "Todos os Pedidos Ativos",
   hoje: "Entregas de Hoje",
+  semana: "Entregas da Semana",
   produzindo: "Em Produção",
   feito: "Prontos para Entregar",
   atrasados: "Atrasados",
 };
+
+/** Recortes que têm uma contagem própria — "todos" é o estado sem filtro. */
+type FiltroContavel = Exclude<Filtro, "todos">;
+
+/** Ordem dos atalhos de filtro acima da lista — do mais urgente ao mais amplo. */
+const FILTRO_CHIPS: { valor: FiltroContavel; label: string }[] = [
+  { valor: "atrasados", label: "Atrasados" },
+  { valor: "hoje", label: "Hoje" },
+  { valor: "semana", label: "Semana" },
+  { valor: "produzindo", label: "Produzindo" },
+  { valor: "feito", label: "Prontos" },
+];
 
 const STATUS_ORDER: StatusPedido[] = ["novo", "produzindo", "feito", "entregue"];
 
@@ -91,6 +103,7 @@ export function DashboardClient({
 
   const grupos = useMemo(() => ({
     hoje: pedidosAtivos.filter((p) => isEntregaHoje(p.data_entrega)),
+    semana: pedidosAtivos.filter((p) => isEntregaSemana(p.data_entrega)),
     produzindo: pedidosAtivos.filter((p) => p.status === "produzindo"),
     feito: pedidosAtivos.filter((p) => p.status === "feito"),
     atrasados: pedidosAtivos.filter(
@@ -100,8 +113,19 @@ export function DashboardClient({
     ),
   }), [pedidosAtivos]);
 
+  const resumoHoje = useMemo(
+    () => resumoDeHoje(pedidosAtivos, pedidosCalendario),
+    [pedidosAtivos, pedidosCalendario]
+  );
+
+  const resumoSemana = useMemo(
+    () => resumoDaSemana(pedidosAtivos, pedidosCalendario),
+    [pedidosAtivos, pedidosCalendario]
+  );
+
   const filtrados = useMemo(() => (
     filtro === "hoje" ? grupos.hoje
+    : filtro === "semana" ? grupos.semana
     : filtro === "produzindo" ? grupos.produzindo
     : filtro === "feito" ? grupos.feito
     : filtro === "atrasados" ? grupos.atrasados
@@ -125,75 +149,39 @@ export function DashboardClient({
 
   return (
     <div className="space-y-5">
-      {/* KPI cards */}
-      <div className="grid grid-cols-2 gap-3">
-        <button
-          onClick={() => toggleFiltro("hoje")}
-          className={`card p-4 text-left transition-all active:scale-95 ${
-            filtro === "hoje" ? "ring-2 ring-brand-400 shadow-md" : "hover:shadow-md"
-          }`}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <div className="p-1.5 bg-brand-50 rounded-lg">
-              <Package size={16} className="text-brand-600" />
-            </div>
-            {filtro === "hoje" && <span className="text-[10px] font-medium text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded-full">ativo</span>}
-          </div>
-          <div className="text-2xl font-bold text-brand-600 leading-none">{grupos.hoje.length}</div>
-          <div className="text-xs text-gray-500 mt-1">Entregas Hoje</div>
-        </button>
-
-        <button
-          onClick={() => toggleFiltro("produzindo")}
-          className={`card p-4 text-left transition-all active:scale-95 ${
-            filtro === "produzindo" ? "ring-2 ring-yellow-400 shadow-md" : "hover:shadow-md"
-          }`}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <div className="p-1.5 bg-yellow-50 rounded-lg">
-              <Loader size={16} className="text-yellow-600" />
-            </div>
-            {filtro === "produzindo" && <span className="text-[10px] font-medium text-yellow-700 bg-yellow-50 px-1.5 py-0.5 rounded-full">ativo</span>}
-          </div>
-          <div className="text-2xl font-bold text-yellow-600 leading-none">{grupos.produzindo.length}</div>
-          <div className="text-xs text-gray-500 mt-1">Produzindo</div>
-        </button>
-
-        <button
-          onClick={() => toggleFiltro("feito")}
-          className={`card p-4 text-left transition-all active:scale-95 ${
-            filtro === "feito" ? "ring-2 ring-green-400 shadow-md" : "hover:shadow-md"
-          }`}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <div className="p-1.5 bg-green-50 rounded-lg">
-              <CheckCircle size={16} className="text-green-600" />
-            </div>
-            {filtro === "feito" && <span className="text-[10px] font-medium text-green-700 bg-green-50 px-1.5 py-0.5 rounded-full">ativo</span>}
-          </div>
-          <div className="text-2xl font-bold text-green-600 leading-none">{grupos.feito.length}</div>
-          <div className="text-xs text-gray-500 mt-1">Prontos</div>
-        </button>
-
+      {/* Atrasados vêm antes de tudo: é o único indicador que pede ação agora */}
+      {grupos.atrasados.length > 0 && (
         <button
           onClick={() => toggleFiltro("atrasados")}
-          className={`card p-4 text-left transition-all active:scale-95 ${
-            filtro === "atrasados" ? "ring-2 ring-red-400 shadow-md" : "hover:shadow-md"
+          className={`w-full flex items-center gap-3 p-3.5 bg-red-50 border rounded-xl text-left transition-colors hover:bg-red-100 active:bg-red-200 ${
+            filtro === "atrasados" ? "border-red-400 ring-2 ring-red-200" : "border-red-200"
           }`}
         >
-          <div className="flex items-center justify-between mb-2">
-            <div className="p-1.5 bg-red-50 rounded-lg">
-              <AlertTriangle size={16} className="text-red-600" />
-            </div>
-            {grupos.atrasados.length > 0 && filtro !== "atrasados" && (
-              <span className="text-[10px] font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded-full">{grupos.atrasados.length}</span>
-            )}
-            {filtro === "atrasados" && <span className="text-[10px] font-medium text-red-700 bg-red-50 px-1.5 py-0.5 rounded-full">ativo</span>}
+          <div className="w-9 h-9 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
+            <AlertTriangle size={16} className="text-red-600" />
           </div>
-          <div className="text-2xl font-bold text-red-600 leading-none">{grupos.atrasados.length}</div>
-          <div className="text-xs text-gray-500 mt-1">Atrasados</div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-red-800">
+              {grupos.atrasados.length} pedido{grupos.atrasados.length !== 1 ? "s" : ""} atrasado
+              {grupos.atrasados.length !== 1 ? "s" : ""}
+            </p>
+            <p className="text-xs text-red-600 mt-0.5">
+              {filtro === "atrasados" ? "Mostrando só os atrasados" : "Toque para ver só esses"}
+            </p>
+          </div>
+          <ChevronRight size={16} className="text-red-400 flex-shrink-0" />
         </button>
-      </div>
+      )}
+
+      {/* Resumo de hoje e da semana */}
+      <DashboardResumo
+        hoje={resumoHoje}
+        semana={resumoSemana}
+        filtroHojeAtivo={filtro === "hoje"}
+        onFiltrarHoje={() => toggleFiltro("hoje")}
+        filtroSemanaAtivo={filtro === "semana"}
+        onFiltrarSemana={() => toggleFiltro("semana")}
+      />
 
       {/* Indicador de rascunhos */}
       {rascunhos.length > 0 && (
@@ -258,6 +246,29 @@ export function DashboardClient({
               <X size={12} /> Limpar
             </button>
           )}
+        </div>
+
+        {/* Atalhos de recorte da lista — os contadores viraram filtro, não enfeite */}
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1 mb-3">
+          {FILTRO_CHIPS.map(({ valor, label }) => {
+            const qtd = grupos[valor].length;
+            if (qtd === 0 && filtro !== valor) return null;
+            const ativo = filtro === valor;
+            return (
+              <button
+                key={valor}
+                onClick={() => toggleFiltro(valor)}
+                className={`flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  ativo
+                    ? "bg-gray-900 text-white border-gray-900"
+                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {label}
+                <span className={ativo ? "ml-1 text-gray-300" : "ml-1 text-gray-400"}>{qtd}</span>
+              </button>
+            );
+          })}
         </div>
 
         {filtrados.length === 0 ? (
