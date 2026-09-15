@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { ToppersList } from "./ToppersList";
 import { Sparkles } from "lucide-react";
 import type { PedidoComTopper } from "@/types/database";
+import { COLUNAS_PEDIDO_TOPPER, COLUNAS_TOPPER_PEDIDO } from "@/lib/consultas";
 import { isErroDeConexao } from "@/lib/erros";
 import { AvisoConexao } from "@/components/AvisoConexao";
 
@@ -10,7 +11,9 @@ export const dynamic = "force-dynamic";
 export default async function ToppersPage() {
   const { data: pedidos, error } = await supabase
     .from("pedidos")
-    .select("*, clientes(nome, telefone), toppers_pedido(*)")
+    .select(
+      `${COLUNAS_PEDIDO_TOPPER}, clientes(nome), toppers_pedido(${COLUNAS_TOPPER_PEDIDO})`
+    )
     // Brinde não é compra de fornecedor: fica fora desta tela, que existe para
     // acompanhar solicitação, recebimento e pagamento do topper encomendado.
     .eq("topper", "sim")

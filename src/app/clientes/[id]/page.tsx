@@ -3,8 +3,9 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { formatDate, formatPhone } from "@/lib/utils";
 import { StatusBadge } from "@/components/StatusBadge";
-import { TIPO_LABELS, type Pedido } from "@/types/database";
+import { TIPO_LABELS, type PedidoDoCliente } from "@/types/database";
 import { Edit, Phone, ShoppingBag } from "lucide-react";
+import { COLUNAS_PEDIDO_DO_CLIENTE } from "@/lib/consultas";
 import { houveErroDeConexao } from "@/lib/erros";
 import { PainelSemConexao } from "@/components/PainelSemConexao";
 import { ExcluirCliente } from "./ExcluirCliente";
@@ -14,7 +15,11 @@ export const dynamic = "force-dynamic";
 export default async function ClienteDetailPage({ params }: { params: { id: string } }) {
   const [clienteResult, pedidosResult] = await Promise.all([
     supabase.from("clientes").select("*").eq("id", params.id).single(),
-    supabase.from("pedidos").select("*").eq("cliente_id", params.id).order("data_entrega", { ascending: false }),
+    supabase
+      .from("pedidos")
+      .select(COLUNAS_PEDIDO_DO_CLIENTE)
+      .eq("cliente_id", params.id)
+      .order("data_entrega", { ascending: false }),
   ]);
 
   const { data: cliente } = clienteResult;
@@ -52,7 +57,7 @@ export default async function ClienteDetailPage({ params }: { params: { id: stri
           <div className="card p-6 text-center text-gray-400 text-sm">Nenhum pedido</div>
         ) : (
           <div className="space-y-2">
-            {(pedidos as unknown as Pedido[]).map((p) => (
+            {(pedidos as unknown as PedidoDoCliente[]).map((p) => (
               <Link key={p.id} href={`/pedidos/${p.id}`} className="card p-3 block hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-medium">{TIPO_LABELS[p.tipo]}</span>

@@ -124,3 +124,24 @@ export async function salvarEntregaAction(
   revalidatePath(`/pedidos/${pedidoId}`);
   return {};
 }
+
+/**
+ * Remove uma imagem de referência do pedido.
+ *
+ * Vive aqui, no servidor, e não no componente: importar o cliente Supabase
+ * dentro de um componente "use client" arrastava o `@supabase/supabase-js`
+ * inteiro para o bundle da tela de detalhe do pedido — dezenas de KB baixados
+ * no celular só para apagar uma linha.
+ */
+export async function removerImagemAction(
+  imagemId: string,
+  pedidoId: string
+): Promise<{ error?: string }> {
+  const supabase = createServerSupabaseClient();
+  const { error } = await supabase.from("imagens_pedido").delete().eq("id", imagemId);
+
+  if (error) return { error: mensagemErro(error) };
+
+  revalidatePath(`/pedidos/${pedidoId}`);
+  return {};
+}

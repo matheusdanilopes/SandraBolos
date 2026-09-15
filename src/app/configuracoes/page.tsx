@@ -1,9 +1,13 @@
-import { supabase } from "@/lib/supabase";
-import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { CategoriasSection } from "./CategoriasSection";
 import { CategoriasProdutoSection } from "./CategoriasProdutoSection";
 import { CardapioVisual } from "../produtos/CardapioVisual";
 import type { CategoriaCusto, CategoriaProduto, ProdutoComCategoria, CardapioConfig } from "@/types/database";
+import {
+  lerCategoriasCusto,
+  lerCategoriasProduto,
+  lerProdutosAtivosComCategoria,
+  lerConfigCardapio,
+} from "@/lib/dadosDeApoio";
 import { houveErroDeConexao } from "@/lib/erros";
 import { AvisoConexao } from "@/components/AvisoConexao";
 
@@ -16,18 +20,11 @@ export default async function ConfiguracoesPage() {
     produtosResult,
     configResult,
   ] = await Promise.all([
-    supabase.from("categorias_custo").select("*").order("nome"),
-    supabase.from("categorias_produto").select("*").order("ordem").order("nome"),
-    supabase
-      .from("produtos")
-      .select("*, categorias_produto(nome, ordem)")
-      .eq("ativo", true)
-      .order("nome"),
-    createServerSupabaseClient()
-      .from("cardapio_config")
-      .select("*")
-      .eq("id", "00000000-0000-0000-0000-000000000001")
-      .single(),
+    // Tela de cadastro: tudo aqui é dado de apoio e vem do cache.
+    lerCategoriasCusto(),
+    lerCategoriasProduto(),
+    lerProdutosAtivosComCategoria(),
+    lerConfigCardapio(),
   ]);
 
   const { data: categoriasCusto } = categoriasCustoResult;

@@ -1,15 +1,28 @@
 "use client";
 
 import { useState, useMemo, useTransition } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Search, X, ChevronRight, Calendar, FileEdit, Trash2, LayoutList, CalendarDays } from "lucide-react";
+import { Search, X, ChevronRight, Calendar, FileEdit, Trash2, LayoutList, CalendarDays, History } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AlertaBadge } from "@/components/AlertaBadge";
 import { cn, formatDate, isEntregaHoje, isEntregaSemana, pedidoAlerta } from "@/lib/utils";
 import { TIPO_LABELS, STATUS_LABELS, type PedidoComCliente, type StatusPedido } from "@/types/database";
 import { excluirPedidoAction } from "./actions";
-import { PedidosCalendar } from "./PedidosCalendar";
+
+// A lista abre sempre na visualização em lista: o calendário (grade do mês,
+// view semanal e o date-fns que ele usa) só é baixado quando alguém troca de
+// visualização, em vez de pesar em toda abertura da tela de Pedidos.
+const PedidosCalendar = dynamic(
+  () => import("./PedidosCalendar").then((m) => m.PedidosCalendar),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="card p-8 text-center text-sm text-gray-400">Carregando calendário…</div>
+    ),
+  }
+);
 
 type Filtro = "todos" | "hoje" | "semana" | "atrasados" | StatusPedido;
 
@@ -61,7 +74,15 @@ function getNomeDisplay(pedido: PedidoComCliente): string {
 
 type Visualizacao = "lista" | "calendario";
 
-export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
+interface Props {
+  pedidos: PedidoComCliente[];
+  /** A lista veio sem recorte de data (`?historico=tudo`). */
+  historicoCompleto: boolean;
+  /** Meses de histórico encerrado que o recorte padrão carrega. */
+  mesesDeHistorico: number;
+}
+
+export function PedidosList({ pedidos, historicoCompleto, mesesDeHistorico }: Props) {
   const router = useRouter();
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("todos");
@@ -83,10 +104,16 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
     );
   }, [pedidosVisiveis, busca]);
 
+  // Uma passada pela lista testando os 10 filtros, em vez de 10 varreduras
+  // completas. `pedidoAlerta` (usado por "atrasados") compara datas e horas,
+  // então repetir a varredura não era de graça.
   const filterCounts = useMemo(() => {
     const counts: Partial<Record<Filtro, number>> = {};
-    for (const { value } of FILTROS) {
-      counts[value] = pedidosVisiveis.filter((p) => matchesFiltro(p, value)).length;
+    for (const { value } of FILTROS) counts[value] = 0;
+    for (const p of pedidosVisiveis) {
+      for (const { value } of FILTROS) {
+        if (matchesFiltro(p, value)) counts[value]!++;
+      }
     }
     return counts;
   }, [pedidosVisiveis]);
@@ -242,19 +269,34 @@ export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
 
         {/* Contagem */}
 
-        <p className="text-xs text-gray-500">
-          {filtered.length} pedido{filtered.length !== 1 ? "s" : ""}
-          {filtro === "todos" && atrasadosCount > 0 && (
-            <span className="text-red-600 font-medium ml-1">
-              · {atrasadosCount} atrasado{atrasadosCount !== 1 ? "s" : ""}
-            </span>
-          )}
-          {filtro === "todos" && rascunhosCount > 0 && (
-            <span className="text-amber-600 font-medium ml-1">
-              · {rascunhosCount} rascunho{rascunhosCount !== 1 ? "s" : ""}
-            </span>
-          )}
-        </p>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <p className="text-xs text-gray-500">
+            {filtered.length} pedido{filtered.length !== 1 ? "s" : ""}
+            {filtro === "todos" && atrasadosCount > 0 && (
+              <span className="text-red-600 font-medium ml-1">
+                · {atrasadosCount} atrasado{atrasadosCount !== 1 ? "s" : ""}
+              </span>
+            )}
+            {filtro === "todos" && rascunhosCount > 0 && (
+              <span className="text-amber-600 font-medium ml-1">
+                · {rascunhosCount} rascunho{rascunhosCount !== 1 ? "s" : ""}
+              </span>
+            )}
+            {!historicoCompleto && (
+              <span className="text-gray-400 ml-1">
+                · entregues e cancelados dos últimos {mesesDeHistorico} meses
+              </span>
+            )}
+          </p>
+          <Link
+            href={historicoCompleto ? "/pedidos" : "/pedidos?historico=tudo"}
+            prefetch={false}
+            className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium whitespace-nowrap"
+          >
+            <History size={12} />
+            {historicoCompleto ? "Voltar ao período recente" : "Ver histórico completo"}
+          </Link>
+        </div>
 
         {/* Lista */}
         {filtered.length === 0 ? (
