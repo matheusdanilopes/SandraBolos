@@ -46,23 +46,54 @@ function pagina(titulo: string, corpo: string, status = 200): NextResponse {
   );
 }
 
+/** URL de implantação da Vercel: `projeto-<hash>-time.vercel.app`. */
+const PADRAO_URL_DE_IMPLANTACAO = /-[a-z0-9]{8,}-[^.]+\.vercel\.app$/i;
+
 /**
  * A URI que o Google precisa ter cadastrada — esta mesma rota.
  *
- * Deduz do cabeçalho encaminhado, e não de `nextUrl.origin`: atrás do proxy da
- * Vercel o origin pode sair com o host interno, e qualquer diferença de uma
- * letra vira `redirect_uri_mismatch` no Google.
+ * A ordem importa. Cada implantação da Vercel ganha uma URL própria, com um hash
+ * que muda a cada deploy; cadastrar essa URL no Google funcionaria uma vez e
+ * quebraria no deploy seguinte. Por isso o domínio estável do projeto vem antes
+ * do host da requisição, mesmo que a pessoa abra a página pela URL da
+ * implantação — o Google devolve no domínio fixo, que é o cadastrado.
+ *
+ * O host da requisição vem do cabeçalho encaminhado, e não de `nextUrl.origin`,
+ * porque atrás do proxy o origin pode sair com o host interno — e qualquer
+ * diferença de uma letra vira `redirect_uri_mismatch`.
  */
-function uriDeRetorno(req: NextRequest): string {
+function uriDeRetorno(req: NextRequest): { uri: string; origem: string; instavel: boolean } {
+  const caminho = "/api/drive/autorizar";
+
   const configurada = process.env.GOOGLE_OAUTH_REDIRECT_URI?.trim();
-  if (configurada) return configurada;
+  if (configurada) {
+    return { uri: configurada, origem: "GOOGLE_OAUTH_REDIRECT_URI", instavel: false };
+  }
+
+  const producao = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  if (producao) {
+    return {
+      uri: `https://${producao}${caminho}`,
+      origem: "domínio de produção do projeto",
+      instavel: false,
+    };
+  }
 
   const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
   if (host) {
     const proto = req.headers.get("x-forwarded-proto") ?? "https";
-    return `${proto}://${host}/api/drive/autorizar`;
+    return {
+      uri: `${proto}://${host}${caminho}`,
+      origem: "endereço desta requisição",
+      instavel: PADRAO_URL_DE_IMPLANTACAO.test(host),
+    };
   }
-  return `${req.nextUrl.origin}/api/drive/autorizar`;
+
+  return {
+    uri: `${req.nextUrl.origin}${caminho}`,
+    origem: "origem da requisição",
+    instavel: PADRAO_URL_DE_IMPLANTACAO.test(req.nextUrl.host),
+  };
 }
 
 export async function GET(req: NextRequest) {
@@ -102,7 +133,8 @@ export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
   const code = params.get("code");
   const erroDoGoogle = params.get("error");
-  const redirectUri = uriDeRetorno(req);
+  const retorno = uriDeRetorno(req);
+  const redirectUri = retorno.uri;
   const oauth = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 
   if (erroDoGoogle) {
@@ -190,6 +222,14 @@ export async function GET(req: NextRequest) {
       `cadastrada <b>exatamente assim</b> no seu client OAuth, em "URIs de ` +
       `redirecionamento autorizados":</p>` +
       `<pre>${redirectUri}</pre>` +
+      `<p style="color:#6b7280;font-size:13px">Origem deste valor: ${retorno.origem}.</p>` +
+      (retorno.instavel
+        ? `<div class="erro">Esse endereço é o da <b>implantação</b>, não o do ` +
+          `projeto — o trecho embaralhado no meio muda a cada deploy. Cadastrar ` +
+          `assim funcionaria hoje e quebraria no próximo. Abra esta página pelo ` +
+          `domínio fixo do projeto (Vercel → Settings → Domains), ou defina ` +
+          `<code>GOOGLE_OAUTH_REDIRECT_URI</code> com ele.</div>`
+        : "") +
       `<div class="aviso">Confira caractere por caractere: barra no final, ` +
       `<code>http</code> vs <code>https</code> e o endereço do site precisam ` +
       `bater. Qualquer diferença vira <code>redirect_uri_mismatch</code>.<br><br>` +
