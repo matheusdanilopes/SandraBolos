@@ -1,31 +1,23 @@
-import { supabase } from "@/lib/supabase";
-import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { ProdutosClient } from "./ProdutosClient";
 import type { ProdutoComCategoria, CategoriaProduto, CardapioConfig } from "@/types/database";
+import {
+  lerProdutosComCategoria,
+  lerCategoriasProduto,
+  lerConfigCardapio,
+} from "@/lib/dadosDeApoio";
 import { houveErroDeConexao } from "@/lib/erros";
 import { AvisoConexao } from "@/components/AvisoConexao";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProdutosPage() {
-  const [produtosResult, categoriasResult, configResult] =
-    await Promise.all([
-      supabase
-        .from("produtos")
-        .select("*, categorias_produto(nome, ordem)")
-        .order("ativo", { ascending: false })
-        .order("nome"),
-      supabase
-        .from("categorias_produto")
-        .select("*")
-        .order("ordem")
-        .order("nome"),
-      createServerSupabaseClient()
-        .from("cardapio_config")
-        .select("*")
-        .eq("id", "00000000-0000-0000-0000-000000000001")
-        .single(),
-    ]);
+  // A tela inteira é catálogo: nada aqui muda entre uma visita e outra, então
+  // tudo vem do cache e a página deixa de esperar três consultas.
+  const [produtosResult, categoriasResult, configResult] = await Promise.all([
+    lerProdutosComCategoria(),
+    lerCategoriasProduto(),
+    lerConfigCardapio(),
+  ]);
 
   const { data: produtosData } = produtosResult;
   const { data: categoriasData } = categoriasResult;

@@ -5,6 +5,11 @@ import { type PedidoComCliente } from "@/types/database";
 import { Plus } from "lucide-react";
 import { isErroDeConexao } from "@/lib/erros";
 import { AvisoConexao } from "@/components/AvisoConexao";
+import {
+  COLUNAS_PEDIDO_LISTA,
+  MESES_DE_HISTORICO,
+  filtroDeHistorico,
+} from "@/lib/consultas";
 
 export const dynamic = "force-dynamic";
 
@@ -15,12 +20,21 @@ export const dynamic = "force-dynamic";
 export default async function PedidosPage({
   searchParams,
 }: {
-  searchParams?: { filtro?: string };
+  searchParams?: { filtro?: string; historico?: string };
 }) {
-  const { data: pedidos, error } = await supabase
+  // Por padrão a lista carrega o trabalho em aberto (qualquer data) mais o
+  // histórico encerrado dos últimos meses, em vez do banco inteiro a cada
+  // abertura. `?historico=tudo` traz tudo, para quando a Sandra procura um
+  // pedido antigo.
+  const historicoCompleto = searchParams?.historico === "tudo";
+
+  const query = supabase
     .from("pedidos")
-    .select("*, clientes(nome, telefone)")
-    .order("data_entrega", { ascending: true });
+    .select(`${COLUNAS_PEDIDO_LISTA}, clientes(nome)`);
+
+  const { data: pedidos, error } = await (
+    historicoCompleto ? query : query.or(filtroDeHistorico())
+  ).order("data_entrega", { ascending: true });
 
   return (
     <div className="py-4 space-y-4">
@@ -37,6 +51,8 @@ export default async function PedidosPage({
       <PedidosList
         pedidos={(pedidos ?? []) as unknown as PedidoComCliente[]}
         filtroInicial={searchParams?.filtro}
+        historicoCompleto={historicoCompleto}
+        mesesDeHistorico={MESES_DE_HISTORICO}
       />
     </div>
   );

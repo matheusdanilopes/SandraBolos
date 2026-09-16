@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { isErroDeConexao, mensagemErro } from "@/lib/erros";
+import { invalidarDadosDeApoio, TAG_CLIENTES } from "@/lib/dadosDeApoio";
 import type { TipoPedido, Topper, TopperPedido } from "@/types/database";
 
 interface ItemPayload {
@@ -139,6 +140,9 @@ export async function criarPedidoAction(
       .single();
     if (clienteError) return { error: mensagemErro(clienteError) };
     resolvedClienteId = clienteData.id;
+    // Cliente nasce aqui quando o nome é digitado direto no pedido — sem isto
+    // ele não apareceria no seletor do próximo pedido enquanto o cache durasse.
+    invalidarDadosDeApoio(TAG_CLIENTES);
     revalidatePath("/clientes");
     // O seletor de cliente do próximo pedido lê a mesma lista.
     revalidatePath("/pedidos/novo");
@@ -234,9 +238,13 @@ export async function excluirPedidoAction(
   if (!EXCLUIVEIS.includes(pedido.status))
     return { error: "Só dá para excluir rascunho ou pedido novo. Use o cancelamento para os demais." };
 
-  await supabase.from("itens_pedido").delete().eq("pedido_id", pedidoId);
-  await supabase.from("imagens_pedido").delete().eq("pedido_id", pedidoId);
-  await supabase.from("toppers_pedido").delete().eq("pedido_id", pedidoId);
+  // Três tabelas distintas, nenhuma depende do resultado da outra: em série
+  // eram três idas ao banco enfileiradas antes de apagar o pedido.
+  await Promise.all([
+    supabase.from("itens_pedido").delete().eq("pedido_id", pedidoId),
+    supabase.from("imagens_pedido").delete().eq("pedido_id", pedidoId),
+    supabase.from("toppers_pedido").delete().eq("pedido_id", pedidoId),
+  ]);
 
   const { error } = await supabase.from("pedidos").delete().eq("id", pedidoId);
   if (error) return { error: mensagemErro(error) };
