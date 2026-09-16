@@ -13,10 +13,14 @@ import {
 
 export const dynamic = "force-dynamic";
 
+/**
+ * `?filtro=` deixa o dashboard abrir a lista já no recorte que a pessoa tocou
+ * (hoje, semana, atrasados...). Valor inválido cai em "todos" na própria lista.
+ */
 export default async function PedidosPage({
   searchParams,
 }: {
-  searchParams?: { historico?: string };
+  searchParams?: { filtro?: string; historico?: string };
 }) {
   // Por padrão a lista carrega o trabalho em aberto (qualquer data) mais o
   // histórico encerrado dos últimos meses, em vez do banco inteiro a cada
@@ -46,6 +50,7 @@ export default async function PedidosPage({
 
       <PedidosList
         pedidos={(pedidos ?? []) as unknown as PedidoComCliente[]}
+        filtroInicial={searchParams?.filtro}
         historicoCompleto={historicoCompleto}
         mesesDeHistorico={MESES_DE_HISTORICO}
       />

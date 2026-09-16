@@ -45,6 +45,8 @@ export async function cancelarPedidoAction(
   // O pedido cancelado sai da tela de Toppers; sem esta linha ele continuaria
   // lá, contado nos totais, até a próxima revalidação daquela rota.
   revalidatePath("/toppers");
+  // E sai das contas do financeiro — receita, a receber e o topper a pagar.
+  revalidatePath("/financeiro");
   revalidatePath("/");
   return {};
 }
@@ -63,6 +65,9 @@ export async function avancarStatusAction(
 
   revalidatePath(`/pedidos/${pedidoId}`);
   revalidatePath("/pedidos");
+  // "Feito" é o que está a receber e "entregue" é a receita: andar no fluxo
+  // move dinheiro de uma coluna do financeiro para a outra.
+  revalidatePath("/financeiro");
   revalidatePath("/");
   return {};
 }
@@ -81,6 +86,7 @@ export async function voltarStatusAction(
 
   revalidatePath(`/pedidos/${pedidoId}`);
   revalidatePath("/pedidos");
+  revalidatePath("/financeiro");
   revalidatePath("/");
   return {};
 }
@@ -106,9 +112,14 @@ export async function salvarPrecificacaoAction(
   if (error) return { error: mensagemErro(error) };
 
   revalidatePath(`/pedidos/${pedidoId}`);
+  // `valor_cobrado` é a receita do financeiro: sem revalidar, a tela continuava
+  // mostrando o total anterior (e a entrega ainda como "sem valor").
+  revalidatePath("/financeiro");
+  revalidatePath("/");
   return {};
 }
 
+/** Mesma gravação de `valor_cobrado` do passo anterior, feita na entrega. */
 export async function salvarEntregaAction(
   pedidoId: string,
   valorCobrado: number | null
@@ -122,6 +133,8 @@ export async function salvarEntregaAction(
   if (error) return { error: mensagemErro(error) };
 
   revalidatePath(`/pedidos/${pedidoId}`);
+  revalidatePath("/financeiro");
+  revalidatePath("/");
   return {};
 }
 

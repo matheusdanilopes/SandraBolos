@@ -31,6 +31,7 @@ export async function salvarTopperAction(data: TopperPayload): Promise<{ error?:
 
   if (error) return { error: mensagemErro(error) };
   revalidatePath("/toppers");
+  revalidatePath("/financeiro");
   return {};
 }
 
@@ -77,6 +78,7 @@ export async function definirEtapaTopperAction(
   }
 
   revalidatePath("/toppers");
+  revalidatePath("/financeiro");
   return {};
 }
 
@@ -112,6 +114,7 @@ export async function registrarPagamentoAction(
   }
 
   revalidatePath("/toppers");
+  revalidatePath("/financeiro");
   return {};
 }
 
@@ -127,6 +130,7 @@ export async function desfazerPagamentoAction(
 
   if (error) return { error: mensagemErro(error) };
   revalidatePath("/toppers");
+  revalidatePath("/financeiro");
   return {};
 }
 
@@ -144,5 +148,6 @@ export async function registrarPagamentoLoteAction(
 
   if (error) return { error: mensagemErro(error) };
   revalidatePath("/toppers");
+  revalidatePath("/financeiro");
   return {};
 }

@@ -120,6 +120,52 @@ tocar num dia abre quem é e em que etapa está.
 | `src/app/DashboardCalendario.tsx` | a grade em si: alternância mês/semana, atalho "Hoje" quando o período não contém o dia atual e o painel do dia escolhido |
 | `src/app/page.tsx` | busca do calendário junto das outras (mesmo `Promise.all`, mesmo aviso de falha de conexão) |
 
+## Tela de Financeiro
+
+Revisão da tela inteira. O ponto de partida era a pergunta "pedido cancelado
+entra nas contas?" — entrava em um lugar, e a conferência puxou o resto.
+
+### Pedido cancelado
+
+Receita, ticket médio, a receber e a evolução mensal já saíam limpos: as buscas
+filtram `status = 'entregue'` e `status = 'feito'`, e cancelado não é nenhum dos
+dois. O furo estava no topper.
+
+| Onde | O que acontecia | O que passa a valer |
+| --- | --- | --- |
+| "A pagar fornecedores" | a busca de `toppers_pedido` não olhava o pedido: o topper de um pedido cancelado continuava cobrado como dívida em aberto — e a tela de Toppers já não mostra esse pedido desde `143c4c5`, então não havia nem como quitá-la | `pedidos(status)` vem junto e o cancelado sai da conta; o que saiu aparece em uma linha de nota, para o total não mudar sem explicação |
+| "Pago no período" | idem | continua contando: o dinheiro saiu antes do cancelamento. Quando há valor assim, a nota diz quanto e por quê |
+| Toda a tela | o cancelado sumia sem deixar rastro — mês com dois cancelamentos parecia só um mês fraco | bloco "N pedidos cancelados" (fechado por padrão) com o que deixou de entrar, listando os pedidos |
+
+### Números que não fechavam
+
+| Correção | Por quê |
+| --- | --- |
+| Ticket médio divide pelas entregas **com valor** | dividir por todas as entregas jogava a média para baixo a cada pedido sem valor registrado, como se o preço de venda tivesse caído |
+| Margem aparece com receita > 0 | exigia custo lançado: o período sem gasto nenhum — quando a margem é a melhor possível — ficava sem margem na tela |
+| Entrega com valor `0` conta como "sem valor" | é o que o campo vale quando ninguém preencheu; mostrar "R$ 0,00" com o ✓ de conferido escondia justamente a entrega a acertar |
+| Aviso de entregas sem valor diz o efeito e o caminho | antes só contava os pedidos; agora diz que receita e ticket estão menores que o real e onde corrigir |
+| "A Receber" avisa que não depende do período | somar "a receber" à receita do período não bate com nada — são recortes diferentes, e nada na tela dizia isso |
+
+### Custos
+
+| Correção | Por quê |
+| --- | --- |
+| Título e vazio seguem o período (`periodo.label`) | eram fixos em "Custos do Mês" / "este mês", mas a lista obedece ao seletor lá de cima — em um recorte de 6 meses o rótulo mentia |
+| Data do formulário nasce dentro do período | com período passado na tela, o custo lançado "hoje" era gravado e sumia no mesmo instante, com cara de gravação falhada |
+| Aviso quando a data escolhida cai fora do período | lançar gasto de outro mês é legítimo; sumir sem explicação não |
+| Exclusão pede confirmação e mostra erro | um toque no × ao lado do valor apagava o lançamento sem volta, e a falha de rede era descartada em silêncio |
+| Card de custos mostra a composição | o KPI soma lançamentos + toppers pagos, e o bloco de baixo só os lançamentos: dois totais diferentes com nomes parecidos |
+
+### Telas longas e dados velhos
+
+| Arquivo | Papel |
+| --- | --- |
+| `src/app/financeiro/ListaFinanceira.tsx` | listas de pedidos com corte em 8 linhas e "ver os N restantes" — em 6 meses passavam de cem linhas e empurravam toppers e evolução para fora do alcance |
+| `src/app/financeiro/CanceladosSection.tsx` | bloco recolhível dos cancelados do período |
+| `src/app/pedidos/[id]/actions.ts` | `revalidatePath("/financeiro")` ao cancelar, andar/voltar status e gravar preço ou valor de entrega — são exatamente as ações que mudam receita e a receber, e sem elas o financeiro ficava mostrando o total anterior |
+| `src/app/toppers/actions.ts` | idem para salvar ficha, marcar etapa e registrar/desfazer pagamento do topper |
+
 ## Peso das telas
 
 O app é usado no celular, muitas vezes no 4G da loja. Duas decisões de

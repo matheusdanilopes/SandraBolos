@@ -2,17 +2,72 @@ import { cookies } from "next/headers";
 import { supabase } from "@/lib/supabase";
 import { formatCurrency, calcularValorFinal, formatDate } from "@/lib/utils";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { TIPO_LABELS, type PedidoComCliente, type CustoComCategoria, type CategoriaCusto } from "@/types/database";
-import { TrendingUp, Banknote, AlertCircle, CheckCircle, TrendingDown, Tag, ArrowRight } from "lucide-react";
+import {
+  TIPO_LABELS,
+  type PedidoComCliente,
+  type CustoComCategoria,
+  type CategoriaCusto,
+  type StatusPedido,
+} from "@/types/database";
+import { TrendingUp, Banknote, AlertCircle, TrendingDown, Tag, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { CustosSection } from "./CustosSection";
+import { CanceladosSection } from "./CanceladosSection";
+import { ListaFinanceira, type LinhaFinanceira } from "./ListaFinanceira";
 import { getPeriodoRange, getMesesNoPeriodo, isValidPreset } from "@/lib/periodo";
 import { lerCategoriasCusto } from "@/lib/dadosDeApoio";
 import { houveErroDeConexao } from "@/lib/erros";
 import { AvisoConexao } from "@/components/AvisoConexao";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Ficha de topper com o status do pedido dono dela.
+ *
+ * O status vem junto porque topper de pedido cancelado não é dívida com o
+ * fornecedor — ver `totalToppersAPagar` abaixo.
+ */
+interface TopperFinanceiro {
+  valor: number;
+  frete: number;
+  pago_fornecedor: boolean;
+  data_pagamento: string | null;
+  // PostgREST devolve objeto no vínculo de muitos-para-um; o array cobre o caso
+  // de ele resolver a relação como lista, para o status não sumir em silêncio.
+  pedidos: { status: StatusPedido } | { status: StatusPedido }[] | null;
+}
+
+function custoDoTopper(t: TopperFinanceiro): number {
+  return (t.valor ?? 0) + (t.frete ?? 0);
+}
+
+function pedidoCancelado(t: TopperFinanceiro): boolean {
+  const pedido = Array.isArray(t.pedidos) ? t.pedidos[0] : t.pedidos;
+  return pedido?.status === "cancelado";
+}
+
+function somar(valores: number[]): number {
+  return valores.reduce((acc, v) => acc + v, 0);
+}
+
+/**
+ * Valor de uma entrega. Zero conta como "não registrado": é o que o campo vale
+ * quando ninguém preencheu, e mostrá-lo como R$ 0,00 com sinal de conferido
+ * esconderia justamente a entrega que falta acertar.
+ */
+function valorDaEntrega(p: PedidoComCliente): number | null {
+  return p.valor_cobrado || null;
+}
+
+function linhaDoPedido(p: PedidoComCliente, valor: number | null, semValor: string): LinhaFinanceira {
+  return {
+    id: p.id,
+    titulo: p.clientes?.nome ?? p.nome_cliente ?? "Sem cliente",
+    detalhe: `${TIPO_LABELS[p.tipo]} · ${formatDate(p.data_entrega)}`,
+    valor,
+    semValor,
+  };
+}
 
 export default async function FinanceiroPage() {
   const cookieStore = cookies();
@@ -22,11 +77,11 @@ export default async function FinanceiroPage() {
   const ate = cookieStore.get("sb_periodo_ate")?.value;
   const periodo = getPeriodoRange(preset, de, ate);
 
-  const [entreguesResult, feitosResult, custosResult, categoriasResult, toppersResult] =
+  const [entreguesResult, feitosResult, canceladosResult, custosResult, categoriasResult, toppersResult] =
     await Promise.all([
       supabase
         .from("pedidos")
-        .select("data_entrega, valor_cobrado, valor_calculado, preco_corrigido, valor_brinde, tipo, id, created_at, clientes(nome)")
+        .select("data_entrega, valor_cobrado, valor_calculado, preco_corrigido, valor_brinde, tipo, id, nome_cliente, created_at, clientes(nome)")
         .eq("status", "entregue")
         .gte("data_entrega", periodo.inicio)
         .lte("data_entrega", periodo.fim)
@@ -34,9 +89,19 @@ export default async function FinanceiroPage() {
 
       supabase
         .from("pedidos")
-        .select("id, data_entrega, valor_calculado, preco_corrigido, valor_brinde, tipo, created_at, clientes(nome)")
+        .select("id, data_entrega, valor_calculado, preco_corrigido, valor_brinde, tipo, nome_cliente, created_at, clientes(nome)")
         .eq("status", "feito")
         .order("data_entrega", { ascending: true }),
+
+      // Cancelados do período: não entram em nenhuma conta desta tela — vêm só
+      // para a tela poder dizer isso, em vez de deixar o buraco sem explicação.
+      supabase
+        .from("pedidos")
+        .select("id, data_entrega, valor_cobrado, valor_calculado, preco_corrigido, valor_brinde, tipo, nome_cliente, created_at, clientes(nome)")
+        .eq("status", "cancelado")
+        .gte("data_entrega", periodo.inicio)
+        .lte("data_entrega", periodo.fim)
+        .order("data_entrega", { ascending: false }),
 
       supabase
         .from("custos")
@@ -48,72 +113,109 @@ export default async function FinanceiroPage() {
       // Categorias mudam de longe em longe: vêm do cache, fora da espera.
       lerCategoriasCusto(),
 
+      // `pedidos(status)` traz o status do pedido dono da ficha: sem ele não dá
+      // para separar o topper de um pedido cancelado dos demais. A busca não
+      // filtra por período — ver o bloco de toppers mais abaixo.
       supabase
         .from("toppers_pedido")
-        .select("valor, frete, pago_fornecedor, data_pagamento"),
+        .select("valor, frete, pago_fornecedor, data_pagamento, pedidos(status)"),
     ]);
 
   const entregues = (entreguesResult.data ?? []) as unknown as PedidoComCliente[];
   const feitos = (feitosResult.data ?? []) as unknown as PedidoComCliente[];
+  const cancelados = (canceladosResult.data ?? []) as unknown as PedidoComCliente[];
   const custos = (custosResult.data ?? []) as unknown as CustoComCategoria[];
   const categorias = (categoriasResult.data ?? []) as CategoriaCusto[];
-  const toppers = toppersResult.data ?? [];
+  const toppers = (toppersResult.data ?? []) as unknown as TopperFinanceiro[];
 
   const semConexao = houveErroDeConexao(
     entreguesResult,
     feitosResult,
+    canceladosResult,
     custosResult,
     categoriasResult,
     toppersResult
   );
 
-  // KPIs do período selecionado
-  const receitaPeriodo = entregues.reduce((acc, p) => acc + (p.valor_cobrado ?? 0), 0);
-  const ticketMedio = entregues.length > 0 ? receitaPeriodo / entregues.length : null;
-  const semValor = entregues.filter((p) => !p.valor_cobrado).length;
+  // ── Receita e ticket médio ────────────────────────────────────────────────
+  // Só o que está com status "entregue" entra aqui; cancelado e a fazer ficam de fora.
+  const receitaPeriodo = somar(entregues.map((p) => p.valor_cobrado ?? 0));
+  const entreguesComValor = entregues.filter((p) => valorDaEntrega(p) != null);
+  const semValor = entregues.length - entreguesComValor.length;
+  // Divide pelas entregas que têm valor: incluir as sem valor no divisor puxava
+  // o ticket para baixo e fazia parecer que a média de venda tinha caído.
+  const ticketMedio =
+    entreguesComValor.length > 0 ? receitaPeriodo / entreguesComValor.length : null;
 
-  const aReceber = feitos.reduce((acc, p) => acc + (calcularValorFinal(p) ?? 0), 0);
+  const aReceber = somar(feitos.map((p) => calcularValorFinal(p) ?? 0));
+  const feitosSemValor = feitos.filter((p) => calcularValorFinal(p) == null).length;
 
-  const totalCustosLancados = custos.reduce((acc, c) => acc + c.valor, 0);
+  const totalCustosLancados = somar(custos.map((c) => c.valor));
 
-  // Toppers: a pagar (sem filtro de período — operacional) e pagos no período
-  const totalToppersAPagar = toppers
-    .filter((t) => !t.pago_fornecedor && t.valor + t.frete > 0)
-    .reduce((acc, t) => acc + t.valor + t.frete, 0);
-  const totalToppersPagosPeriodo = toppers
-    .filter(
-      (t) =>
-        t.pago_fornecedor &&
-        t.data_pagamento &&
-        t.data_pagamento >= periodo.inicio &&
-        t.data_pagamento <= periodo.fim
-    )
-    .reduce((acc, t) => acc + t.valor + t.frete, 0);
-  const mostrarToppers = totalToppersAPagar > 0 || totalToppersPagosPeriodo > 0;
+  // ── Toppers ───────────────────────────────────────────────────────────────
+  // "A pagar" é dívida em aberto com o fornecedor. Pedido cancelado não tem
+  // topper a solicitar, receber ou pagar — ele já sai da tela de Toppers por
+  // isso, e cobrá-lo aqui mostraria uma dívida que nem dá para quitar por lá.
+  const aPagar = toppers.filter(
+    (t) => !t.pago_fornecedor && !pedidoCancelado(t) && custoDoTopper(t) > 0
+  );
+  const totalToppersAPagar = somar(aPagar.map(custoDoTopper));
+  const toppersAPagarCancelados = somar(
+    toppers
+      .filter((t) => !t.pago_fornecedor && pedidoCancelado(t) && custoDoTopper(t) > 0)
+      .map(custoDoTopper)
+  );
 
+  // Já pago continua sendo custo mesmo se o pedido caiu depois: o dinheiro saiu.
+  const pagosNoPeriodo = toppers.filter(
+    (t) =>
+      t.pago_fornecedor &&
+      t.data_pagamento &&
+      t.data_pagamento >= periodo.inicio &&
+      t.data_pagamento <= periodo.fim
+  );
+  const totalToppersPagosPeriodo = somar(pagosNoPeriodo.map(custoDoTopper));
+  const toppersPagosCancelados = somar(
+    pagosNoPeriodo.filter(pedidoCancelado).map(custoDoTopper)
+  );
+  const mostrarToppers =
+    totalToppersAPagar > 0 || totalToppersPagosPeriodo > 0 || toppersAPagarCancelados > 0;
+
+  // ── Custos, lucro e margem ────────────────────────────────────────────────
   const totalCustosPeriodo = totalCustosLancados + totalToppersPagosPeriodo;
   const lucroEstimado = receitaPeriodo - totalCustosPeriodo;
-  const margemPct =
-    receitaPeriodo > 0 && totalCustosPeriodo > 0
-      ? Math.round((lucroEstimado / receitaPeriodo) * 100)
-      : null;
+  // Margem com receita > 0: exigir custo lançado escondia a margem justo no
+  // período em que nada foi gasto, que é quando ela é melhor.
+  const margemPct = receitaPeriodo > 0 ? Math.round((lucroEstimado / receitaPeriodo) * 100) : null;
 
-  // Histórico mensal adaptado ao período selecionado
+  const valorPerdidoCancelados = somar(
+    cancelados.map((p) => valorDaEntrega(p) ?? calcularValorFinal(p) ?? 0)
+  );
+
+  // ── Histórico mensal adaptado ao período selecionado ──────────────────────
   const meses = getMesesNoPeriodo(periodo.inicio, periodo.fim);
   const mesAtualChave = format(new Date(), "yyyy-MM");
 
   const mesesResumo = meses.map((mes) => {
     const pedidosMes = entregues.filter((p) => p.data_entrega.startsWith(mes.chave));
-    const receita = pedidosMes.reduce((acc, p) => acc + (p.valor_cobrado ?? 0), 0);
+    const receita = somar(pedidosMes.map((p) => p.valor_cobrado ?? 0));
     return { ...mes, receita, quantidade: pedidosMes.length };
   });
   const maxReceita = Math.max(...mesesResumo.map((m) => m.receita), 1);
+
+  const linhasFeitos = feitos.map((p) => linhaDoPedido(p, calcularValorFinal(p), "definir valor"));
+  const linhasEntregues = entregues.map((p) =>
+    linhaDoPedido(p, valorDaEntrega(p), "sem valor")
+  );
+  const linhasCancelados = cancelados.map((p) =>
+    linhaDoPedido(p, valorDaEntrega(p) ?? calcularValorFinal(p), "sem valor")
+  );
 
   return (
     <div className="py-4 space-y-5">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Financeiro</h1>
-        <p className="text-sm text-gray-400 capitalize mt-0.5">{periodo.label}</p>
+        <p className="text-sm text-gray-400 mt-0.5">{periodo.label}</p>
       </div>
 
       {semConexao && <AvisoConexao detalhe="Os valores abaixo podem estar incompletos." />}
@@ -137,15 +239,10 @@ export default async function FinanceiroPage() {
             Custos do Período
           </div>
           <p className="text-xl font-bold text-rose-600">{formatCurrency(totalCustosPeriodo)}</p>
-          {totalToppersPagosPeriodo > 0 ? (
-            <p className="text-xs text-gray-400 mt-0.5">
-              inclui {formatCurrency(totalToppersPagosPeriodo)} em toppers
-            </p>
-          ) : (
-            <p className="text-xs text-gray-400 mt-0.5">
-              {custos.length} lançamento{custos.length !== 1 ? "s" : ""}
-            </p>
-          )}
+          <p className="text-xs text-gray-400 mt-0.5">
+            {custos.length} lançamento{custos.length !== 1 ? "s" : ""}
+            {totalToppersPagosPeriodo > 0 && ` + ${formatCurrency(totalToppersPagosPeriodo)} em toppers`}
+          </p>
         </div>
 
         <div className="card p-4">
@@ -172,20 +269,27 @@ export default async function FinanceiroPage() {
             {ticketMedio != null ? formatCurrency(ticketMedio) : <span className="text-gray-300">—</span>}
           </p>
           <p className="text-xs text-gray-400 mt-0.5">
-            {ticketMedio != null ? "por pedido" : "nenhuma entrega"}
+            {ticketMedio != null
+              ? `${entreguesComValor.length} entrega${entreguesComValor.length !== 1 ? "s" : ""} com valor`
+              : "nenhuma entrega com valor"}
           </p>
         </div>
       </div>
 
       {/* Lançamentos de Custos */}
-      <CustosSection custos={custos} categorias={categorias} />
+      <CustosSection custos={custos} categorias={categorias} periodo={periodo} />
 
-      {/* Aviso pedidos sem valor */}
+      {/* Pedidos entregues que ficaram sem valor: receita que existiu e não foi contada */}
       {semValor > 0 && (
         <div className="flex items-start gap-2 bg-orange-50 border border-orange-200 rounded-xl p-3">
           <AlertCircle size={14} className="text-orange-500 mt-0.5 flex-shrink-0" />
           <p className="text-xs text-orange-700">
-            {semValor} pedido{semValor > 1 ? "s" : ""} entregue{semValor > 1 ? "s" : ""} no período sem valor registrado.
+            <span className="font-semibold">
+              {semValor} entrega{semValor > 1 ? "s" : ""} sem valor registrado
+            </span>{" "}
+            — a receita e o ticket médio acima estão menores do que o real. Abra
+            {semValor > 1 ? " os pedidos marcados com " : " o pedido marcado com "}
+            <AlertCircle size={11} className="inline -mt-0.5 text-orange-500" /> em Entregas e informe o valor cobrado.
           </p>
         </div>
       )}
@@ -195,36 +299,19 @@ export default async function FinanceiroPage() {
         <div className="card p-4 space-y-4">
           {feitos.length > 0 && (
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-sm text-gray-700">A Receber</h2>
-                <span className="text-sm font-bold text-blue-600">{formatCurrency(aReceber)}</span>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h2 className="font-semibold text-sm text-gray-700">A Receber</h2>
+                  {/* Sem esta linha a conta não fecha: soma-se "a receber" à receita
+                      do período e o total não bate com nada que a tela mostra. */}
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Tudo que está pronto e ainda não foi entregue — não depende do período
+                    {feitosSemValor > 0 && ` · ${feitosSemValor} sem valor`}
+                  </p>
+                </div>
+                <span className="text-sm font-bold text-blue-600 flex-shrink-0">{formatCurrency(aReceber)}</span>
               </div>
-              <div className="space-y-1">
-                {feitos.map((p) => {
-                  const valor = calcularValorFinal(p);
-                  return (
-                    <Link
-                      key={p.id}
-                      href={`/pedidos/${p.id}`}
-                      className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 -mx-1 px-1 rounded transition-colors"
-                    >
-                      <div>
-                        <p className="text-sm font-medium text-gray-800">
-                          {p.clientes?.nome ?? "Sem cliente"}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {TIPO_LABELS[p.tipo]} · Entrega: {formatDate(p.data_entrega)}
-                        </p>
-                      </div>
-                      {valor != null ? (
-                        <span className="text-sm font-semibold text-blue-600">{formatCurrency(valor)}</span>
-                      ) : (
-                        <span className="text-xs text-gray-400 italic">sem valor</span>
-                      )}
-                    </Link>
-                  );
-                })}
-              </div>
+              <ListaFinanceira linhas={linhasFeitos} corValor="text-blue-600" />
             </div>
           )}
 
@@ -232,44 +319,28 @@ export default async function FinanceiroPage() {
 
           {entregues.length > 0 && (
             <div className="space-y-2">
-              <h2 className="font-semibold text-sm text-gray-700 capitalize">
-                Entregas — {periodo.label}
-              </h2>
-              <div className="space-y-1">
-                {entregues.map((p) => (
-                  <Link
-                    key={p.id}
-                    href={`/pedidos/${p.id}`}
-                    className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 -mx-1 px-1 rounded transition-colors"
-                  >
-                    <div className="flex items-start gap-2">
-                      {p.valor_cobrado ? (
-                        <CheckCircle size={14} className="text-emerald-500 mt-0.5 flex-shrink-0" />
-                      ) : (
-                        <AlertCircle size={14} className="text-orange-400 mt-0.5 flex-shrink-0" />
-                      )}
-                      <div>
-                        <p className="text-sm font-medium text-gray-800">
-                          {p.clientes?.nome ?? "Sem cliente"}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {TIPO_LABELS[p.tipo]} · {formatDate(p.data_entrega)}
-                        </p>
-                      </div>
-                    </div>
-                    {p.valor_cobrado ? (
-                      <span className="text-sm font-semibold text-emerald-600">
-                        {formatCurrency(p.valor_cobrado)}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-orange-500 font-medium">sem valor</span>
-                    )}
-                  </Link>
-                ))}
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h2 className="font-semibold text-sm text-gray-700">Entregas</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">{periodo.label}</p>
+                </div>
+                <span className="text-sm font-bold text-emerald-600 flex-shrink-0">
+                  {formatCurrency(receitaPeriodo)}
+                </span>
               </div>
+              <ListaFinanceira linhas={linhasEntregues} corValor="text-emerald-600" mostrarSinal />
             </div>
           )}
         </div>
+      )}
+
+      {/* Cancelados do período — o que a tela deixou de fora, à vista */}
+      {cancelados.length > 0 && (
+        <CanceladosSection
+          linhas={linhasCancelados}
+          valorPerdido={valorPerdidoCancelados}
+          periodoLabel={periodo.label}
+        />
       )}
 
       {/* Toppers */}
@@ -287,15 +358,29 @@ export default async function FinanceiroPage() {
           <div className="space-y-2">
             {totalToppersAPagar > 0 && (
               <div className="flex items-center justify-between py-1.5 border-b border-gray-100">
-                <span className="text-sm text-gray-600">A pagar fornecedores</span>
+                <span className="text-sm text-gray-600">
+                  A pagar fornecedores
+                  <span className="block text-[11px] text-gray-400">
+                    {aPagar.length} topper{aPagar.length !== 1 ? "s" : ""} de pedidos ativos
+                  </span>
+                </span>
                 <span className="text-sm font-semibold text-red-600">{formatCurrency(totalToppersAPagar)}</span>
               </div>
             )}
             {totalToppersPagosPeriodo > 0 && (
               <div className="flex items-center justify-between py-1.5">
-                <span className="text-sm text-gray-600 capitalize">Pago — {periodo.label}</span>
+                <span className="text-sm text-gray-600">Pago — {periodo.label}</span>
                 <span className="text-sm font-semibold text-gray-500">{formatCurrency(totalToppersPagosPeriodo)}</span>
               </div>
+            )}
+            {(toppersAPagarCancelados > 0 || toppersPagosCancelados > 0) && (
+              <p className="text-[11px] text-gray-400 pt-1 border-t border-gray-100">
+                {toppersAPagarCancelados > 0 &&
+                  `${formatCurrency(toppersAPagarCancelados)} de pedidos cancelados ficaram de fora do que há a pagar.`}
+                {toppersAPagarCancelados > 0 && toppersPagosCancelados > 0 && " "}
+                {toppersPagosCancelados > 0 &&
+                  `${formatCurrency(toppersPagosCancelados)} pagos no período são de pedidos cancelados depois — o dinheiro saiu, então continuam no custo.`}
+              </p>
             )}
           </div>
         ) : (
@@ -306,7 +391,7 @@ export default async function FinanceiroPage() {
       {/* Histórico mensal adaptado ao período */}
       {mesesResumo.length > 0 && (
         <div className="card p-4 space-y-4">
-          <h2 className="font-semibold text-sm text-gray-700 capitalize">
+          <h2 className="font-semibold text-sm text-gray-700">
             {mesesResumo.length === 1 ? "Resumo do Período" : `Evolução — ${periodo.label}`}
           </h2>
           <div className="space-y-3">
@@ -316,7 +401,7 @@ export default async function FinanceiroPage() {
               return (
                 <div key={mes.chave} className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className={`text-xs capitalize ${isMesAtual ? "font-semibold text-gray-800" : "text-gray-500"}`}>
+                    <span className={`text-xs ${isMesAtual ? "font-semibold text-gray-800" : "text-gray-500"}`}>
                       {mes.label}
                       {isMesAtual && (
                         <span className="ml-1.5 text-[10px] bg-brand-100 text-brand-700 px-1.5 py-0.5 rounded-full font-medium">

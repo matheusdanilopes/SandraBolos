@@ -68,6 +68,11 @@ function matchesFiltro(p: PedidoComCliente, filtro: Filtro): boolean {
   }
 }
 
+/** Lê o filtro vindo da URL, ignorando qualquer valor que não exista na barra. */
+function filtroDaUrl(valor?: string): Filtro {
+  return FILTROS.some((f) => f.value === valor) ? (valor as Filtro) : "todos";
+}
+
 function getNomeDisplay(pedido: PedidoComCliente): string {
   return pedido.clientes?.nome ?? pedido.nome_cliente ?? "Sem cliente";
 }
@@ -76,16 +81,23 @@ type Visualizacao = "lista" | "calendario";
 
 interface Props {
   pedidos: PedidoComCliente[];
+  /** Filtro que veio do dashboard pela URL (`?filtro=`). */
+  filtroInicial?: string;
   /** A lista veio sem recorte de data (`?historico=tudo`). */
   historicoCompleto: boolean;
   /** Meses de histórico encerrado que o recorte padrão carrega. */
   mesesDeHistorico: number;
 }
 
-export function PedidosList({ pedidos, historicoCompleto, mesesDeHistorico }: Props) {
+export function PedidosList({
+  pedidos,
+  filtroInicial,
+  historicoCompleto,
+  mesesDeHistorico,
+}: Props) {
   const router = useRouter();
   const [busca, setBusca] = useState("");
-  const [filtro, setFiltro] = useState<Filtro>("todos");
+  const [filtro, setFiltro] = useState<Filtro>(() => filtroDaUrl(filtroInicial));
   const [visualizacao, setVisualizacao] = useState<Visualizacao>("lista");
   const [confirmandoExclusaoId, setConfirmandoExclusaoId] = useState<string | null>(null);
   const [localDeleted, setLocalDeleted] = useState<Set<string>>(new Set());
@@ -121,6 +133,17 @@ export function PedidosList({ pedidos, historicoCompleto, mesesDeHistorico }: Pr
   const atrasadosCount = filterCounts["atrasados"] ?? 0;
   const rascunhosCount = filterCounts["rascunho"] ?? 0;
   const canceladosCount = filterCounts["cancelado"] ?? 0;
+
+  // Trocar o recorte de histórico recarrega a rota, e o filtro é estado de
+  // cliente: sem levá-lo na URL, quem veio do dashboard em "Atrasados" e pede
+  // o histórico completo cairia em "Todos" sem ter pedido isso.
+  const linkHistorico = useMemo(() => {
+    const params = new URLSearchParams();
+    if (filtro !== "todos") params.set("filtro", filtro);
+    if (!historicoCompleto) params.set("historico", "tudo");
+    const query = params.toString();
+    return query ? `/pedidos?${query}` : "/pedidos";
+  }, [filtro, historicoCompleto]);
 
   const buscaLower = useMemo(() => busca.toLowerCase(), [busca]);
 
@@ -289,7 +312,7 @@ export function PedidosList({ pedidos, historicoCompleto, mesesDeHistorico }: Pr
             )}
           </p>
           <Link
-            href={historicoCompleto ? "/pedidos" : "/pedidos?historico=tudo"}
+            href={linkHistorico}
             prefetch={false}
             className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium whitespace-nowrap"
           >

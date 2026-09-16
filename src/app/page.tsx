@@ -62,13 +62,14 @@ export default async function DashboardPage() {
     calendarioResult
   );
 
-  const hoje = format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR });
+  const hojeBruto = format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR });
+  const hoje = hojeBruto.charAt(0).toUpperCase() + hojeBruto.slice(1);
 
   return (
     <div className="py-4 space-y-5">
       <div>
         <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-sm text-gray-400 capitalize">{hoje}</p>
+        <p className="text-sm text-gray-400">{hoje}</p>
       </div>
 
       {semConexao && <AvisoConexao detalhe="Os números abaixo podem estar incompletos." />}
