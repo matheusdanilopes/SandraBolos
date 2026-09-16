@@ -1,7 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { format } from "date-fns";
-import { CalendarRange, ChefHat, CheckCircle2, Clock, Sun, Truck } from "lucide-react";
+import {
+  CalendarRange,
+  ChefHat,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  Sun,
+  Truck,
+} from "lucide-react";
 import { formatCurrency, formatTime } from "@/lib/utils";
 import { semanaDe } from "@/lib/calendario";
 import type { ResumoEntregas } from "@/lib/resumoDashboard";
@@ -71,20 +80,9 @@ function SituacaoPills({ resumo }: { resumo: ResumoEntregas }) {
 interface Props {
   hoje: ResumoEntregas;
   semana: ResumoEntregas;
-  filtroHojeAtivo: boolean;
-  onFiltrarHoje: () => void;
-  onFiltrarSemana: () => void;
-  filtroSemanaAtivo: boolean;
 }
 
-export function DashboardResumo({
-  hoje,
-  semana,
-  filtroHojeAtivo,
-  onFiltrarHoje,
-  filtroSemanaAtivo,
-  onFiltrarSemana,
-}: Props) {
+export function DashboardResumo({ hoje, semana }: Props) {
   const { inicio, fim } = semanaDe(new Date());
   const rotuloSemana = `${format(inicio, "dd/MM")} a ${format(fim, "dd/MM")}`;
 
@@ -94,11 +92,9 @@ export function DashboardResumo({
   return (
     <div className="space-y-3">
       {/* Hoje: o que ainda tem que sair da cozinha e a que horas */}
-      <button
-        onClick={onFiltrarHoje}
-        className={`card w-full p-4 text-left transition-all active:scale-[0.99] ${
-          filtroHojeAtivo ? "ring-2 ring-brand-400 shadow-md" : "hover:shadow-md"
-        }`}
+      <Link
+        href="/pedidos?filtro=hoje"
+        className="card block w-full p-4 transition-all hover:shadow-md active:scale-[0.99]"
       >
         <div className="flex items-center justify-between mb-3">
           <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">
@@ -127,12 +123,13 @@ export function DashboardResumo({
               <span className="text-3xl font-bold text-brand-600 leading-none">
                 {hoje.pendentes}
               </span>
-              <span className="text-sm text-gray-600">
+              <span className="flex-1 text-sm text-gray-600">
                 {plural(hoje.pendentes, "entrega pendente", "entregas pendentes")}
                 {hoje.entregues > 0 && (
                   <span className="text-gray-400"> de {hoje.total}</span>
                 )}
               </span>
+              <ChevronRight size={16} className="text-gray-300 flex-shrink-0 self-center" />
             </div>
 
             <SituacaoPills resumo={hoje} />
@@ -156,14 +153,12 @@ export function DashboardResumo({
             )}
           </div>
         )}
-      </button>
+      </Link>
 
       {/* Semana: o que vem pela frente antes de virar urgência */}
-      <button
-        onClick={onFiltrarSemana}
-        className={`card w-full p-4 text-left transition-all active:scale-[0.99] ${
-          filtroSemanaAtivo ? "ring-2 ring-indigo-400 shadow-md" : "hover:shadow-md"
-        }`}
+      <Link
+        href="/pedidos?filtro=semana"
+        className="card block w-full p-4 transition-all hover:shadow-md active:scale-[0.99]"
       >
         <div className="flex items-center justify-between mb-3">
           <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-0">
@@ -191,12 +186,13 @@ export function DashboardResumo({
               <span className="text-3xl font-bold text-indigo-600 leading-none">
                 {semana.pendentes}
               </span>
-              <span className="text-sm text-gray-600">
+              <span className="flex-1 text-sm text-gray-600">
                 {plural(semana.pendentes, "entrega pendente", "entregas pendentes")}
                 {semana.entregues > 0 && (
                   <span className="text-gray-400"> de {semana.total}</span>
                 )}
               </span>
+              <ChevronRight size={16} className="text-gray-300 flex-shrink-0 self-center" />
             </div>
 
             <SituacaoPills resumo={semana} />
@@ -208,7 +204,7 @@ export function DashboardResumo({
             )}
           </div>
         )}
-      </button>
+      </Link>
     </div>
   );
 }

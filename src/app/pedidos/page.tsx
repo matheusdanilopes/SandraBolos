@@ -8,7 +8,15 @@ import { AvisoConexao } from "@/components/AvisoConexao";
 
 export const dynamic = "force-dynamic";
 
-export default async function PedidosPage() {
+/**
+ * `?filtro=` deixa o dashboard abrir a lista já no recorte que a pessoa tocou
+ * (hoje, semana, atrasados...). Valor inválido cai em "todos" na própria lista.
+ */
+export default async function PedidosPage({
+  searchParams,
+}: {
+  searchParams?: { filtro?: string };
+}) {
   const { data: pedidos, error } = await supabase
     .from("pedidos")
     .select("*, clientes(nome, telefone)")
@@ -26,7 +34,10 @@ export default async function PedidosPage() {
 
       {isErroDeConexao(error) && <AvisoConexao detalhe="A lista pode estar incompleta." />}
 
-      <PedidosList pedidos={(pedidos ?? []) as unknown as PedidoComCliente[]} />
+      <PedidosList
+        pedidos={(pedidos ?? []) as unknown as PedidoComCliente[]}
+        filtroInicial={searchParams?.filtro}
+      />
     </div>
   );
 }
