@@ -18,6 +18,19 @@ export type CalView = "mes" | "semana";
 /** A semana da confeitaria começa na segunda e termina no domingo. */
 const WEEK_OPTIONS = { weekStartsOn: 1 } as const;
 
+/**
+ * Intervalo da semana que contém `date`, na convenção da confeitaria.
+ *
+ * Fica aqui para que calendário, filtros de lista e indicadores do dashboard
+ * falem da mesma "semana" — do contrário cada tela conta uma janela diferente.
+ */
+export function semanaDe(date: Date): { inicio: Date; fim: Date } {
+  return {
+    inicio: startOfWeek(date, WEEK_OPTIONS),
+    fim: endOfWeek(date, WEEK_OPTIONS),
+  };
+}
+
 export const WEEK_HEADER = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
 /** Dias da grade mensal — inclui as bordas das semanas que invadem outros meses. */

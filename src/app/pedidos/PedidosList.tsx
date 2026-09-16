@@ -55,16 +55,27 @@ function matchesFiltro(p: PedidoComCliente, filtro: Filtro): boolean {
   }
 }
 
+/** Lê o filtro vindo da URL, ignorando qualquer valor que não exista na barra. */
+function filtroDaUrl(valor?: string): Filtro {
+  return FILTROS.some((f) => f.value === valor) ? (valor as Filtro) : "todos";
+}
+
 function getNomeDisplay(pedido: PedidoComCliente): string {
   return pedido.clientes?.nome ?? pedido.nome_cliente ?? "Sem cliente";
 }
 
 type Visualizacao = "lista" | "calendario";
 
-export function PedidosList({ pedidos }: { pedidos: PedidoComCliente[] }) {
+export function PedidosList({
+  pedidos,
+  filtroInicial,
+}: {
+  pedidos: PedidoComCliente[];
+  filtroInicial?: string;
+}) {
   const router = useRouter();
   const [busca, setBusca] = useState("");
-  const [filtro, setFiltro] = useState<Filtro>("todos");
+  const [filtro, setFiltro] = useState<Filtro>(() => filtroDaUrl(filtroInicial));
   const [visualizacao, setVisualizacao] = useState<Visualizacao>("lista");
   const [confirmandoExclusaoId, setConfirmandoExclusaoId] = useState<string | null>(null);
   const [localDeleted, setLocalDeleted] = useState<Set<string>>(new Set());

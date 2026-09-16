@@ -55,7 +55,8 @@ interface Props {
 
 export function DashboardCalendario({ pedidos }: Props) {
   const [currentDate, setCurrentDate] = useState(() => new Date());
-  const [calView, setCalView] = useState<CalView>("mes");
+  /** A semana é o horizonte de trabalho da confeitaria — o mês fica a um toque. */
+  const [calView, setCalView] = useState<CalView>("semana");
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
 
   const pedidosPorDia = useMemo(() => agruparPorDataEntrega(pedidos), [pedidos]);
