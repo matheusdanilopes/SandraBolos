@@ -165,6 +165,16 @@ export interface ItemPedido {
   preco_unitario: number;
   quantidade: number;
   valor_total: number;
+  /**
+   * Apuração do item no "Feito": peso/quantidade que realmente saiu, preço
+   * praticado e valor do item. Ficam separados do que foi combinado na venda
+   * (`quantidade`, `preco_unitario`, `valor_total`) porque é a quantidade
+   * combinada que serve de referência para a regra dos 300g. `null` enquanto o
+   * item não foi precificado.
+   */
+  quantidade_real: number | null;
+  preco_real: number | null;
+  valor_real: number | null;
   created_at: string;
 }
 
@@ -448,6 +458,9 @@ export type Database = {
           preco_unitario: number
           quantidade: number
           valor_total: number
+          quantidade_real?: number | null
+          preco_real?: number | null
+          valor_real?: number | null
           created_at: string
         }
         Insert: {
@@ -459,6 +472,9 @@ export type Database = {
           preco_unitario: number
           quantidade: number
           valor_total: number
+          quantidade_real?: number | null
+          preco_real?: number | null
+          valor_real?: number | null
           created_at?: string
         }
         Update: {
@@ -470,6 +486,9 @@ export type Database = {
           preco_unitario?: number
           quantidade?: number
           valor_total?: number
+          quantidade_real?: number | null
+          preco_real?: number | null
+          valor_real?: number | null
           created_at?: string
         }
         Relationships: [

@@ -10,33 +10,12 @@ import type {
   ProdutoComCategoria,
   UnidadeMedida,
 } from "@/types/database";
+import {
+  calcularTotalItem as calcularTotal,
+  formatQuantidade as formatQuantidadeItem,
+} from "@/lib/precificacao";
 import { SeletorProduto } from "../SeletorProduto";
 import { adicionarItemAction, removerItemAction } from "./itensActions";
-
-// ─── Cálculo por unidade de medida ──────────────────────────────────────────
-
-function calcularTotal(
-  quantidade: number,
-  precoUnitario: number,
-  unidade: UnidadeMedida
-): number {
-  switch (unidade) {
-    case "peso_kg":
-      // decimal × valor/kg  (ex: 1,5 kg × R$80 = R$120)
-      return Math.round(quantidade * precoUnitario * 100) / 100;
-    case "cento":
-      // proporcional ao cento  (ex: 50 un. = 0,5 × R$80 = R$40)
-      return Math.round((quantidade / 100) * precoUnitario * 100) / 100;
-    case "unidade":
-      // inteiro × valor unitário
-      return Math.round(Math.round(quantidade) * precoUnitario * 100) / 100;
-  }
-}
-
-function formatQuantidadeItem(quantidade: number, unidade: UnidadeMedida): string {
-  if (unidade === "peso_kg") return `${quantidade.toFixed(3)} kg`;
-  return `${Math.round(quantidade)} un.`;
-}
 
 // ─── Configuração de input por unidade ───────────────────────────────────────
 
@@ -83,7 +62,21 @@ function ItemRow({
     <div className="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5">
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-gray-800 truncate">{item.nome_produto}</p>
+        {/* Depois da precificação vale o que foi apurado: manter só o combinado
+            faria a lista contradizer o peso real registrado no "Feito". */}
+        {item.quantidade_real != null && (
+          <p className="text-[11px] text-emerald-700">
+            Real: {formatQuantidadeItem(item.quantidade_real, item.unidade_medida)}
+            {item.preco_real != null &&
+              ` · ${item.unidade_medida === "cento"
+                ? `cento: ${formatCurrency(item.preco_real)}`
+                : item.unidade_medida === "peso_kg"
+                ? `${formatCurrency(item.preco_real)}/kg`
+                : `${formatCurrency(item.preco_real)}/un.`}`}
+          </p>
+        )}
         <p className="text-[11px] text-gray-500">
+          {item.quantidade_real != null && "Pedido: "}
           {formatQuantidadeItem(item.quantidade, item.unidade_medida)}
           {centoFator && ` = ${centoFator} × cento`}
           {" · "}
@@ -95,7 +88,7 @@ function ItemRow({
         </p>
       </div>
       <span className="text-sm font-semibold text-emerald-700 whitespace-nowrap">
-        {formatCurrency(item.valor_total)}
+        {formatCurrency(item.valor_real ?? item.valor_total)}
       </span>
       <button
         type="button"
@@ -167,7 +160,7 @@ export function ItensForm({ pedidoId, produtos, categorias = [], itens }: Props)
       ? calcularTotal(qtdNum, precoNum, unidade)
       : null;
 
-  const totalItens = itens.reduce((sum, item) => sum + item.valor_total, 0);
+  const totalItens = itens.reduce((sum, item) => sum + (item.valor_real ?? item.valor_total), 0);
   const inputCfg = unidade ? quantidadeInputConfig(unidade) : null;
 
   function handleProdutoChange(produto: ProdutoComCategoria | null) {
