@@ -132,6 +132,12 @@ Agora, quando o pedido tem itens lançados, a precificação é item a item: cad
 linha tem o seu peso (ou quantidade) real e o seu preço, e o pedido recebe a
 soma — que é de onde o financeiro lê.
 
+Os três campos de cada linha — quantidade, preço unitário e valor — são a mesma
+conta vista de ângulos diferentes, e qual deles se sabe primeiro muda com o
+pedido: às vezes o bolo é pesado e o preço do kg é o de tabela (sai o valor),
+às vezes o valor já foi combinado com a cliente e o que falta é saber em quanto
+ficou o kg. Preencher dois preenche o terceiro, nas duas direções.
+
 | Decisão | Por quê |
 | --- | --- |
 | Colunas novas (`quantidade_real`, `preco_real`, `valor_real`) em vez de sobrescrever `quantidade`/`preco_unitario`/`valor_total` | o que foi combinado na venda continua sendo a referência da regra dos 300g — sem ele não há como saber se o bolo passou do pedido |
@@ -141,12 +147,16 @@ soma — que é de onde o financeiro lê.
 | `preco_por_kg` do pedido fica nulo com mais de um item | não existe "o preço por kg" de um pedido com dois bolos de preços diferentes; o preço de cada um está na linha dele |
 | Pedido sem item mantém a tela antiga | pedido lançado antes do catálogo (ou rascunho) não tem item para precificar |
 | Lista de itens mostra o real quando existe | depois de registrar 1,650 kg, a lista continuar mostrando 1,500 kg faria a tela contradizer o que acabou de ser gravado |
+| Preço e valor se recalculam nas duas direções, com o peso como base | era só peso × preço = valor: quem fechava o preço pela cliente ("esse sai por R$ 150") tinha que dividir de cabeça para achar o preço do kg |
+| `ancora` guarda o último dos dois que foi digitado | corrigir o peso depois precisa recalcular o **outro** campo; sem isso, ajustar o peso sobrescreveria o valor que a pessoa acabou de combinar |
+| Preço unitário derivado com 4 casas (`numeric(10,4)`) | R$ 150 em 1,8 kg dá R$ 83,3333/kg — arredondar para centavos faria o valor de volta sair R$ 150,01 |
+| Campo apagado não apaga o outro | quem limpa o valor para redigitar ainda tem o preço na tela, e o item segue valendo o que valia até o número novo chegar |
 
 | Arquivo | Papel |
 | --- | --- |
 | `supabase/migrations/013_add_precificacao_itens.sql` | as três colunas novas em `itens_pedido` — **precisa ser executada no SQL Editor do Supabase** |
-| `src/lib/precificacao.ts` | a conta por unidade de medida e a regra dos 300g, agora num lugar só (`PedidoForm` e `ItensForm` tinham cópias da mesma conta) |
-| `src/app/pedidos/[id]/PrecificacaoForm.tsx` | formulário por item com aviso de corte em cada linha e a soma no rodapé |
+| `src/lib/precificacao.ts` | a conta por unidade de medida, a volta dela (`precoUnitarioDoValor`) e a regra dos 300g, agora num lugar só (`PedidoForm` e `ItensForm` tinham cópias da mesma conta) |
+| `src/app/pedidos/[id]/PrecificacaoForm.tsx` | formulário por item com os três campos ligados, aviso de corte em cada linha e a soma no rodapé; os formulários de pedido sem item (bolo e doce) usam os mesmos campos ligados |
 | `src/app/pedidos/[id]/actions.ts` | `salvarPrecificacaoItensAction` grava os itens primeiro e só então o total do pedido |
 
 ## Tela de Financeiro

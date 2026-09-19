@@ -37,6 +37,28 @@ export function calcularTotalItem(
   }
 }
 
+/**
+ * Caminho de volta: o preço unitário que faz a conta fechar no valor informado.
+ *
+ * É o mesmo cálculo de `calcularTotalItem` ao contrário — quem já combinou o
+ * valor com a cliente ("esse bolo sai por R$ 150") precisa saber em quanto fica
+ * o kg, e não o contrário. Quatro casas porque `preco_unitario` é
+ * `numeric(10,4)`: R$ 150 em 1,8 kg dá R$ 83,3333/kg, e arredondar para
+ * centavos aqui faria o valor de volta não bater com o que foi digitado.
+ *
+ * `null` quando não há como dividir (quantidade ausente ou zerada).
+ */
+export function precoUnitarioDoValor(
+  valorTotal: number,
+  quantidade: number,
+  unidade: UnidadeMedida
+): number | null {
+  const base =
+    unidade === "cento" ? quantidade / 100 : unidade === "unidade" ? Math.round(quantidade) : quantidade;
+  if (!base || base <= 0) return null;
+  return Math.round((valorTotal / base) * 10000) / 10000;
+}
+
 export interface ItemPrecificado {
   /** Quanto daria a conta pelo que foi apurado, sem nenhum corte. */
   valorTotal: number;
