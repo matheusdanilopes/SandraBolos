@@ -120,6 +120,35 @@ tocar num dia abre quem é e em que etapa está.
 | `src/app/DashboardCalendario.tsx` | a grade em si: alternância mês/semana, atalho "Hoje" quando o período não contém o dia atual e o painel do dia escolhido |
 | `src/app/page.tsx` | busca do calendário junto das outras (mesmo `Promise.all`, mesmo aviso de falha de conexão) |
 
+## Precificação por item
+
+Sintoma relatado: **"quando há mais de um bolo não permite alterar os dois,
+apenas um"**. A precificação do "Feito" era um par único no pedido — `peso` ×
+`preco_por_kg` —, então um pedido com dois bolos só tinha onde registrar o peso
+real de um. O peso do outro continuava sendo o combinado na venda, e o valor
+saía errado sem nada na tela indicando isso.
+
+Agora, quando o pedido tem itens lançados, a precificação é item a item: cada
+linha tem o seu peso (ou quantidade) real e o seu preço, e o pedido recebe a
+soma — que é de onde o financeiro lê.
+
+| Decisão | Por quê |
+| --- | --- |
+| Colunas novas (`quantidade_real`, `preco_real`, `valor_real`) em vez de sobrescrever `quantidade`/`preco_unitario`/`valor_total` | o que foi combinado na venda continua sendo a referência da regra dos 300g — sem ele não há como saber se o bolo passou do pedido |
+| Regra dos 300g aplicada **por item** | o teto é o peso daquele bolo; somar os pesos do pedido deixaria um bolo muito acima compensar outro abaixo |
+| Só itens por peso entram na regra | doce vendido por cento ou unidade não tem folga de peso: o que foi apurado é o que se cobra |
+| Soma gravada em `valor_calculado` (sem corte) e `preco_corrigido` (com corte) | são as mesmas colunas da precificação antiga, então financeiro, dashboard e valor estimado seguem lendo o mesmo lugar |
+| `preco_por_kg` do pedido fica nulo com mais de um item | não existe "o preço por kg" de um pedido com dois bolos de preços diferentes; o preço de cada um está na linha dele |
+| Pedido sem item mantém a tela antiga | pedido lançado antes do catálogo (ou rascunho) não tem item para precificar |
+| Lista de itens mostra o real quando existe | depois de registrar 1,650 kg, a lista continuar mostrando 1,500 kg faria a tela contradizer o que acabou de ser gravado |
+
+| Arquivo | Papel |
+| --- | --- |
+| `supabase/migrations/013_add_precificacao_itens.sql` | as três colunas novas em `itens_pedido` — **precisa ser executada no SQL Editor do Supabase** |
+| `src/lib/precificacao.ts` | a conta por unidade de medida e a regra dos 300g, agora num lugar só (`PedidoForm` e `ItensForm` tinham cópias da mesma conta) |
+| `src/app/pedidos/[id]/PrecificacaoForm.tsx` | formulário por item com aviso de corte em cada linha e a soma no rodapé |
+| `src/app/pedidos/[id]/actions.ts` | `salvarPrecificacaoItensAction` grava os itens primeiro e só então o total do pedido |
+
 ## Tela de Financeiro
 
 Revisão da tela inteira. O ponto de partida era a pergunta "pedido cancelado
