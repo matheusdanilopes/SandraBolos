@@ -10,6 +10,7 @@ import { SeletorCliente } from "./SeletorCliente";
 import { SeletorProduto } from "./SeletorProduto";
 import { parseISO, isPast, isToday } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
+import { calcularTotalItem as calcularTotal } from "@/lib/precificacao";
 import { mensagemErro } from "@/lib/erros";
 
 interface Props {
@@ -22,13 +23,7 @@ interface Props {
   topperPedido?: TopperPedido | null;
 }
 
-// ─── Cálculo por unidade de medida ──────────────────────────────────────────
-
-function calcularTotal(quantidade: number, preco: number, unidade: UnidadeMedida): number {
-  if (unidade === "peso_kg") return Math.round(quantidade * preco * 100) / 100;
-  if (unidade === "cento")   return Math.round((quantidade / 100) * preco * 100) / 100;
-  return Math.round(Math.round(quantidade) * preco * 100) / 100;
-}
+// ─── Campos por unidade de medida ───────────────────────────────────────────
 
 function inputCfg(unidade: UnidadeMedida) {
   if (unidade === "peso_kg") return { step: "0.001", min: "0.001", label: "Quantidade (kg)", placeholder: "Ex: 1,500" };

@@ -281,7 +281,7 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
 
       {/* Precificação — aparece quando status = feito ou entregue */}
       {!isCancelado && (pedidoTyped.status === "feito" || pedidoTyped.status === "entregue") && (
-        <PrecificacaoForm pedido={pedidoTyped} />
+        <PrecificacaoForm pedido={pedidoTyped} itens={(itens ?? []) as ItemPedido[]} />
       )}
 
       {/* Hint de precificação quando status ainda não chegou em "feito" */}
