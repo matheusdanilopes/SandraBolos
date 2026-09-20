@@ -4,54 +4,64 @@ import { supabase } from "@/lib/supabase";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AlertaBadge } from "@/components/AlertaBadge";
 import { formatDate, formatTime, formatPhone, calcularValorFinal, formatCurrency, pedidoNumero } from "@/lib/utils";
-import { TIPO_LABELS, TOPPER_LABELS, STATUS_FLOW, type PedidoComCliente, type ItemPedido, type ProdutoComCategoria, type CategoriaProduto } from "@/types/database";
+import { TIPO_LABELS, TOPPER_LABELS, STATUS_FLOW, type PedidoComClienteContato, type ItemPedido, type ProdutoComCategoria, type CategoriaProduto } from "@/types/database";
 import { Edit, CheckCircle, AlertCircle, MessageCircle, Phone, ArrowLeft, Lock, FileEdit, XCircle } from "lucide-react";
 import { StatusActions } from "./StatusActions";
 import { PrecificacaoForm } from "./PrecificacaoForm";
 import { EntregaForm } from "./EntregaForm";
 import { ImagensSection } from "./ImagensSection";
 import { ItensForm } from "./ItensForm";
+import { lerCategoriasProduto, lerProdutosAtivosComCategoria } from "@/lib/dadosDeApoio";
 import { isErroDeConexao } from "@/lib/erros";
 import { PainelSemConexao } from "@/components/PainelSemConexao";
 
 export const dynamic = "force-dynamic";
 
 export default async function PedidoDetailPage({ params }: { params: { id: string } }) {
-  const { data: pedido, error } = await supabase
-    .from("pedidos")
-    .select("*, clientes(nome, telefone)")
-    .eq("id", params.id)
-    .single();
+  // Tudo numa rodada só. Imagens e itens são buscados por `params.id` e o
+  // catálogo por `ativo = true`: nenhum deles depende da linha do pedido, então
+  // esperar o pedido chegar antes de disparar os outros custava uma ida inteira
+  // ao Supabase na tela mais aberta do app. O catálogo ainda vem do cache.
+  const [
+    { data: pedido, error },
+    { data: imagens },
+    { data: itens },
+    { data: produtos },
+    { data: categorias },
+  ] = await Promise.all([
+    supabase
+      .from("pedidos")
+      .select("*, clientes(nome, telefone)")
+      .eq("id", params.id)
+      .single(),
+
+    supabase
+      .from("imagens_pedido")
+      .select("*")
+      .eq("pedido_id", params.id)
+      .order("created_at"),
+
+    supabase
+      .from("itens_pedido")
+      .select("*")
+      .eq("pedido_id", params.id)
+      .order("created_at"),
+
+    // Catálogo com a categoria de cada produto e a lista de categorias: são o
+    // que o seletor de item usa para busca e chips. Ambos do cache.
+    lerProdutosAtivosComCategoria(),
+    lerCategoriasProduto(),
+  ]);
 
   // Falha de rede não é pedido inexistente: mandar para o 404 faria parecer
   // que o pedido foi apagado.
   if (isErroDeConexao(error)) return <PainelSemConexao titulo="Não foi possível carregar o pedido" />;
   if (!pedido) notFound();
 
-  const pedidoTyped = pedido as unknown as PedidoComCliente;
+  const pedidoTyped = pedido as unknown as PedidoComClienteContato;
 
-  const { data: imagens } = await supabase
-    .from("imagens_pedido")
-    .select("*")
-    .eq("pedido_id", params.id)
-    .order("created_at");
-
-  const { data: itens } = await supabase
-    .from("itens_pedido")
-    .select("*")
-    .eq("pedido_id", params.id)
-    .order("created_at");
-
-  // A categoria vem junto (e a lista de categorias também) para o seletor de
-  // item ter a mesma busca e os mesmos chips do lançamento do pedido.
-  const [{ data: produtos }, { data: categorias }] = await Promise.all([
-    supabase
-      .from("produtos")
-      .select("*, categorias_produto(nome, ordem)")
-      .eq("ativo", true)
-      .order("nome"),
-    supabase.from("categorias_produto").select("*").eq("ativo", true).order("ordem").order("nome"),
-  ]);
+  // A leitura cacheada traz todas as categorias; os chips mostram só as ativas.
+  const categoriasAtivas = (categorias ?? []).filter((c) => c.ativo);
 
   const cliente = pedidoTyped.clientes ?? null;
   const valorFinal = calcularValorFinal(pedidoTyped);
@@ -262,7 +272,7 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
       <ItensForm
         pedidoId={pedidoTyped.id}
         produtos={(produtos ?? []) as unknown as ProdutoComCategoria[]}
-        categorias={(categorias ?? []) as CategoriaProduto[]}
+        categorias={categoriasAtivas as CategoriaProduto[]}
         itens={(itens ?? []) as ItemPedido[]}
       />
 

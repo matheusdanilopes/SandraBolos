@@ -1,26 +1,31 @@
-import { supabase } from "@/lib/supabase";
 import { PedidoForm } from "../PedidoForm";
 import type { CategoriaProduto, ProdutoComCategoria } from "@/types/database";
+import {
+  lerCategoriasProduto,
+  lerClientesParaSelecao,
+  lerProdutosAtivosComCategoria,
+} from "@/lib/dadosDeApoio";
 import { houveErroDeConexao } from "@/lib/erros";
 import { AvisoConexao } from "@/components/AvisoConexao";
 
 export const dynamic = "force-dynamic";
 
 export default async function NovoPedidoPage() {
+  // Clientes, catálogo e categorias vêm do cache: o formulário abre sem esperar
+  // três idas ao Supabase que devolvem quase sempre a mesma coisa. A categoria
+  // vem junto com o produto para o seletor de item poder filtrar por ela.
   const [clientesResult, produtosResult, categoriasResult] = await Promise.all([
-    supabase.from("clientes").select("id, nome, telefone").order("nome"),
-    // A categoria vem junto para o seletor de item poder filtrar por ela.
-    supabase
-      .from("produtos")
-      .select("*, categorias_produto(nome, ordem)")
-      .eq("ativo", true)
-      .order("nome"),
-    supabase.from("categorias_produto").select("*").eq("ativo", true).order("ordem").order("nome"),
+    lerClientesParaSelecao(),
+    lerProdutosAtivosComCategoria(),
+    lerCategoriasProduto(),
   ]);
 
   const { data: clientes } = clientesResult;
   const { data: produtos } = produtosResult;
-  const { data: categorias } = categoriasResult;
+  // A leitura cacheada traz todas as categorias; os chips do seletor mostram só
+  // as ativas. Filtrar aqui evita uma segunda entrada de cache para uma tabela
+  // de poucas linhas.
+  const categorias = (categoriasResult.data ?? []).filter((c) => c.ativo);
   // Com a lista de clientes vazia por falha de rede é fácil cadastrar um cliente
   // repetido sem perceber — daí o aviso antes do formulário.
   const semConexao = houveErroDeConexao(clientesResult, produtosResult, categoriasResult);
@@ -35,7 +40,7 @@ export default async function NovoPedidoPage() {
       <PedidoForm
         clientes={clientes ?? []}
         produtos={(produtos ?? []) as unknown as ProdutoComCategoria[]}
-        categorias={(categorias ?? []) as CategoriaProduto[]}
+        categorias={categorias as CategoriaProduto[]}
       />
     </div>
   );

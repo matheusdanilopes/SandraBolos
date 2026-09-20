@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { PedidoForm } from "../../PedidoForm";
 import { type Pedido, type TopperPedido } from "@/types/database";
+import { lerClientesParaSelecao } from "@/lib/dadosDeApoio";
 import { houveErroDeConexao } from "@/lib/erros";
 import { PainelSemConexao } from "@/components/PainelSemConexao";
 
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function EditarPedidoPage({ params }: { params: { id: string } }) {
   const [pedidoResult, clientesResult, topperResult] = await Promise.all([
     supabase.from("pedidos").select("*").eq("id", params.id).single(),
-    supabase.from("clientes").select("id, nome, telefone").order("nome"),
+    lerClientesParaSelecao(),
     // A ficha do topper vem junto para o formulário abrir com fornecedor e
     // valores já registrados — salvar a edição não pode apagá-los.
     supabase.from("toppers_pedido").select("*").eq("pedido_id", params.id).maybeSingle(),

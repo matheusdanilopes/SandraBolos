@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { getPeriodoRange, isValidPreset } from "@/lib/periodo";
 import { calcularValorFinal } from "@/lib/utils";
+import { COLUNAS_PEDIDO_PAINEL } from "@/lib/consultas";
 import { houveErroDeConexao } from "@/lib/erros";
 import { AvisoConexao } from "@/components/AvisoConexao";
 
@@ -22,7 +23,7 @@ export default async function DashboardPage() {
   const [pedidosResult, receitaResult, feitosResult, calendarioResult] = await Promise.all([
     supabase
       .from("pedidos")
-      .select("*, clientes(nome, telefone)")
+      .select(`${COLUNAS_PEDIDO_PAINEL}, clientes(nome)`)
       .neq("status", "entregue")
       .neq("status", "cancelado")
       .order("data_entrega", { ascending: true }),

@@ -204,3 +204,122 @@ dois. O furo estava no topper.
 | `src/app/financeiro/CanceladosSection.tsx` | bloco recolhível dos cancelados do período |
 | `src/app/pedidos/[id]/actions.ts` | `revalidatePath("/financeiro")` ao cancelar, andar/voltar status e gravar preço ou valor de entrega — são exatamente as ações que mudam receita e a receber, e sem elas o financeiro ficava mostrando o total anterior |
 | `src/app/toppers/actions.ts` | idem para salvar ficha, marcar etapa e registrar/desfazer pagamento do topper |
+
+## Peso das telas
+
+O app é usado no celular, muitas vezes no 4G da loja. Duas decisões de
+performance mudam o que chega ao aparelho e valem ser lembradas antes de mexer
+nas consultas.
+
+### Colunas explícitas nas listas
+
+`src/lib/consultas.ts` guarda as colunas que cada tela realmente desenha. As
+listas usam essas constantes em vez de `select("*")`, que trazia preço por kg,
+valor cobrado, id da pasta do Drive e o telefone do cliente — nada disso é
+mostrado ali.
+
+| Tela | Por linha | Redução |
+| --- | --- | --- |
+| `/pedidos` | 622 → 396 bytes | −36% |
+| `/` (dashboard) | 622 → 358 bytes | −42% |
+| `/toppers` | 622 → 217 bytes | −65% |
+
+Duas armadilhas ao editar:
+
+- as constantes são **literais de string** de propósito. O `select()` do
+  supabase-js é tipado em cima do texto da consulta; montar a lista em tempo de
+  execução faz o tipo do resultado virar erro de parser;
+- coluna que não está na lista **não chega** ao componente. O tipo reclama
+  (`PedidoComCliente.clientes` tem só `nome`; o telefone vive em
+  `PedidoComClienteContato`, usado na tela de detalhe), mas é preciso lembrar de
+  adicionar a coluna ao usar um campo novo.
+
+Um efeito colateral: a consulta passa a depender de a migration estar aplicada.
+Com `select("*")`, uma coluna faltando virava `undefined`; com lista explícita,
+o PostgREST recusa a consulta inteira. Rode as migrations antes de subir.
+
+### Recorte de histórico em `/pedidos`
+
+A lista carregava **todos** os pedidos de toda a história a cada abertura, sem
+limite. Agora o padrão é: tudo que está em aberto (qualquer data) mais o que já
+foi entregue ou cancelado nos últimos `MESES_DE_HISTORICO` meses.
+
+O corte é por idade do que já acabou, nunca por quantidade — um pedido atrasado
+de um ano continua aparecendo, senão sumiria justamente do filtro "Atrasados".
+A contagem abaixo dos filtros diz qual recorte está valendo e o link
+`?historico=tudo` carrega a história completa.
+
+A tela de Toppers ficou **sem** recorte de propósito: o total "a pagar
+fornecedores" é operacional e vale para sempre, então esconder toppers antigos
+não pagos apagaria dívida da tela.
+
+Duas outras consultas também ficam sem recorte, e pelo mesmo tipo de razão — o
+recurso precisa do conjunto inteiro: o calendário do dashboard (a pessoa navega
+para qualquer mês; ver **Calendário do dashboard**) e o total de toppers acima.
+Nos dois casos a contrapartida é trazer poucas colunas de todos os pedidos, não
+todas as colunas de poucos.
+
+## Tempo até o dado aparecer
+
+Três mecanismos trabalham juntos para a tela não ficar esperando. Medido contra
+um Supabase falso com 120 ms de latência por consulta.
+
+### Uma única rodada de consultas por tela
+
+Nenhuma página espera uma consulta para disparar a próxima. O caso que mais
+doía era a tela de detalhe do pedido, que buscava o pedido e só então imagens,
+itens e catálogo — mas nenhuma dessas três depende da linha do pedido (duas
+filtram por `params.id`, a outra por `ativo = true`).
+
+| | consultas | rodadas | tempo |
+| --- | --- | --- | --- |
+| antes | 4 | 2 | 264 ms |
+| depois | 3 | 1 | 141 ms |
+
+Ao mexer aqui, a pergunta é sempre: esta consulta **precisa** do resultado da
+anterior? Se não, ela entra no mesmo `Promise.all`.
+
+### Cache dos dados de apoio (`src/lib/dadosDeApoio.ts`)
+
+Catálogo, clientes, categorias e configuração do cardápio aparecem em quase toda
+tela e mudam de longe em longe. Passam pelo Data Cache do Next, com `revalidateTag`
+nas actions que gravam.
+
+| Tela | 1ª visita | Revisita |
+| --- | --- | --- |
+| `/produtos` | 3 consultas · 149 ms | **0 consultas · 16 ms** |
+| `/configuracoes` | 145 ms | **0 consultas · 18 ms** |
+| `/pedidos/novo` | 140 ms | **0 consultas · 14 ms** |
+| `/financeiro` | 5 consultas | 4 consultas |
+
+Duas regras ao mexer:
+
+- **toda escrita numa tabela cacheada precisa chamar `invalidarDadosDeApoio`**
+  com a tag correspondente, senão a tela abre com dado velho. As tags derrubam
+  só o que devem — invalidar `produtos` não rebusca categorias nem o cardápio;
+- a leitura cacheada **lança** em caso de erro em vez de devolver `{ error }`.
+  É de propósito: `unstable_cache` não guarda o que lançou, e uma falha de rede
+  cacheada deixaria o aviso de "sem conexão" preso na tela por cinco minutos
+  depois de a internet voltar. O `revalidate` de 5 min é só rede de segurança
+  para alteração feita fora do app (no painel do Supabase, por exemplo).
+
+### Cache de navegação (`staleTimes` em `next.config.mjs`)
+
+O padrão do App Router para rota dinâmica é 0: voltar para a tela anterior, ou
+alternar entre as abas de Comercial, refazia a requisição inteira. Com 30 s a
+volta é instantânea. As actions chamam `revalidatePath`, que limpa esse cache,
+então gravação feita no app derruba a entrada na hora — o prazo só cobre ir e
+voltar em poucos segundos.
+
+Este é o mesmo cache citado em **Lista de clientes no pedido**, então vale ser
+explícito sobre o limite: os 30 s valem para navegação sem gravação. Alteração
+feita fora deste app — outra aba, outro aparelho — não é alcançada por
+`revalidatePath`, e é por isso que o formulário de pedido relê a lista de
+clientes ao abrir em vez de confiar no payload da rota. Para desligar o prazo,
+basta `dynamic: 0`.
+
+### Esqueletos por tela
+
+Cada rota tem o `loading.tsx` com a forma do que vai chegar. Sem ele a tela
+herda o esqueleto do segmento pai — detalhe de pedido piscava a lista, Toppers
+piscava a grade do dashboard — e a troca de forma faz parecer mais lento do que é.

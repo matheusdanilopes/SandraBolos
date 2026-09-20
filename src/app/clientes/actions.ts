@@ -4,10 +4,16 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { mensagemErro } from "@/lib/erros";
+import { invalidarDadosDeApoio, TAG_CLIENTES } from "@/lib/dadosDeApoio";
 import type { Cliente } from "@/types/database";
 
 /** Telas que mostram a lista de clientes e precisam saber de um cadastro novo. */
 function revalidarTelasComClientes(clienteId?: string) {
+  // A lista de clientes é lida do cache de dados de apoio. Sem derrubar a tag
+  // aqui, o cadastro novo continuaria invisível no seletor mesmo com as rotas
+  // revalidadas — o cache devolveria a lista antiga por até cinco minutos.
+  invalidarDadosDeApoio(TAG_CLIENTES);
+
   if (clienteId) revalidatePath(`/clientes/${clienteId}`);
   revalidatePath("/clientes");
   // O seletor de cliente do pedido lê a mesma lista. Sem esta linha um cliente
@@ -26,6 +32,10 @@ export type ClienteOpcao = Pick<Cliente, "id" | "nome" | "telefone">;
  * tempo depois da primeira visita). Quem acabou de cadastrar um cliente em
  * /clientes e volta para o pedido não pode ficar sem ele na lista — daí a
  * releitura ao abrir o formulário.
+ *
+ * Esta leitura é de propósito direta, fora do cache de dados de apoio: ela
+ * existe justamente para cobrir o cadastro feito em outra aba ou aparelho, que
+ * invalidação nenhuma no servidor deste app alcança.
  */
 export async function listarClientesAction(): Promise<{
   clientes?: ClienteOpcao[];

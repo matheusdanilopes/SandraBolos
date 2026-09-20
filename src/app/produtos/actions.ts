@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { mensagemErro } from "@/lib/erros";
+import { invalidarDadosDeApoio, TAG_PRODUTOS } from "@/lib/dadosDeApoio";
 import type { UnidadeMedida } from "@/types/database";
 
 interface ProdutoPayload {
@@ -30,6 +31,7 @@ export async function criarProdutoAction(
   });
 
   if (error) return { error: mensagemErro(error) };
+  invalidarDadosDeApoio(TAG_PRODUTOS);
   revalidatePath("/produtos");
   return {};
 }
@@ -55,6 +57,7 @@ export async function editarProdutoAction(
     .eq("id", id);
 
   if (error) return { error: mensagemErro(error) };
+  invalidarDadosDeApoio(TAG_PRODUTOS);
   revalidatePath("/produtos");
   return {};
 }
@@ -70,6 +73,7 @@ export async function toggleAtivoAction(
     .eq("id", id);
 
   if (error) return { error: mensagemErro(error) };
+  invalidarDadosDeApoio(TAG_PRODUTOS);
   revalidatePath("/produtos");
   return {};
 }

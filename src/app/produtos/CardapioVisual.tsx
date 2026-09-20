@@ -6,6 +6,7 @@ import {
   useTransition,
   useEffect,
   useCallback,
+  useMemo,
   type CSSProperties,
 } from "react";
 import {
@@ -60,10 +61,16 @@ function injectGoogleFont(url: string) {
   document.head.appendChild(link);
 }
 
-async function ensureFontsLoaded() {
-  Object.values(FONTS).forEach((f) => {
-    if (f.googleUrl) injectGoogleFont(f.googleUrl);
-  });
+/**
+ * Garante que a fonte escolhida esteja carregada antes de rasterizar o PNG.
+ *
+ * Carrega só a fonte em uso: injetar as quatro do catálogo puxava três folhas
+ * de estilo e três famílias do Google Fonts que a tela nunca desenha — custo
+ * pago no 4G, sem nada em troca.
+ */
+async function ensureFontsLoaded(fontFamily: string) {
+  const url = (FONTS[fontFamily] ?? FONTS.georgia).googleUrl;
+  if (url) injectGoogleFont(url);
   await document.fonts.ready;
 }
 
@@ -489,6 +496,13 @@ interface ConfigSidebarProps {
 function ConfigSidebar({ cfg, upd, uploading, onUpload, onSave, isPending, saveOk, fileRef }: ConfigSidebarProps) {
   const [showUrlInput, setShowUrlInput] = useState(false);
 
+  // O seletor mostra um "Abc" desenhado na própria fonte, então aqui as quatro
+  // do catálogo são necessárias. Fica neste componente de propósito: a prévia
+  // em /produtos não tem seletor e não paga esse download.
+  useEffect(() => {
+    Object.values(FONTS).forEach((f) => { if (f.googleUrl) injectGoogleFont(f.googleUrl); });
+  }, []);
+
   function applyManualUrl() {
     const url = cfg.bgUrlInput.trim();
     if (url) { upd("bgUrl", url); upd("bgType", "upload"); }
@@ -817,12 +831,20 @@ export function CardapioVisual({ produtos, categorias, configInicial, modoVisual
   const fileRef    = useRef<HTMLInputElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
 
-  const ativos = produtos.filter((p) => p.ativo);
-  const grupos = buildGrupos(ativos, categorias);
+  // Sem memo, filtrar e reagrupar o catálogo inteiro acontecia a cada render —
+  // isto é, a cada caractere digitado no título e a cada passo dos sliders de
+  // posição/opacidade, que são os controles mais arrastados da tela.
+  const grupos = useMemo(
+    () => buildGrupos(produtos.filter((p) => p.ativo), categorias),
+    [produtos, categorias]
+  );
 
+  // Só a fonte em uso é baixada. Antes as quatro do catálogo vinham sempre,
+  // inclusive na prévia somente-leitura de /produtos, que desenha uma só.
   useEffect(() => {
-    Object.values(FONTS).forEach((f) => { if (f.googleUrl) injectGoogleFont(f.googleUrl); });
-  }, []);
+    const url = (FONTS[cfg.fontFamily] ?? FONTS.georgia).googleUrl;
+    if (url) injectGoogleFont(url);
+  }, [cfg.fontFamily]);
 
   const upd = useCallback(
     <K extends keyof ConfigState>(key: K, val: ConfigState[K]) => {
@@ -879,7 +901,7 @@ export function CardapioVisual({ produtos, categorias, configInicial, modoVisual
     if (!previewRef.current) return;
     setExporting(true);
     try {
-      await ensureFontsLoaded();
+      await ensureFontsLoaded(cfg.fontFamily);
       const { default: html2canvas } = await import("html2canvas");
       const canvas = await html2canvas(previewRef.current, {
         scale: 3,
