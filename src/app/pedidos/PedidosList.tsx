@@ -201,9 +201,14 @@ export function PedidosList({
           <PedidosCalendar pedidos={pedidosCalendario} />
         )}
 
-        {/* Quadro kanban — colunas por status, pensado para telas maiores */}
+        {/* Quadro kanban — colunas por status, pensado para telas maiores.
+            O app inteiro roda num shell mobile de largura fixa (max-w-2xl);
+            aqui a gente escapa dele para o quadro usar a largura real da tela,
+            senão as colunas ficam espremidas com corte sem aviso. */}
         {visualizacao === "kanban" && (
-          <PedidosKanban pedidos={pedidosCalendario} />
+          <div className="relative left-1/2 right-1/2 -mx-[50vw] w-screen px-4 md:px-8">
+            <PedidosKanban pedidos={pedidosCalendario} />
+          </div>
         )}
 
         {/* Filtros, contagem e lista — apenas na visualização em lista */}

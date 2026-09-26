@@ -154,7 +154,8 @@ export function PedidosKanban({ pedidos }: { pedidos: PedidoComCliente[] }) {
 
   return (
     <div className="space-y-2">
-      <div className="flex gap-3 overflow-x-auto pb-3 -mx-1 px-1 items-start">
+      <div className="relative">
+        <div className="flex gap-3 overflow-x-auto pb-3 items-start scrollbar-none">
         {COLUNAS.map(({ status, icon: Icon }) => {
           const itens = porStatus.get(status) ?? [];
           const cor = COLUNA_COR[status];
@@ -216,6 +217,10 @@ export function PedidosKanban({ pedidos }: { pedidos: PedidoComCliente[] }) {
             </div>
           );
         })}
+        </div>
+        {/* Sinaliza que há mais colunas fora da área visível — sem isso o corte
+            da última coluna parece um bug de layout em vez de rolagem. */}
+        <div className="pointer-events-none absolute right-0 top-0 bottom-3 w-10 bg-gradient-to-l from-gray-100 to-transparent" />
       </div>
 
       {/* Toast de erro / transição inválida */}
