@@ -3,13 +3,14 @@
 import { useState, useMemo, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Search, X, ChevronRight, Calendar, FileEdit, Trash2, LayoutList, CalendarDays } from "lucide-react";
+import { Search, X, ChevronRight, Calendar, FileEdit, Trash2, LayoutList, CalendarDays, Kanban } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AlertaBadge } from "@/components/AlertaBadge";
 import { cn, formatDate, isEntregaHoje, isEntregaSemana, pedidoAlerta } from "@/lib/utils";
 import { TIPO_LABELS, STATUS_LABELS, type PedidoComCliente, type StatusPedido } from "@/types/database";
 import { excluirPedidoAction } from "./actions";
 import { PedidosCalendar } from "./PedidosCalendar";
+import { PedidosKanban } from "./PedidosKanban";
 
 type Filtro = "todos" | "hoje" | "semana" | "atrasados" | StatusPedido;
 
@@ -64,7 +65,7 @@ function getNomeDisplay(pedido: PedidoComCliente): string {
   return pedido.clientes?.nome ?? pedido.nome_cliente ?? "Sem cliente";
 }
 
-type Visualizacao = "lista" | "calendario";
+type Visualizacao = "lista" | "calendario" | "kanban";
 
 export function PedidosList({
   pedidos,
@@ -180,12 +181,29 @@ export function PedidosList({
             >
               <CalendarDays size={16} />
             </button>
+            <button
+              onClick={() => setVisualizacao("kanban")}
+              className={cn(
+                "p-2 rounded-lg transition-colors hidden md:inline-flex",
+                visualizacao === "kanban"
+                  ? "bg-brand-50 text-brand-600"
+                  : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+              )}
+              aria-label="Visualização em quadro (kanban)"
+            >
+              <Kanban size={16} />
+            </button>
           </div>
         </div>
 
         {/* Calendário */}
         {visualizacao === "calendario" && (
           <PedidosCalendar pedidos={pedidosCalendario} />
+        )}
+
+        {/* Quadro kanban — colunas por status, pensado para telas maiores */}
+        {visualizacao === "kanban" && (
+          <PedidosKanban pedidos={pedidosCalendario} />
         )}
 
         {/* Filtros, contagem e lista — apenas na visualização em lista */}
