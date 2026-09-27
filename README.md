@@ -207,9 +207,9 @@ dois. O furo estava no topper.
 
 ## Peso das telas
 
-O app é usado no celular, muitas vezes no 4G da loja. Duas decisões de
+O app é usado no celular, muitas vezes no 4G da loja. Três decisões de
 performance mudam o que chega ao aparelho e valem ser lembradas antes de mexer
-nas consultas.
+nas consultas ou de acrescentar uma visualização.
 
 ### Colunas explícitas nas listas
 
@@ -258,6 +258,24 @@ recurso precisa do conjunto inteiro: o calendário do dashboard (a pessoa navega
 para qualquer mês; ver **Calendário do dashboard**) e o total de toppers acima.
 Nos dois casos a contrapartida é trazer poucas colunas de todos os pedidos, não
 todas as colunas de poucos.
+
+### Visualizações alternativas entram sob demanda
+
+A tela de Pedidos abre sempre em lista. O calendário e o quadro kanban são
+carregados com `next/dynamic` (`ssr: false`) só quando alguém troca de
+visualização — cada um tem algumas centenas de linhas e, no caso do kanban, o
+botão nem aparece no celular.
+
+| `/pedidos` | JS da página | First Load JS |
+| --- | --- | --- |
+| com os dois no pacote inicial | 10,2 kB | 114 kB |
+| carregados sob demanda | **7,9 kB** | **112 kB** |
+
+A regra para a próxima visualização: painel que só aparece depois de um clique
+entra por `dynamic`, com um `loading` de uma linha. O que **não** vale a pena é
+o contrário — o calendário do dashboard segue com import estático, porque é
+parte fixa da tela e carregá-lo sob demanda só piscaria um placeholder a cada
+abertura.
 
 ## Tempo até o dado aparecer
 

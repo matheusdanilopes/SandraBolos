@@ -4,22 +4,34 @@ import { useState, useMemo, useTransition } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Search, X, ChevronRight, Calendar, FileEdit, Trash2, LayoutList, CalendarDays, History } from "lucide-react";
+import { Search, X, ChevronRight, Calendar, FileEdit, Trash2, LayoutList, CalendarDays, History, Kanban } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AlertaBadge } from "@/components/AlertaBadge";
 import { cn, formatDate, isEntregaHoje, isEntregaSemana, pedidoAlerta } from "@/lib/utils";
 import { TIPO_LABELS, STATUS_LABELS, type PedidoComCliente, type StatusPedido } from "@/types/database";
 import { excluirPedidoAction } from "./actions";
 
-// A lista abre sempre na visualização em lista: o calendário (grade do mês,
-// view semanal e o date-fns que ele usa) só é baixado quando alguém troca de
-// visualização, em vez de pesar em toda abertura da tela de Pedidos.
+// A lista abre sempre na visualização em lista: calendário e quadro só são
+// baixados quando alguém troca de visualização, em vez de pesarem em toda
+// abertura da tela de Pedidos. No calendário são a grade do mês, a view
+// semanal e o date-fns que ela usa; no quadro, as colunas por status — que
+// nem aparecem no celular, onde o botão fica escondido.
 const PedidosCalendar = dynamic(
   () => import("./PedidosCalendar").then((m) => m.PedidosCalendar),
   {
     ssr: false,
     loading: () => (
       <div className="card p-8 text-center text-sm text-gray-400">Carregando calendário…</div>
+    ),
+  }
+);
+
+const PedidosKanban = dynamic(
+  () => import("./PedidosKanban").then((m) => m.PedidosKanban),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="card p-8 text-center text-sm text-gray-400">Carregando quadro…</div>
     ),
   }
 );
@@ -77,7 +89,7 @@ function getNomeDisplay(pedido: PedidoComCliente): string {
   return pedido.clientes?.nome ?? pedido.nome_cliente ?? "Sem cliente";
 }
 
-type Visualizacao = "lista" | "calendario";
+type Visualizacao = "lista" | "calendario" | "kanban";
 
 interface Props {
   pedidos: PedidoComCliente[];
@@ -219,12 +231,34 @@ export function PedidosList({
             >
               <CalendarDays size={16} />
             </button>
+            <button
+              onClick={() => setVisualizacao("kanban")}
+              className={cn(
+                "p-2 rounded-lg transition-colors hidden md:inline-flex",
+                visualizacao === "kanban"
+                  ? "bg-brand-50 text-brand-600"
+                  : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+              )}
+              aria-label="Visualização em quadro (kanban)"
+            >
+              <Kanban size={16} />
+            </button>
           </div>
         </div>
 
         {/* Calendário */}
         {visualizacao === "calendario" && (
           <PedidosCalendar pedidos={pedidosCalendario} />
+        )}
+
+        {/* Quadro kanban — colunas por status, pensado para telas maiores.
+            O app inteiro roda num shell mobile de largura fixa (max-w-2xl);
+            aqui a gente escapa dele para o quadro usar a largura real da tela,
+            senão as colunas ficam espremidas com corte sem aviso. */}
+        {visualizacao === "kanban" && (
+          <div className="relative left-1/2 right-1/2 -mx-[50vw] w-screen px-4 md:px-8">
+            <PedidosKanban pedidos={pedidosCalendario} />
+          </div>
         )}
 
         {/* Filtros, contagem e lista — apenas na visualização em lista */}
