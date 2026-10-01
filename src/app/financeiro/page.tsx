@@ -9,11 +9,11 @@ import {
   type CategoriaCusto,
   type StatusPedido,
 } from "@/types/database";
-import { TrendingUp, Banknote, AlertCircle, TrendingDown, Tag, ArrowRight } from "lucide-react";
+import type { ReactNode } from "react";
+import { TrendingUp, TrendingDown, Wallet, ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { CustosSection } from "./CustosSection";
-import { CanceladosSection } from "./CanceladosSection";
-import { ListaFinanceira, type LinhaFinanceira } from "./ListaFinanceira";
+import type { LinhaFinanceira } from "./ListaFinanceira";
+import { PainelMovimentacoes, type Aba } from "./PainelMovimentacoes";
 import { getPeriodoRange, getMesesNoPeriodo, isValidPreset } from "@/lib/periodo";
 import { houveErroDeConexao } from "@/lib/erros";
 import { AvisoConexao } from "@/components/AvisoConexao";
@@ -179,8 +179,6 @@ export default async function FinanceiroPage() {
   const toppersPagosCancelados = somar(
     pagosNoPeriodo.filter(pedidoCancelado).map(custoDoTopper)
   );
-  const mostrarToppers =
-    totalToppersAPagar > 0 || totalToppersPagosPeriodo > 0 || toppersAPagarCancelados > 0;
 
   // ── Custos, lucro e margem ────────────────────────────────────────────────
   const totalCustosPeriodo = totalCustosLancados + totalToppersPagosPeriodo;
@@ -193,14 +191,31 @@ export default async function FinanceiroPage() {
     cancelados.map((p) => valorDaEntrega(p) ?? calcularValorFinal(p) ?? 0)
   );
 
+  const notaToppers =
+    [
+      toppersAPagarCancelados > 0 &&
+        `${formatCurrency(toppersAPagarCancelados)} de pedidos cancelados ficaram de fora do que há a pagar.`,
+      toppersPagosCancelados > 0 &&
+        `${formatCurrency(toppersPagosCancelados)} pagos no período são de pedidos cancelados depois — o dinheiro saiu, então continuam no custo.`,
+    ]
+      .filter(Boolean)
+      .join(" ") || null;
+
   // ── Histórico mensal adaptado ao período selecionado ──────────────────────
+  // Com um mês só, a "evolução" repetia o card de resultado; ela só aparece
+  // quando há mais de um mês para comparar.
   const meses = getMesesNoPeriodo(periodo.inicio, periodo.fim);
   const mesAtualChave = format(new Date(), "yyyy-MM");
 
   const mesesResumo = meses.map((mes) => {
     const pedidosMes = entregues.filter((p) => p.data_entrega.startsWith(mes.chave));
     const receita = somar(pedidosMes.map((p) => p.valor_cobrado ?? 0));
-    return { ...mes, receita, quantidade: pedidosMes.length };
+    const custo =
+      somar(custos.filter((c) => c.data.startsWith(mes.chave)).map((c) => c.valor)) +
+      somar(
+        pagosNoPeriodo.filter((t) => t.data_pagamento!.startsWith(mes.chave)).map(custoDoTopper)
+      );
+    return { ...mes, receita, custo, lucro: receita - custo, quantidade: pedidosMes.length };
   });
   const maxReceita = Math.max(...mesesResumo.map((m) => m.receita), 1);
 
@@ -212,232 +227,247 @@ export default async function FinanceiroPage() {
     linhaDoPedido(p, valorDaEntrega(p) ?? calcularValorFinal(p), "sem valor")
   );
 
+  const abaInicial: Aba =
+    entregues.length > 0 ? "entregas" : feitos.length > 0 ? "receber" : "custos";
+
+  // Fatia da receita consumida pelos custos — o resto da barra é o lucro.
+  const fatiaCustos =
+    receitaPeriodo > 0
+      ? Math.min(100, Math.round((totalCustosPeriodo / receitaPeriodo) * 100))
+      : totalCustosPeriodo > 0
+        ? 100
+        : 0;
+  const fatiaLucro = receitaPeriodo > 0 ? 100 - fatiaCustos : 0;
+
+  const detalheCustos = [
+    `${custos.length} lançamento${custos.length !== 1 ? "s" : ""}`,
+    totalToppersPagosPeriodo > 0 && `${formatCurrency(totalToppersPagosPeriodo)} em toppers`,
+  ]
+    .filter(Boolean)
+    .join(" + ");
+
   return (
-    <div className="py-4 space-y-5">
-      <div>
+    <div className="py-4 space-y-4">
+      <header>
         <h1 className="text-2xl font-bold text-gray-900">Financeiro</h1>
         <p className="text-sm text-gray-400 mt-0.5">{periodo.label}</p>
-      </div>
+      </header>
 
       {semConexao && <AvisoConexao detalhe="Os valores abaixo podem estar incompletos." />}
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="card p-4">
-          <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2">
-            <TrendingUp size={12} className="text-emerald-500" />
-            Receita do Período
+      {/* Resultado: a conta inteira do período num lugar só — receita − custos = lucro. */}
+      <section className="card p-4 space-y-4" aria-label="Resultado do período">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
+              <Wallet size={13} className="text-gray-400" />
+              Lucro estimado
+            </p>
+            <p
+              className={`text-3xl font-bold tracking-tight tabular-nums mt-1 ${
+                lucroEstimado >= 0 ? "text-emerald-600" : "text-red-600"
+              }`}
+            >
+              {formatCurrency(lucroEstimado)}
+            </p>
           </div>
-          <p className="text-xl font-bold text-emerald-600">{formatCurrency(receitaPeriodo)}</p>
-          <p className="text-xs text-gray-400 mt-0.5">
-            {entregues.length} pedido{entregues.length !== 1 ? "s" : ""} entregue{entregues.length !== 1 ? "s" : ""}
-          </p>
-        </div>
-
-        <div className="card p-4">
-          <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2">
-            <TrendingDown size={12} className="text-rose-500" />
-            Custos do Período
-          </div>
-          <p className="text-xl font-bold text-rose-600">{formatCurrency(totalCustosPeriodo)}</p>
-          <p className="text-xs text-gray-400 mt-0.5">
-            {custos.length} lançamento{custos.length !== 1 ? "s" : ""}
-            {totalToppersPagosPeriodo > 0 && ` + ${formatCurrency(totalToppersPagosPeriodo)} em toppers`}
-          </p>
-        </div>
-
-        <div className="card p-4">
-          <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2">
-            <Tag size={12} className={lucroEstimado >= 0 ? "text-emerald-500" : "text-red-500"} />
-            Lucro Estimado
-          </div>
-          <p className={`text-xl font-bold ${lucroEstimado >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-            {formatCurrency(lucroEstimado)}
-          </p>
-          {margemPct !== null ? (
-            <p className="text-xs text-gray-400 mt-0.5">margem {margemPct}%</p>
-          ) : (
-            <p className="text-xs text-gray-400 mt-0.5">receita − custos</p>
+          {margemPct !== null && (
+            <span
+              className={`flex-shrink-0 text-xs font-semibold px-2 py-1 rounded-full ${
+                margemPct >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+              }`}
+            >
+              margem {margemPct}%
+            </span>
           )}
         </div>
 
-        <div className="card p-4">
-          <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2">
-            <Banknote size={12} className="text-gray-400" />
-            Ticket Médio
-          </div>
-          <p className="text-xl font-bold text-gray-700">
-            {ticketMedio != null ? formatCurrency(ticketMedio) : <span className="text-gray-300">—</span>}
-          </p>
-          <p className="text-xs text-gray-400 mt-0.5">
-            {ticketMedio != null
-              ? `${entreguesComValor.length} entrega${entreguesComValor.length !== 1 ? "s" : ""} com valor`
-              : "nenhuma entrega com valor"}
-          </p>
+        <div
+          className="h-2 rounded-full bg-gray-100 flex overflow-hidden"
+          role="img"
+          aria-label={`Custos consomem ${fatiaCustos}% da receita`}
+        >
+          <div className="h-full bg-rose-400 transition-all duration-500" style={{ width: `${fatiaCustos}%` }} />
+          <div className="h-full bg-emerald-400 transition-all duration-500" style={{ width: `${fatiaLucro}%` }} />
         </div>
-      </div>
 
-      {/* Lançamentos de Custos */}
-      <CustosSection custos={custos} categorias={categorias} periodo={periodo} />
+        <dl className="space-y-2.5">
+          <LinhaResultado
+            icone={<TrendingUp size={14} className="text-emerald-500" />}
+            rotulo="Receita"
+            detalhe={
+              <>
+                {entregues.length} entrega{entregues.length !== 1 ? "s" : ""}
+                {semValor > 0 && <span className="text-orange-500"> · {semValor} sem valor</span>}
+              </>
+            }
+            valor={formatCurrency(receitaPeriodo)}
+            cor="text-emerald-600"
+          />
+          <LinhaResultado
+            icone={<TrendingDown size={14} className="text-rose-500" />}
+            rotulo="Custos"
+            detalhe={detalheCustos}
+            valor={`− ${formatCurrency(totalCustosPeriodo)}`}
+            cor="text-rose-600"
+          />
+        </dl>
 
-      {/* Pedidos entregues que ficaram sem valor: receita que existiu e não foi contada */}
-      {semValor > 0 && (
-        <div className="flex items-start gap-2 bg-orange-50 border border-orange-200 rounded-xl p-3">
-          <AlertCircle size={14} className="text-orange-500 mt-0.5 flex-shrink-0" />
-          <p className="text-xs text-orange-700">
-            <span className="font-semibold">
-              {semValor} entrega{semValor > 1 ? "s" : ""} sem valor registrado
-            </span>{" "}
-            — a receita e o ticket médio acima estão menores do que o real. Abra
-            {semValor > 1 ? " os pedidos marcados com " : " o pedido marcado com "}
-            <AlertCircle size={11} className="inline -mt-0.5 text-orange-500" /> em Entregas e informe o valor cobrado.
-          </p>
-        </div>
-      )}
-
-      {/* A Receber e Entregas do Período */}
-      {(feitos.length > 0 || entregues.length > 0) && (
-        <div className="card p-4 space-y-4">
-          {feitos.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h2 className="font-semibold text-sm text-gray-700">A Receber</h2>
-                  {/* Sem esta linha a conta não fecha: soma-se "a receber" à receita
-                      do período e o total não bate com nada que a tela mostra. */}
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    Tudo que está pronto e ainda não foi entregue — não depende do período
-                    {feitosSemValor > 0 && ` · ${feitosSemValor} sem valor`}
-                  </p>
-                </div>
-                <span className="text-sm font-bold text-blue-600 flex-shrink-0">{formatCurrency(aReceber)}</span>
-              </div>
-              <ListaFinanceira linhas={linhasFeitos} corValor="text-blue-600" />
-            </div>
-          )}
-
-          {feitos.length > 0 && entregues.length > 0 && <hr className="border-gray-100" />}
-
-          {entregues.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h2 className="font-semibold text-sm text-gray-700">Entregas</h2>
-                  <p className="text-xs text-gray-400 mt-0.5">{periodo.label}</p>
-                </div>
-                <span className="text-sm font-bold text-emerald-600 flex-shrink-0">
-                  {formatCurrency(receitaPeriodo)}
-                </span>
-              </div>
-              <ListaFinanceira linhas={linhasEntregues} corValor="text-emerald-600" mostrarSinal />
-            </div>
+        <div className={`grid gap-2 pt-3 border-t border-gray-100 ${totalToppersAPagar > 0 ? "grid-cols-3" : "grid-cols-2"}`}>
+          <MiniIndicador
+            rotulo="Ticket médio"
+            valor={ticketMedio != null ? formatCurrency(ticketMedio) : "—"}
+            detalhe={
+              ticketMedio != null
+                ? `${entreguesComValor.length} com valor`
+                : "sem entregas com valor"
+            }
+          />
+          <MiniIndicador
+            rotulo="A receber"
+            valor={formatCurrency(aReceber)}
+            detalhe={`${feitos.length} pronto${feitos.length !== 1 ? "s" : ""}${
+              feitosSemValor > 0 ? ` · ${feitosSemValor} sem valor` : ""
+            }`}
+            cor="text-blue-600"
+          />
+          {totalToppersAPagar > 0 && (
+            <MiniIndicador
+              rotulo="A pagar"
+              valor={formatCurrency(totalToppersAPagar)}
+              detalhe={`${aPagar.length} topper${aPagar.length !== 1 ? "s" : ""}`}
+              cor="text-red-600"
+              href="/toppers"
+            />
           )}
         </div>
-      )}
+      </section>
 
-      {/* Cancelados do período — o que a tela deixou de fora, à vista */}
-      {cancelados.length > 0 && (
-        <CanceladosSection
-          linhas={linhasCancelados}
-          valorPerdido={valorPerdidoCancelados}
-          periodoLabel={periodo.label}
-        />
-      )}
+      <PainelMovimentacoes
+        abaInicial={abaInicial}
+        periodo={periodo}
+        entregas={{ linhas: linhasEntregues, total: receitaPeriodo }}
+        aReceber={{ linhas: linhasFeitos, total: aReceber }}
+        custos={{
+          itens: custos,
+          categorias,
+          total: totalCustosPeriodo,
+          toppers: {
+            pagosPeriodo: totalToppersPagosPeriodo,
+            aPagar: totalToppersAPagar,
+            quantidadeAPagar: aPagar.length,
+            nota: notaToppers,
+          },
+        }}
+        cancelados={{ linhas: linhasCancelados, valorPerdido: valorPerdidoCancelados }}
+      />
 
-      {/* Toppers */}
-      <div className="card p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-sm text-gray-700">Custos com Toppers</h2>
-          <Link
-            href="/toppers"
-            className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium transition-colors"
-          >
-            Gerenciar <ArrowRight size={12} />
-          </Link>
-        </div>
-        {mostrarToppers ? (
-          <div className="space-y-2">
-            {totalToppersAPagar > 0 && (
-              <div className="flex items-center justify-between py-1.5 border-b border-gray-100">
-                <span className="text-sm text-gray-600">
-                  A pagar fornecedores
-                  <span className="block text-[11px] text-gray-400">
-                    {aPagar.length} topper{aPagar.length !== 1 ? "s" : ""} de pedidos ativos
-                  </span>
-                </span>
-                <span className="text-sm font-semibold text-red-600">{formatCurrency(totalToppersAPagar)}</span>
-              </div>
-            )}
-            {totalToppersPagosPeriodo > 0 && (
-              <div className="flex items-center justify-between py-1.5">
-                <span className="text-sm text-gray-600">Pago — {periodo.label}</span>
-                <span className="text-sm font-semibold text-gray-500">{formatCurrency(totalToppersPagosPeriodo)}</span>
-              </div>
-            )}
-            {(toppersAPagarCancelados > 0 || toppersPagosCancelados > 0) && (
-              <p className="text-[11px] text-gray-400 pt-1 border-t border-gray-100">
-                {toppersAPagarCancelados > 0 &&
-                  `${formatCurrency(toppersAPagarCancelados)} de pedidos cancelados ficaram de fora do que há a pagar.`}
-                {toppersAPagarCancelados > 0 && toppersPagosCancelados > 0 && " "}
-                {toppersPagosCancelados > 0 &&
-                  `${formatCurrency(toppersPagosCancelados)} pagos no período são de pedidos cancelados depois — o dinheiro saiu, então continuam no custo.`}
-              </p>
-            )}
+      {/* Evolução mês a mês — uma linha por mês, com a receita como barra de fundo. */}
+      {mesesResumo.length > 1 && (
+        <section className="card p-4 space-y-3" aria-label="Evolução mensal">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="font-semibold text-sm text-gray-700">Mês a mês</h2>
+            <span className="text-[11px] text-gray-400">receita do mês</span>
           </div>
-        ) : (
-          <p className="text-xs text-gray-400">Nenhum custo com toppers no período.</p>
-        )}
-      </div>
-
-      {/* Histórico mensal adaptado ao período */}
-      {mesesResumo.length > 0 && (
-        <div className="card p-4 space-y-4">
-          <h2 className="font-semibold text-sm text-gray-700">
-            {mesesResumo.length === 1 ? "Resumo do Período" : `Evolução — ${periodo.label}`}
-          </h2>
-          <div className="space-y-3">
+          <ul className="space-y-1.5">
             {mesesResumo.map((mes) => {
               const isMesAtual = mes.chave === mesAtualChave;
               const barWidth = mes.receita > 0 ? Math.round((mes.receita / maxReceita) * 100) : 0;
+              const vazio = mes.receita === 0 && mes.custo === 0;
               return (
-                <div key={mes.chave} className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className={`text-xs ${isMesAtual ? "font-semibold text-gray-800" : "text-gray-500"}`}>
-                      {mes.label}
-                      {isMesAtual && (
-                        <span className="ml-1.5 text-[10px] bg-brand-100 text-brand-700 px-1.5 py-0.5 rounded-full font-medium">
-                          atual
-                        </span>
-                      )}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-gray-400">{mes.quantidade} ped.</span>
-                      <span className={`text-sm font-bold ${isMesAtual ? "text-emerald-600" : "text-gray-600"}`}>
-                        {mes.receita > 0 ? formatCurrency(mes.receita) : <span className="text-gray-300">—</span>}
+                <li key={mes.chave} className="relative rounded-lg overflow-hidden">
+                  <div
+                    className={`absolute inset-y-0 left-0 transition-all duration-500 ${
+                      isMesAtual ? "bg-emerald-100" : "bg-gray-100"
+                    }`}
+                    style={{ width: `${barWidth}%` }}
+                  />
+                  <div className="relative flex items-center justify-between gap-2 px-2.5 py-1.5">
+                    <span className="min-w-0">
+                      <span className={`block text-xs ${isMesAtual ? "font-semibold text-gray-800" : "text-gray-600"}`}>
+                        {mes.label}
                       </span>
-                    </div>
+                      <span className="block text-[10px] text-gray-400">
+                        {mes.quantidade} pedido{mes.quantidade !== 1 ? "s" : ""}
+                      </span>
+                    </span>
+                    {vazio ? (
+                      <span className="text-xs text-gray-300">—</span>
+                    ) : (
+                      <span className="text-right tabular-nums flex-shrink-0">
+                        <span className="block text-sm font-semibold text-gray-800">{formatCurrency(mes.receita)}</span>
+                        <span className={`block text-[10px] font-medium ${mes.lucro >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                          lucro {formatCurrency(mes.lucro)}
+                        </span>
+                      </span>
+                    )}
                   </div>
-                  <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${isMesAtual ? "bg-emerald-400" : "bg-gray-300"}`}
-                      style={{ width: `${barWidth}%` }}
-                    />
-                  </div>
-                </div>
+                </li>
               );
             })}
-          </div>
-        </div>
-      )}
-
-      {entregues.length === 0 && feitos.length === 0 && (
-        <div className="card p-8 text-center space-y-2">
-          <span className="text-3xl block">📊</span>
-          <p className="text-sm text-gray-400">
-            Nenhum dado financeiro para o período selecionado.
-          </p>
-        </div>
+          </ul>
+        </section>
       )}
     </div>
+  );
+}
+
+function LinhaResultado({
+  icone,
+  rotulo,
+  detalhe,
+  valor,
+  cor,
+}: {
+  icone: ReactNode;
+  rotulo: string;
+  detalhe: ReactNode;
+  valor: string;
+  cor: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <dt className="flex items-start gap-2 min-w-0">
+        <span className="mt-0.5">{icone}</span>
+        <span className="min-w-0">
+          <span className="block text-sm text-gray-700">{rotulo}</span>
+          <span className="block text-[11px] text-gray-400">{detalhe}</span>
+        </span>
+      </dt>
+      <dd className={`text-sm font-semibold tabular-nums flex-shrink-0 ${cor}`}>{valor}</dd>
+    </div>
+  );
+}
+
+function MiniIndicador({
+  rotulo,
+  valor,
+  detalhe,
+  cor = "text-gray-700",
+  href,
+}: {
+  rotulo: string;
+  valor: string;
+  detalhe: string;
+  cor?: string;
+  href?: string;
+}) {
+  const conteudo = (
+    <>
+      <p className="text-[11px] text-gray-500 flex items-center gap-0.5">
+        {rotulo}
+        {href && <ArrowRight size={10} className="text-gray-400" />}
+      </p>
+      <p className={`text-sm font-bold tabular-nums mt-0.5 ${cor}`}>{valor}</p>
+      <p className="text-[10px] text-gray-400 leading-tight mt-0.5">{detalhe}</p>
+    </>
+  );
+  const classe = "rounded-lg bg-gray-50 px-2.5 py-2 min-w-0";
+  return href ? (
+    <Link href={href} className={`${classe} hover:bg-gray-100 transition-colors duration-200`}>
+      {conteudo}
+    </Link>
+  ) : (
+    <div className={classe}>{conteudo}</div>
   );
 }
