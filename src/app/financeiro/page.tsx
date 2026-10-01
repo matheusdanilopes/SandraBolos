@@ -4,18 +4,20 @@ import { formatCurrency, calcularValorFinal, formatDate } from "@/lib/utils";
 import { format } from "date-fns";
 import {
   TIPO_LABELS,
+  STATUS_LABELS,
   type PedidoComCliente,
   type CustoComCategoria,
   type CategoriaCusto,
   type StatusPedido,
 } from "@/types/database";
 import type { ReactNode } from "react";
-import { TrendingUp, TrendingDown, Wallet, ArrowRight } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, ArrowRight, CalendarClock } from "lucide-react";
 import Link from "next/link";
 import type { LinhaFinanceira } from "./ListaFinanceira";
 import { PainelMovimentacoes, type Aba } from "./PainelMovimentacoes";
 import { getPeriodoRange, getMesesNoPeriodo, isValidPreset } from "@/lib/periodo";
 import { houveErroDeConexao } from "@/lib/erros";
+import { STATUS_PREVISTOS, pedidosPrevistos, resumirPrevisto } from "@/lib/receitaFutura";
 import { AvisoConexao } from "@/components/AvisoConexao";
 
 export const dynamic = "force-dynamic";
@@ -58,11 +60,16 @@ function valorDaEntrega(p: PedidoComCliente): number | null {
   return p.valor_cobrado || null;
 }
 
-function linhaDoPedido(p: PedidoComCliente, valor: number | null, semValor: string): LinhaFinanceira {
+function linhaDoPedido(
+  p: PedidoComCliente,
+  valor: number | null,
+  semValor: string,
+  extra: string[] = []
+): LinhaFinanceira {
   return {
     id: p.id,
     titulo: p.clientes?.nome ?? p.nome_cliente ?? "Sem cliente",
-    detalhe: `${TIPO_LABELS[p.tipo]} · ${formatDate(p.data_entrega)}`,
+    detalhe: [TIPO_LABELS[p.tipo], formatDate(p.data_entrega), ...extra].join(" · "),
     valor,
     semValor,
   };
@@ -76,7 +83,7 @@ export default async function FinanceiroPage() {
   const ate = cookieStore.get("sb_periodo_ate")?.value;
   const periodo = getPeriodoRange(preset, de, ate);
 
-  const [entreguesResult, feitosResult, canceladosResult, custosResult, categoriasResult, toppersResult] =
+  const [entreguesResult, ativosResult, canceladosResult, custosResult, categoriasResult, toppersResult] =
     await Promise.all([
       supabase
         .from("pedidos")
@@ -86,10 +93,13 @@ export default async function FinanceiroPage() {
         .lte("data_entrega", periodo.fim)
         .order("data_entrega", { ascending: false }),
 
+      // Pedidos confirmados que ainda não saíram. Sem filtro de período: os
+      // prontos formam o "a receber", que não depende dele; o previsto do
+      // período é recortado abaixo.
       supabase
         .from("pedidos")
-        .select("id, data_entrega, valor_calculado, preco_corrigido, valor_brinde, topper, toppers_pedido(valor), tipo, nome_cliente, created_at, clientes(nome)")
-        .eq("status", "feito")
+        .select("id, status, data_entrega, valor_calculado, preco_corrigido, valor_brinde, topper, toppers_pedido(valor), tipo, nome_cliente, created_at, clientes(nome)")
+        .in("status", STATUS_PREVISTOS)
         .order("data_entrega", { ascending: true }),
 
       // Cancelados do período: não entram em nenhuma conta desta tela — vêm só
@@ -123,7 +133,8 @@ export default async function FinanceiroPage() {
     ]);
 
   const entregues = (entreguesResult.data ?? []) as unknown as PedidoComCliente[];
-  const feitos = (feitosResult.data ?? []) as unknown as PedidoComCliente[];
+  const ativos = (ativosResult.data ?? []) as unknown as PedidoComCliente[];
+  const feitos = ativos.filter((p) => p.status === "feito");
   const cancelados = (canceladosResult.data ?? []) as unknown as PedidoComCliente[];
   const custos = (custosResult.data ?? []) as unknown as CustoComCategoria[];
   const categorias = (categoriasResult.data ?? []) as CategoriaCusto[];
@@ -131,7 +142,7 @@ export default async function FinanceiroPage() {
 
   const semConexao = houveErroDeConexao(
     entreguesResult,
-    feitosResult,
+    ativosResult,
     canceladosResult,
     custosResult,
     categoriasResult,
@@ -150,6 +161,13 @@ export default async function FinanceiroPage() {
 
   const aReceber = somar(feitos.map((p) => calcularValorFinal(p) ?? 0));
   const feitosSemValor = feitos.filter((p) => calcularValorFinal(p) == null).length;
+
+  // ── Previsto ──────────────────────────────────────────────────────────────
+  // O que entra no período se os pedidos confirmados forem entregues na data
+  // marcada. Fica separado da receita: só vira receita quando é entregue.
+  const hoje = format(new Date(), "yyyy-MM-dd");
+  const previstos = pedidosPrevistos(ativos, periodo.inicio, periodo.fim);
+  const previsto = resumirPrevisto(previstos, hoje);
 
   const totalCustosLancados = somar(custos.map((c) => c.valor));
 
@@ -187,6 +205,12 @@ export default async function FinanceiroPage() {
   // período em que nada foi gasto, que é quando ela é melhor.
   const margemPct = receitaPeriodo > 0 ? Math.round((lucroEstimado / receitaPeriodo) * 100) : null;
 
+  // Projeção: se tudo o que está previsto for entregue, com os custos de hoje.
+  const receitaProjetada = receitaPeriodo + previsto.total;
+  const lucroProjetado = receitaProjetada - totalCustosPeriodo;
+  const margemProjetadaPct =
+    receitaProjetada > 0 ? Math.round((lucroProjetado / receitaProjetada) * 100) : null;
+
   const valorPerdidoCancelados = somar(
     cancelados.map((p) => valorDaEntrega(p) ?? calcularValorFinal(p) ?? 0)
   );
@@ -210,34 +234,74 @@ export default async function FinanceiroPage() {
   const mesesResumo = meses.map((mes) => {
     const pedidosMes = entregues.filter((p) => p.data_entrega.startsWith(mes.chave));
     const receita = somar(pedidosMes.map((p) => p.valor_cobrado ?? 0));
+    const previstoMes = somar(
+      previstos
+        .filter((p) => p.data_entrega.startsWith(mes.chave))
+        .map((p) => calcularValorFinal(p) ?? 0)
+    );
     const custo =
       somar(custos.filter((c) => c.data.startsWith(mes.chave)).map((c) => c.valor)) +
       somar(
         pagosNoPeriodo.filter((t) => t.data_pagamento!.startsWith(mes.chave)).map(custoDoTopper)
       );
-    return { ...mes, receita, custo, lucro: receita - custo, quantidade: pedidosMes.length };
+    return {
+      ...mes,
+      receita,
+      previsto: previstoMes,
+      custo,
+      lucro: receita - custo,
+      quantidade: pedidosMes.length,
+    };
   });
-  const maxReceita = Math.max(...mesesResumo.map((m) => m.receita), 1);
+  // A escala inclui o previsto para a barra clara caber ao lado da receita.
+  const maxReceita = Math.max(...mesesResumo.map((m) => m.receita + m.previsto), 1);
+  const temPrevistoNosMeses = mesesResumo.some((m) => m.previsto > 0);
+  // Hachurado: o previsto ainda não é receita, e a barra lisa do mês atual tem
+  // o mesmo verde — sem o padrão as duas viravam uma barra só.
+  const fundoPrevisto = {
+    backgroundImage:
+      "repeating-linear-gradient(135deg, rgb(110 231 183 / 0.55) 0 3px, transparent 3px 6px)",
+  };
 
   const linhasFeitos = feitos.map((p) => linhaDoPedido(p, calcularValorFinal(p), "definir valor"));
   const linhasEntregues = entregues.map((p) =>
     linhaDoPedido(p, valorDaEntrega(p), "sem valor")
   );
+  const linhasPrevistos = previstos.map((p) =>
+    linhaDoPedido(p, calcularValorFinal(p), "definir valor", [
+      STATUS_LABELS[p.status],
+      ...(p.data_entrega < hoje ? ["atrasado"] : []),
+    ])
+  );
   const linhasCancelados = cancelados.map((p) =>
     linhaDoPedido(p, valorDaEntrega(p) ?? calcularValorFinal(p), "sem valor")
   );
 
+  // Num período ainda sem entregas (um mês futuro, o começo do mês) o que
+  // interessa é o que está para entrar.
   const abaInicial: Aba =
-    entregues.length > 0 ? "entregas" : feitos.length > 0 ? "receber" : "custos";
+    entregues.length > 0
+      ? "entregas"
+      : previstos.length > 0
+        ? "previsto"
+        : feitos.length > 0
+          ? "receber"
+          : "custos";
 
-  // Fatia da receita consumida pelos custos — o resto da barra é o lucro.
+  // A barra mede a receita projetada: os custos comem a primeira fatia, o
+  // lucro já realizado vem depois e o previsto fecha a barra num tom mais claro.
+  // Sem nada previsto, é a mesma barra de receita − custos de antes.
   const fatiaCustos =
-    receitaPeriodo > 0
-      ? Math.min(100, Math.round((totalCustosPeriodo / receitaPeriodo) * 100))
+    receitaProjetada > 0
+      ? Math.min(100, Math.round((totalCustosPeriodo / receitaProjetada) * 100))
       : totalCustosPeriodo > 0
         ? 100
         : 0;
-  const fatiaLucro = receitaPeriodo > 0 ? 100 - fatiaCustos : 0;
+  const fatiaLucro =
+    receitaProjetada > 0
+      ? Math.round((Math.max(0, lucroEstimado) / receitaProjetada) * 100)
+      : 0;
+  const fatiaPrevisto = receitaProjetada > 0 ? 100 - fatiaCustos - fatiaLucro : 0;
 
   const detalheCustos = [
     `${custos.length} lançamento${custos.length !== 1 ? "s" : ""}`,
@@ -285,10 +349,15 @@ export default async function FinanceiroPage() {
         <div
           className="h-2 rounded-full bg-gray-100 flex overflow-hidden"
           role="img"
-          aria-label={`Custos consomem ${fatiaCustos}% da receita`}
+          aria-label={
+            previsto.total > 0
+              ? `Custos consomem ${fatiaCustos}% da receita projetada; ${fatiaPrevisto}% ainda está previsto`
+              : `Custos consomem ${fatiaCustos}% da receita`
+          }
         >
           <div className="h-full bg-rose-400 transition-all duration-500" style={{ width: `${fatiaCustos}%` }} />
           <div className="h-full bg-emerald-400 transition-all duration-500" style={{ width: `${fatiaLucro}%` }} />
+          <div className="h-full bg-emerald-200 transition-all duration-500" style={{ width: `${fatiaPrevisto}%` }} />
         </div>
 
         <dl className="space-y-2.5">
@@ -311,7 +380,52 @@ export default async function FinanceiroPage() {
             valor={`− ${formatCurrency(totalCustosPeriodo)}`}
             cor="text-rose-600"
           />
+          {previsto.quantidade > 0 && (
+            <LinhaResultado
+              icone={<CalendarClock size={14} className="text-emerald-400" />}
+              rotulo="Previsto"
+              detalhe={
+                <>
+                  {previsto.quantidade} pedido{previsto.quantidade !== 1 ? "s" : ""} a entregar
+                  {previsto.semValor > 0 && (
+                    <span className="text-orange-500"> · {previsto.semValor} sem valor</span>
+                  )}
+                  {previsto.atrasados.quantidade > 0 && (
+                    <span className="text-red-500">
+                      {" "}
+                      · {previsto.atrasados.quantidade} atrasado{previsto.atrasados.quantidade !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                </>
+              }
+              valor={`+ ${formatCurrency(previsto.total)}`}
+              cor="text-emerald-500"
+            />
+          )}
         </dl>
+
+        {/* Projeção só existe quando há algo previsto — num período fechado ela
+            repetiria o lucro de cima. */}
+        {previsto.quantidade > 0 && (
+          <div className="flex items-center justify-between gap-3 rounded-lg bg-emerald-50/70 px-3 py-2">
+            <span className="min-w-0">
+              <span className="block text-xs font-medium text-gray-700">Lucro projetado</span>
+              <span className="block text-[10px] text-gray-400">se tudo previsto for entregue</span>
+            </span>
+            <span className="text-right flex-shrink-0">
+              <span
+                className={`block text-sm font-bold tabular-nums ${
+                  lucroProjetado >= 0 ? "text-emerald-700" : "text-red-600"
+                }`}
+              >
+                {formatCurrency(lucroProjetado)}
+              </span>
+              {margemProjetadaPct !== null && (
+                <span className="block text-[10px] text-gray-500">margem {margemProjetadaPct}%</span>
+              )}
+            </span>
+          </div>
+        )}
 
         <div className={`grid gap-2 pt-3 border-t border-gray-100 ${totalToppersAPagar > 0 ? "grid-cols-3" : "grid-cols-2"}`}>
           <MiniIndicador
@@ -348,6 +462,7 @@ export default async function FinanceiroPage() {
         periodo={periodo}
         entregas={{ linhas: linhasEntregues, total: receitaPeriodo }}
         aReceber={{ linhas: linhasFeitos, total: aReceber }}
+        previsto={{ linhas: linhasPrevistos, resumo: previsto }}
         custos={{
           itens: custos,
           categorias,
@@ -367,13 +482,23 @@ export default async function FinanceiroPage() {
         <section className="card p-4 space-y-3" aria-label="Evolução mensal">
           <div className="flex items-baseline justify-between gap-2">
             <h2 className="font-semibold text-sm text-gray-700">Mês a mês</h2>
-            <span className="text-[11px] text-gray-400">receita do mês</span>
+            <span className="flex items-center gap-2 text-[11px] text-gray-400">
+              receita do mês
+              {temPrevistoNosMeses && (
+                <span className="flex items-center gap-1">
+                  <span className="w-2.5 h-2.5 rounded-sm" style={fundoPrevisto} aria-hidden />
+                  previsto
+                </span>
+              )}
+            </span>
           </div>
           <ul className="space-y-1.5">
             {mesesResumo.map((mes) => {
               const isMesAtual = mes.chave === mesAtualChave;
               const barWidth = mes.receita > 0 ? Math.round((mes.receita / maxReceita) * 100) : 0;
-              const vazio = mes.receita === 0 && mes.custo === 0;
+              const previstoWidth =
+                mes.previsto > 0 ? Math.round((mes.previsto / maxReceita) * 100) : 0;
+              const vazio = mes.receita === 0 && mes.custo === 0 && mes.previsto === 0;
               return (
                 <li key={mes.chave} className="relative rounded-lg overflow-hidden">
                   <div
@@ -382,6 +507,12 @@ export default async function FinanceiroPage() {
                     }`}
                     style={{ width: `${barWidth}%` }}
                   />
+                  {previstoWidth > 0 && (
+                    <div
+                      className="absolute inset-y-0 transition-all duration-500"
+                      style={{ ...fundoPrevisto, left: `${barWidth}%`, width: `${previstoWidth}%` }}
+                    />
+                  )}
                   <div className="relative flex items-center justify-between gap-2 px-2.5 py-1.5">
                     <span className="min-w-0">
                       <span className={`block text-xs ${isMesAtual ? "font-semibold text-gray-800" : "text-gray-600"}`}>
@@ -399,6 +530,11 @@ export default async function FinanceiroPage() {
                         <span className={`block text-[10px] font-medium ${mes.lucro >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                           lucro {formatCurrency(mes.lucro)}
                         </span>
+                        {mes.previsto > 0 && (
+                          <span className="block text-[10px] font-medium text-emerald-500">
+                            + {formatCurrency(mes.previsto)} previsto
+                          </span>
+                        )}
                       </span>
                     )}
                   </div>

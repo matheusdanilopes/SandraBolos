@@ -5,16 +5,19 @@ import { AlertCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import type { CustoComCategoria, CategoriaCusto } from "@/types/database";
 import type { PeriodoRange } from "@/lib/periodo";
+import type { ResumoPrevisto } from "@/lib/receitaFutura";
 import { Chip, ListaFinanceira, type LinhaFinanceira } from "./ListaFinanceira";
 import { CustosSection, type ResumoToppers } from "./CustosSection";
 
-export type Aba = "entregas" | "receber" | "custos" | "cancelados";
+export type Aba = "entregas" | "receber" | "previsto" | "custos" | "cancelados";
 
 interface Props {
   abaInicial: Aba;
   periodo: PeriodoRange;
   entregas: { linhas: LinhaFinanceira[]; total: number };
   aReceber: { linhas: LinhaFinanceira[]; total: number };
+  /** Pedidos confirmados com entrega no período que ainda não saíram. */
+  previsto: { linhas: LinhaFinanceira[]; resumo: ResumoPrevisto };
   custos: {
     itens: CustoComCategoria[];
     categorias: CategoriaCusto[];
@@ -33,7 +36,15 @@ interface Props {
  * chegar em toppers e na evolução mensal. Nas abas o total de cada grupo fica
  * sempre à vista, e só a lista escolhida ocupa espaço.
  */
-export function PainelMovimentacoes({ abaInicial, periodo, entregas, aReceber, custos, cancelados }: Props) {
+export function PainelMovimentacoes({
+  abaInicial,
+  periodo,
+  entregas,
+  aReceber,
+  previsto,
+  custos,
+  cancelados,
+}: Props) {
   const [aba, setAba] = useState<Aba>(abaInicial);
   const [soSemValor, setSoSemValor] = useState(false);
 
@@ -49,8 +60,17 @@ export function PainelMovimentacoes({ abaInicial, periodo, entregas, aReceber, c
       alerta: entregasSemValor.length > 0,
     },
     { id: "receber", rotulo: "A receber", valor: formatCurrency(aReceber.total), cor: "text-blue-600" },
-    { id: "custos", rotulo: "Custos", valor: formatCurrency(custos.total), cor: "text-rose-600" },
   ];
+  // Num período que já passou não há nada previsto — a aba só apareceria vazia.
+  if (previsto.linhas.length > 0) {
+    abas.push({
+      id: "previsto",
+      rotulo: "Previsto",
+      valor: formatCurrency(previsto.resumo.total),
+      cor: "text-emerald-500",
+    });
+  }
+  abas.push({ id: "custos", rotulo: "Custos", valor: formatCurrency(custos.total), cor: "text-rose-600" });
   if (cancelados.linhas.length > 0) {
     abas.push({
       id: "cancelados",
@@ -145,6 +165,34 @@ export function PainelMovimentacoes({ abaInicial, periodo, entregas, aReceber, c
               linhas={aReceber.linhas}
               corValor="text-blue-600"
               vazio="Nenhum pedido pronto aguardando entrega."
+            />
+          </>
+        )}
+
+        {aba === "previsto" && (
+          <>
+            {/* Os prontos daqui também estão em "a receber": lá a lista é de
+                todos os prontos, aqui só os com entrega no período. */}
+            <Resumo>
+              Confirmados com entrega em {periodo.label} — viram receita quando entregues
+              {previsto.resumo.prontos.quantidade > 0 &&
+                ` · ${formatCurrency(previsto.resumo.prontos.valor)} já prontos`}
+              {previsto.resumo.semValor > 0 && (
+                <span className="text-orange-500"> · {previsto.resumo.semValor} sem valor</span>
+              )}
+            </Resumo>
+            {previsto.resumo.atrasados.quantidade > 0 && (
+              <p className="text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                {previsto.resumo.atrasados.quantidade} pedido
+                {previsto.resumo.atrasados.quantidade !== 1 ? "s" : ""} com a data de entrega já passada
+                ({formatCurrency(previsto.resumo.atrasados.valor)}). Se já foram entregues, marque no
+                pedido para o valor entrar na receita.
+              </p>
+            )}
+            <ListaFinanceira
+              linhas={previsto.linhas}
+              corValor="text-emerald-500"
+              vazio={`Nenhum pedido previsto em ${periodo.label}.`}
             />
           </>
         )}
