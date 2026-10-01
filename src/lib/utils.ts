@@ -72,20 +72,45 @@ export function pedidoNumero(createdAt: string, id: string) {
   return `PED-${id.slice(0, 4).toUpperCase()}`;
 }
 
+type FichaTopperValor = { valor?: number | null };
+
 /**
- * Valor do pedido: o preço do que foi produzido mais o topper dado de brinde.
+ * Valor do topper encomendado que entra no preço do pedido.
  *
- * O brinde é receita do pedido (não custo de fornecedor), então entra aqui para
- * aparecer no valor estimado, no que está a receber e na sugestão do valor
- * cobrado na entrega.
+ * Só conta com topper "sim": a ficha pode sobreviver a uma troca para "não" ou
+ * "brinde" (quando já tinha valores lançados), e aí não é mais cobrada da
+ * cliente. O frete fica de fora — é custo da compra, não preço do topper.
+ */
+export function valorTopperDoPedido(pedido: {
+  topper?: string | null;
+  // PostgREST devolve objeto no vínculo um-para-um; o array cobre o caso de ele
+  // resolver a relação como lista, para o valor não sumir em silêncio.
+  toppers_pedido?: FichaTopperValor | FichaTopperValor[] | null;
+}): number | null {
+  if (pedido.topper !== "sim") return null;
+  const ficha = Array.isArray(pedido.toppers_pedido) ? pedido.toppers_pedido[0] : pedido.toppers_pedido;
+  const valor = Number(ficha?.valor ?? 0);
+  return valor > 0 ? valor : null;
+}
+
+/**
+ * Valor do pedido: o preço do que foi produzido (a soma dos itens) mais o
+ * topper — o encomendado, quando houver, ou o dado de brinde.
+ *
+ * Os dois entram aqui para aparecer no valor estimado, no que está a receber e
+ * na sugestão do valor cobrado na entrega. O custo do topper encomendado
+ * continua sendo custo no financeiro quando é pago ao fornecedor.
  */
 export function calcularValorFinal(pedido: {
   valor_calculado?: number | null;
   preco_corrigido?: number | null;
   valor_brinde?: number | null;
+  topper?: string | null;
+  toppers_pedido?: FichaTopperValor | FichaTopperValor[] | null;
 }) {
   const producao = pedido.preco_corrigido ?? pedido.valor_calculado ?? null;
   const brinde = pedido.valor_brinde ?? null;
-  if (producao == null && brinde == null) return null;
-  return (producao ?? 0) + (brinde ?? 0);
+  const topper = valorTopperDoPedido(pedido);
+  if (producao == null && brinde == null && topper == null) return null;
+  return (producao ?? 0) + (brinde ?? 0) + (topper ?? 0);
 }

@@ -147,6 +147,35 @@ function CampoValor({
   );
 }
 
+/**
+ * Topper somado ao preço da produção — o que a cliente paga no fim.
+ *
+ * A soma dos itens é só o que saiu da cozinha; sem esta linha o valor da tela
+ * de precificação ficava abaixo do valor estimado do pedido, que já conta o
+ * topper.
+ */
+function ResumoTopper({ base, valorTopper }: { base: number | null; valorTopper: number }) {
+  if (valorTopper <= 0 || base === null) return null;
+  return (
+    <div className="rounded-lg border border-purple-200 bg-purple-50 p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-purple-700 font-medium">+ Topper</span>
+        <span className="text-sm font-semibold text-purple-800">{formatCurrency(valorTopper)}</span>
+      </div>
+      <div className="flex items-center justify-between gap-2 border-t border-purple-200 pt-2">
+        <span className="text-xs text-purple-700 font-medium">Valor final do pedido</span>
+        <span className="text-lg font-bold text-purple-900">{formatCurrency(base + valorTopper)}</span>
+      </div>
+    </div>
+  );
+}
+
+/** O valor manual substitui o final inteiro — topper incluso. */
+function DicaValorManual({ valorTopper }: { valorTopper: number }) {
+  if (valorTopper <= 0) return null;
+  return <p className="text-[11px] text-gray-400 mt-1">Informe o valor total, já com o topper.</p>;
+}
+
 // ────────────────────────────────────────────────────────────
 // Itens: cada bolo (ou doce, ou kit) com a sua própria apuração
 //
@@ -169,7 +198,7 @@ function estadoInicial(itens: ItemPedido[]): Record<string, CamposItem> {
   return Object.fromEntries(itens.map((item) => [item.id, camposDoItem(item)]));
 }
 
-function FormItens({ pedido, itens }: { pedido: Pedido; itens: ItemPedido[] }) {
+function FormItens({ pedido, itens, valorTopper }: { pedido: Pedido; itens: ItemPedido[]; valorTopper: number }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [campos, setCampos] = useState<Record<string, CamposItem>>(() => estadoInicial(itens));
@@ -361,6 +390,8 @@ function FormItens({ pedido, itens }: { pedido: Pedido; itens: ItemPedido[] }) {
         </div>
       )}
 
+      <ResumoTopper base={valorAjustado} valorTopper={valorTopper} />
+
       <div>
         <label className="label">Valor corrigido manual (opcional)</label>
         <input
@@ -373,6 +404,7 @@ function FormItens({ pedido, itens }: { pedido: Pedido; itens: ItemPedido[] }) {
           placeholder="Deixe vazio para usar o valor ajustado"
           disabled={isPending}
         />
+        <DicaValorManual valorTopper={valorTopper} />
         {valorManualDigitado !== null && (
           <p className="text-xs text-brand-600 mt-1 font-medium">
             Valor a cobrar: {formatCurrency(valorManualDigitado)}
@@ -391,7 +423,7 @@ function FormItens({ pedido, itens }: { pedido: Pedido; itens: ItemPedido[] }) {
 // ────────────────────────────────────────────────────────────
 // Bolo: peso × preço/kg + regra dos 300g
 // ────────────────────────────────────────────────────────────
-function FormBolo({ pedido }: { pedido: Pedido }) {
+function FormBolo({ pedido, valorTopper }: { pedido: Pedido; valorTopper: number }) {
   const [isPending, startTransition] = useTransition();
   const [campos, setCampos] = useState<CamposItem>(() =>
     camposDe("peso_kg", derivarPesoReal(pedido), pedido.preco_por_kg?.toString() ?? "")
@@ -501,6 +533,8 @@ function FormBolo({ pedido }: { pedido: Pedido }) {
         </div>
       )}
 
+      <ResumoTopper base={calculo?.valorAjustado ?? null} valorTopper={valorTopper} />
+
       <div>
         <label className="label">Valor corrigido manual (opcional)</label>
         <input
@@ -512,6 +546,7 @@ function FormBolo({ pedido }: { pedido: Pedido }) {
           onChange={(e) => { setValorManual(e.target.value); setSaved(false); }}
           placeholder="Deixe vazio para usar o valor ajustado"
         />
+        <DicaValorManual valorTopper={valorTopper} />
         {valorManualNum !== null && (
           <p className="text-xs text-brand-600 mt-1 font-medium">
             Valor a cobrar: {formatCurrency(valorManualNum)}
@@ -530,7 +565,7 @@ function FormBolo({ pedido }: { pedido: Pedido }) {
 // ────────────────────────────────────────────────────────────
 // Doce: quantidade × preço por unidade
 // ────────────────────────────────────────────────────────────
-function FormDoce({ pedido }: { pedido: Pedido }) {
+function FormDoce({ pedido, valorTopper }: { pedido: Pedido; valorTopper: number }) {
   const [isPending, startTransition] = useTransition();
   const [campos, setCampos] = useState<CamposItem>(() =>
     camposDe("unidade", derivarQtdReal(pedido), pedido.preco_por_kg?.toString() ?? "")
@@ -611,6 +646,8 @@ function FormDoce({ pedido }: { pedido: Pedido }) {
         onChange={(valor) => atualizar("valor", valor)}
       />
 
+      <ResumoTopper base={valorCalculado} valorTopper={valorTopper} />
+
       <div>
         <label className="label">Valor manual (opcional)</label>
         <input
@@ -622,6 +659,7 @@ function FormDoce({ pedido }: { pedido: Pedido }) {
           onChange={(e) => { setValorManual(e.target.value); setSaved(false); }}
           placeholder="Deixe vazio para usar o calculado"
         />
+        <DicaValorManual valorTopper={valorTopper} />
         {valorManualNum !== null && (
           <p className="text-xs text-brand-600 mt-1 font-medium">
             Valor a cobrar: {formatCurrency(valorManualNum)}
@@ -640,7 +678,7 @@ function FormDoce({ pedido }: { pedido: Pedido }) {
 // ────────────────────────────────────────────────────────────
 // Kit: valor flat
 // ────────────────────────────────────────────────────────────
-function FormKit({ pedido }: { pedido: Pedido }) {
+function FormKit({ pedido, valorTopper }: { pedido: Pedido; valorTopper: number }) {
   const [isPending, startTransition] = useTransition();
   const [valorKit, setValorKit] = useState(
     (pedido.preco_corrigido ?? pedido.valor_calculado)?.toString() ?? ""
@@ -680,12 +718,14 @@ function FormKit({ pedido }: { pedido: Pedido }) {
           onChange={(e) => { setValorKit(e.target.value); setSaved(false); }}
           placeholder="Ex: 150.00"
         />
-        {valorNum !== null && (
+        {valorNum !== null && valorTopper <= 0 && (
           <p className="text-xs text-brand-600 mt-1 font-medium">
             Valor a cobrar: {formatCurrency(valorNum)}
           </p>
         )}
       </div>
+
+      <ResumoTopper base={valorNum} valorTopper={valorTopper} />
 
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button onClick={handleSave} disabled={isPending || !canSave} className="btn-primary w-full">
@@ -704,7 +744,16 @@ const TIPO_TITULO: Record<TipoPedido, string> = {
   kit: "Precificação do Kit",
 };
 
-export function PrecificacaoForm({ pedido, itens = [] }: { pedido: Pedido; itens?: ItemPedido[] }) {
+export function PrecificacaoForm({
+  pedido,
+  itens = [],
+  valorTopper = 0,
+}: {
+  pedido: Pedido;
+  itens?: ItemPedido[];
+  /** Topper (encomendado ou de brinde) somado ao preço da produção. */
+  valorTopper?: number;
+}) {
   // Com itens lançados a precificação é item a item — é o único jeito de
   // registrar o peso real de cada bolo de um pedido com mais de um. Pedido sem
   // item (lançado antes do catálogo, ou rascunho) continua na medida única.
@@ -716,12 +765,12 @@ export function PrecificacaoForm({ pedido, itens = [] }: { pedido: Pedido; itens
         {temItens && itens.length > 1 ? "Precificação dos Itens" : TIPO_TITULO[pedido.tipo]}
       </h2>
       {temItens ? (
-        <FormItens pedido={pedido} itens={itens} />
+        <FormItens pedido={pedido} itens={itens} valorTopper={valorTopper} />
       ) : (
         <>
-          {pedido.tipo === "bolo" && <FormBolo pedido={pedido} />}
-          {pedido.tipo === "doce" && <FormDoce pedido={pedido} />}
-          {pedido.tipo === "kit" && <FormKit pedido={pedido} />}
+          {pedido.tipo === "bolo" && <FormBolo pedido={pedido} valorTopper={valorTopper} />}
+          {pedido.tipo === "doce" && <FormDoce pedido={pedido} valorTopper={valorTopper} />}
+          {pedido.tipo === "kit" && <FormKit pedido={pedido} valorTopper={valorTopper} />}
         </>
       )}
     </div>

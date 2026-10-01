@@ -36,7 +36,7 @@ export default async function DashboardPage() {
 
     supabase
       .from("pedidos")
-      .select("valor_calculado, preco_corrigido, valor_brinde")
+      .select("valor_calculado, preco_corrigido, valor_brinde, topper, toppers_pedido(valor)")
       .eq("status", "feito"),
 
     // Calendário: os entregues também contam, então esta busca não pode se
