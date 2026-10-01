@@ -7,10 +7,11 @@ import { type PedidoCalendario, type PedidoComCliente } from "@/types/database";
 import { DashboardCalendario } from "./DashboardCalendario";
 import { DashboardResumo } from "./DashboardResumo";
 import { resumoDaSemana, resumoDeHoje } from "@/lib/resumoDashboard";
+import type { ResumoPrevisto } from "@/lib/receitaFutura";
 import {
   AlertTriangle,
   TrendingUp,
-  Banknote,
+  CalendarClock,
   FileEdit,
   ChevronRight,
 } from "lucide-react";
@@ -19,7 +20,12 @@ interface Props {
   pedidos: PedidoComCliente[];
   receitaPeriodo: number;
   periodoLabel: string;
-  aReceber: number;
+  /** Pedidos confirmados com entrega no mês corrente que ainda não saíram. */
+  previstoMes: ResumoPrevisto;
+  /** Receita já entregue no mês corrente. */
+  realizadoMes: number;
+  /** Último dia do mês corrente, já em dd/MM. */
+  fimMes: string;
   pedidosCalendario: PedidoCalendario[];
 }
 
@@ -27,7 +33,9 @@ export function DashboardClient({
   pedidos,
   receitaPeriodo,
   periodoLabel,
-  aReceber,
+  previstoMes,
+  realizadoMes,
+  fimMes,
   pedidosCalendario,
 }: Props) {
   const rascunhos = useMemo(() => pedidos.filter((p) => p.status === "rascunho"), [pedidos]);
@@ -109,17 +117,39 @@ export function DashboardClient({
             {formatCurrency(receitaPeriodo)}
           </div>
         </div>
-        <div className="card p-4">
+        {/* Previsto: o que ainda entra até o fim do mês se tudo for entregue */}
+        <Link
+          href="/financeiro"
+          className="card p-4 transition-all hover:shadow-md active:scale-[0.99]"
+        >
           <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2">
             <div className="p-1 bg-blue-50 rounded-md">
-              <Banknote size={12} className="text-blue-600" />
+              <CalendarClock size={12} className="text-blue-600" />
             </div>
-            A Receber
+            <span className="truncate">Previsto até {fimMes}</span>
           </div>
-          <div className="text-lg font-bold text-blue-600 leading-tight">
-            {aReceber > 0 ? formatCurrency(aReceber) : <span className="text-gray-400 font-normal text-sm">Nenhum pendente</span>}
-          </div>
-        </div>
+          {previstoMes.quantidade === 0 ? (
+            <div className="text-sm text-gray-400 leading-tight">Nada agendado</div>
+          ) : (
+            <>
+              <div className="text-lg font-bold text-blue-600 leading-tight">
+                {formatCurrency(previstoMes.total)}
+              </div>
+              <p className="text-[11px] text-gray-400 mt-1 leading-tight">
+                {previstoMes.quantidade} pedido{previstoMes.quantidade !== 1 ? "s" : ""}
+                {previstoMes.semValor > 0 && (
+                  <span className="text-orange-500"> · {previstoMes.semValor} sem valor</span>
+                )}
+              </p>
+            </>
+          )}
+          <p className="text-[11px] text-gray-500 mt-1 leading-tight">
+            Mês fecha em{" "}
+            <span className="font-semibold text-gray-700 tabular-nums">
+              {formatCurrency(realizadoMes + previstoMes.total)}
+            </span>
+          </p>
+        </Link>
       </div>
 
       {/* Calendário de entregas */}
