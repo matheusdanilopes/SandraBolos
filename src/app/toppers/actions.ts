@@ -32,6 +32,9 @@ export async function salvarTopperAction(data: TopperPayload): Promise<{ error?:
   if (error) return { error: mensagemErro(error) };
   revalidatePath("/toppers");
   revalidatePath("/financeiro");
+  // O valor do topper soma ao valor do pedido (estimado e a receber).
+  revalidatePath(`/pedidos/${data.pedidoId}`);
+  revalidatePath("/");
   return {};
 }
 

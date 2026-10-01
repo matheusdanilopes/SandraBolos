@@ -3,7 +3,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AlertaBadge } from "@/components/AlertaBadge";
-import { formatDate, formatTime, formatPhone, calcularValorFinal, formatCurrency, pedidoNumero } from "@/lib/utils";
+import { formatDate, formatTime, formatPhone, calcularValorFinal, valorTopperDoPedido, formatCurrency, pedidoNumero } from "@/lib/utils";
 import { TIPO_LABELS, TOPPER_LABELS, STATUS_FLOW, type PedidoComCliente, type ItemPedido, type ProdutoComCategoria, type CategoriaProduto } from "@/types/database";
 import { Edit, CheckCircle, AlertCircle, MessageCircle, Phone, ArrowLeft, Lock, FileEdit, XCircle } from "lucide-react";
 import { StatusActions } from "./StatusActions";
@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 export default async function PedidoDetailPage({ params }: { params: { id: string } }) {
   const { data: pedido, error } = await supabase
     .from("pedidos")
-    .select("*, clientes(nome, telefone)")
+    .select("*, clientes(nome, telefone), toppers_pedido(valor)")
     .eq("id", params.id)
     .single();
 
@@ -55,6 +55,7 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
 
   const cliente = pedidoTyped.clientes ?? null;
   const valorFinal = calcularValorFinal(pedidoTyped);
+  const valorTopper = valorTopperDoPedido(pedidoTyped);
   const proximoStatus = STATUS_FLOW[pedidoTyped.status];
   const numero = pedidoNumero(pedidoTyped.created_at, pedidoTyped.id);
 
@@ -206,6 +207,12 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
             <dt className="text-xs text-gray-400 mb-0.5">Topper</dt>
             <dd className="font-medium text-gray-900">{TOPPER_LABELS[pedidoTyped.topper]}</dd>
           </div>
+          {valorTopper != null && (
+            <div>
+              <dt className="text-xs text-gray-400 mb-0.5">Valor do topper</dt>
+              <dd className="font-medium text-gray-900">{formatCurrency(valorTopper)}</dd>
+            </div>
+          )}
           {pedidoTyped.valor_brinde != null && (
             <div>
               <dt className="text-xs text-gray-400 mb-0.5">Brinde (receita)</dt>
@@ -240,8 +247,13 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
             <div className="col-span-2">
               <dt className="text-xs text-gray-400 mb-0.5">Valor estimado</dt>
               <dd className="font-semibold text-emerald-700 text-base">{formatCurrency(valorFinal)}</dd>
-              {/* Sem esta nota o valor estimado parece divergir da precificação,
-                  que calcula só a produção. */}
+              {/* Sem esta nota o valor estimado parece divergir da soma dos
+                  itens, que não conta o topper. */}
+              {valorTopper != null && (
+                <p className="text-[11px] text-gray-400 mt-0.5">
+                  Inclui {formatCurrency(valorTopper)} do topper
+                </p>
+              )}
               {pedidoTyped.valor_brinde != null && (
                 <p className="text-[11px] text-gray-400 mt-0.5">
                   Inclui {formatCurrency(pedidoTyped.valor_brinde)} do topper de brinde
@@ -271,7 +283,11 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
 
       {/* Precificação — aparece quando status = feito ou entregue */}
       {!isCancelado && (pedidoTyped.status === "feito" || pedidoTyped.status === "entregue") && (
-        <PrecificacaoForm pedido={pedidoTyped} itens={(itens ?? []) as ItemPedido[]} />
+        <PrecificacaoForm
+          pedido={pedidoTyped}
+          itens={(itens ?? []) as ItemPedido[]}
+          valorTopper={(valorTopper ?? 0) + (pedidoTyped.valor_brinde ?? 0)}
+        />
       )}
 
       {/* Hint de precificação quando status ainda não chegou em "feito" */}

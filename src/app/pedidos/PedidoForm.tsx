@@ -217,6 +217,10 @@ export function PedidoForm({ clientes, pedido, produtos = [], categorias = [], t
   const isBrinde = topper === "brinde";
   const valorBrindeNum = parseFloat(valorBrinde) || 0;
 
+  // O que o topper soma ao preço do pedido — o encomendado (sem o frete, que é
+  // custo da compra) ou o de brinde.
+  const valorTopperNoPedido = temTopper ? parseFloat(topperValor) || 0 : isBrinde ? valorBrindeNum : 0;
+
   function topperDetalhesPayload() {
     if (!temTopper) return undefined;
     return {
@@ -432,6 +436,18 @@ export function PedidoForm({ clientes, pedido, produtos = [], categorias = [], t
                 <span className="text-xs text-gray-500 font-medium">Total dos itens</span>
                 <span className="text-base font-bold text-emerald-700">{formatCurrency(totalItens)}</span>
               </div>
+              {valorTopperNoPedido > 0 && (
+                <>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-500 font-medium">+ Topper</span>
+                    <span className="text-sm font-semibold text-gray-700">{formatCurrency(valorTopperNoPedido)}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-t border-gray-200 pt-2">
+                    <span className="text-xs text-gray-500 font-medium">Total do pedido</span>
+                    <span className="text-base font-bold text-emerald-700">{formatCurrency(totalItens + valorTopperNoPedido)}</span>
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <div className="flex flex-col items-center gap-1.5 py-3 text-gray-400">
@@ -559,6 +575,11 @@ export function PedidoForm({ clientes, pedido, produtos = [], categorias = [], t
             {topperTotal > 0 && (
               <p className="text-xs text-center text-brand-600 font-medium bg-white rounded-lg py-1.5">
                 Custo do topper: <strong>{formatCurrency(topperTotal)}</strong>
+              </p>
+            )}
+            {valorTopperNoPedido > 0 && (
+              <p className="text-[11px] text-purple-600">
+                O valor do topper ({formatCurrency(valorTopperNoPedido)}) soma ao valor do pedido.
               </p>
             )}
 

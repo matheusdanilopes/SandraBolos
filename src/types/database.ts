@@ -36,6 +36,8 @@ export interface Pedido {
 
 export interface PedidoComCliente extends Pedido {
   clientes?: { nome: string; telefone: string } | null;
+  /** Valor do topper encomendado, quando a busca traz a ficha junto. */
+  toppers_pedido?: { valor: number } | null;
 }
 
 /**

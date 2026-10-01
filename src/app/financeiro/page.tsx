@@ -80,7 +80,7 @@ export default async function FinanceiroPage() {
     await Promise.all([
       supabase
         .from("pedidos")
-        .select("data_entrega, valor_cobrado, valor_calculado, preco_corrigido, valor_brinde, tipo, id, nome_cliente, created_at, clientes(nome)")
+        .select("data_entrega, valor_cobrado, valor_calculado, preco_corrigido, valor_brinde, topper, toppers_pedido(valor), tipo, id, nome_cliente, created_at, clientes(nome)")
         .eq("status", "entregue")
         .gte("data_entrega", periodo.inicio)
         .lte("data_entrega", periodo.fim)
@@ -88,7 +88,7 @@ export default async function FinanceiroPage() {
 
       supabase
         .from("pedidos")
-        .select("id, data_entrega, valor_calculado, preco_corrigido, valor_brinde, tipo, nome_cliente, created_at, clientes(nome)")
+        .select("id, data_entrega, valor_calculado, preco_corrigido, valor_brinde, topper, toppers_pedido(valor), tipo, nome_cliente, created_at, clientes(nome)")
         .eq("status", "feito")
         .order("data_entrega", { ascending: true }),
 
@@ -96,7 +96,7 @@ export default async function FinanceiroPage() {
       // para a tela poder dizer isso, em vez de deixar o buraco sem explicação.
       supabase
         .from("pedidos")
-        .select("id, data_entrega, valor_cobrado, valor_calculado, preco_corrigido, valor_brinde, tipo, nome_cliente, created_at, clientes(nome)")
+        .select("id, data_entrega, valor_cobrado, valor_calculado, preco_corrigido, valor_brinde, topper, toppers_pedido(valor), tipo, nome_cliente, created_at, clientes(nome)")
         .eq("status", "cancelado")
         .gte("data_entrega", periodo.inicio)
         .lte("data_entrega", periodo.fim)
