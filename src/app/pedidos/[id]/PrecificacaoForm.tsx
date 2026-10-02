@@ -184,14 +184,24 @@ function DicaValorManual({ valorTopper }: { valorTopper: number }) {
 // deles — o outro ficava com o peso combinado na venda.
 // ────────────────────────────────────────────────────────────
 
-/** Item ainda não precificado abre com o que foi combinado na venda. */
+/**
+ * Item ainda não precificado abre com o que foi combinado na venda.
+ *
+ * O campo de valor sai da conta peso × preço, e não de `valor_real`: este é o
+ * valor já cortado pela regra dos 300g, e abri-lo ao lado do peso real fazia a
+ * conta da linha não fechar — e o corte ser aplicado de novo ao mexer no peso.
+ */
 function camposDoItem(item: ItemPedido): CamposItem {
   return camposDe(
     item.unidade_medida,
     (item.quantidade_real ?? item.quantidade).toString(),
-    (item.preco_real ?? item.preco_unitario).toString(),
-    item.valor_real != null ? item.valor_real.toString() : undefined
+    (item.preco_real ?? item.preco_unitario).toString()
   );
+}
+
+/** Peso: o campo é a conta cheia; o que se cobra pode sair menor pela regra dos 300g. */
+function labelValorItem(unidade: UnidadeMedida): string {
+  return unidade === "peso_kg" ? "Valor pelo peso real (R$)" : "Valor do item (R$)";
 }
 
 function estadoInicial(itens: ItemPedido[]): Record<string, CamposItem> {
@@ -341,7 +351,7 @@ function FormItens({ pedido, itens, valorTopper }: { pedido: Pedido; itens: Item
               </div>
 
               <div>
-                <label className="label">Valor do item (R$)</label>
+                <label className="label">{labelValorItem(item.unidade_medida)}</label>
                 <input
                   className="input bg-white"
                   type="number"
@@ -354,11 +364,32 @@ function FormItens({ pedido, itens, valorTopper }: { pedido: Pedido; itens: Item
                 />
               </div>
 
+              {/* O que entra no pedido: com a regra dos 300g, menos que o
+                  valor pelo peso real do campo acima. */}
+              {calculo && (
+                <div className="flex items-center justify-between gap-2">
+                  <span
+                    className={`text-[11px] font-medium ${
+                      calculo.aplicouCorte ? "text-orange-700" : "text-gray-500"
+                    }`}
+                  >
+                    Valor cobrado do item
+                  </span>
+                  <span
+                    className={`text-sm font-bold ${
+                      calculo.aplicouCorte ? "text-orange-800" : "text-gray-800"
+                    }`}
+                  >
+                    {formatCurrency(calculo.valorAjustado)}
+                  </span>
+                </div>
+              )}
+
               {calculo?.aplicouCorte && calculo.limite !== null && (
                 <p className="text-[10px] text-orange-600 flex items-start gap-1">
                   <AlertTriangle size={11} className="flex-shrink-0 mt-px" />
-                  Excede o pedido em mais de {LIMITE_EXTRA_KG * 1000}g — cobrado{" "}
-                  {formatCurrency(calculo.valorAjustado)}, até {calculo.limite.toFixed(2)} kg
+                  Excede o pedido em mais de {LIMITE_EXTRA_KG * 1000}g — cobrado até{" "}
+                  {calculo.limite.toFixed(2)} kg (de {formatCurrency(calculo.valorTotal)})
                 </p>
               )}
             </div>
@@ -508,7 +539,7 @@ function FormBolo({ pedido, valorTopper }: { pedido: Pedido; valorTopper: number
       </div>
 
       <CampoValor
-        label="Valor total (R$)"
+        label="Valor pelo peso real (R$)"
         valor={campos.valor}
         onChange={(valor) => atualizar("valor", valor)}
       />
@@ -641,7 +672,7 @@ function FormDoce({ pedido, valorTopper }: { pedido: Pedido; valorTopper: number
       </div>
 
       <CampoValor
-        label="Valor total (R$)"
+        label="Valor pelo peso real (R$)"
         valor={campos.valor}
         onChange={(valor) => atualizar("valor", valor)}
       />
