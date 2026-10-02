@@ -38,6 +38,8 @@ export interface PedidoComCliente extends Pedido {
   clientes?: { nome: string; telefone: string } | null;
   /** Valor do topper encomendado, quando a busca traz a ficha junto. */
   toppers_pedido?: { valor: number } | null;
+  /** Valor dos itens lançados, quando a busca traz os itens junto. */
+  itens_pedido?: { valor_total: number; valor_real?: number | null }[] | null;
 }
 
 /**

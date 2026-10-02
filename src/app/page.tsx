@@ -29,7 +29,7 @@ export default async function DashboardPage() {
     // pedido — sem ela o "a receber" e o previsto ficavam sem o topper.
     supabase
       .from("pedidos")
-      .select("*, clientes(nome, telefone), toppers_pedido(valor)")
+      .select("*, clientes(nome, telefone), toppers_pedido(valor), itens_pedido(valor_total)")
       .neq("status", "entregue")
       .neq("status", "cancelado")
       .order("data_entrega", { ascending: true }),
