@@ -93,9 +93,25 @@ export function valorTopperDoPedido(pedido: {
   return valor > 0 ? valor : null;
 }
 
+type ItemValor = { valor_total?: number | null; valor_real?: number | null };
+
 /**
- * Valor do pedido: o preço do que foi produzido (a soma dos itens) mais o
- * topper — o encomendado, quando houver, ou o dado de brinde.
+ * Soma dos itens lançados no pedido — o apurado no "Feito" quando houver, senão
+ * o combinado na venda. É o valor do pedido enquanto ele não foi precificado.
+ */
+export function somaItensDoPedido(pedido: { itens_pedido?: ItemValor[] | null }): number | null {
+  const itens = pedido.itens_pedido ?? [];
+  if (itens.length === 0) return null;
+  return itens.reduce((acc, item) => acc + Number(item.valor_real ?? item.valor_total ?? 0), 0);
+}
+
+/**
+ * Valor do pedido: o preço do que foi produzido mais o topper — o encomendado,
+ * quando houver, ou o dado de brinde.
+ *
+ * O preço do produzido é o da precificação; antes dela (pedido novo ou em
+ * produção) vale a soma dos itens lançados, senão o previsto e o "a receber"
+ * mostravam só o topper.
  *
  * Os dois entram aqui para aparecer no valor estimado, no que está a receber e
  * na sugestão do valor cobrado na entrega. O custo do topper encomendado
@@ -107,8 +123,10 @@ export function calcularValorFinal(pedido: {
   valor_brinde?: number | null;
   topper?: string | null;
   toppers_pedido?: FichaTopperValor | FichaTopperValor[] | null;
+  itens_pedido?: ItemValor[] | null;
 }) {
-  const producao = pedido.preco_corrigido ?? pedido.valor_calculado ?? null;
+  const producao =
+    pedido.preco_corrigido ?? pedido.valor_calculado ?? somaItensDoPedido(pedido) ?? null;
   const brinde = pedido.valor_brinde ?? null;
   const topper = valorTopperDoPedido(pedido);
   if (producao == null && brinde == null && topper == null) return null;

@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 export default async function PedidoDetailPage({ params }: { params: { id: string } }) {
   const { data: pedido, error } = await supabase
     .from("pedidos")
-    .select("*, clientes(nome, telefone), toppers_pedido(valor)")
+    .select("*, clientes(nome, telefone), toppers_pedido(valor), itens_pedido(valor_total)")
     .eq("id", params.id)
     .single();
 

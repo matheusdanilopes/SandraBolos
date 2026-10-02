@@ -31,6 +31,11 @@ export async function adicionarItemAction(
 
   if (error) return { error: mensagemErro(error) };
   revalidatePath(`/pedidos/${pedidoId}`);
+  // Antes da precificação o valor do pedido é a soma dos itens: lançar ou
+  // tirar um item muda o previsto e o "a receber".
+  revalidatePath("/pedidos");
+  revalidatePath("/financeiro");
+  revalidatePath("/");
   return {};
 }
 
@@ -46,5 +51,10 @@ export async function removerItemAction(
 
   if (error) return { error: mensagemErro(error) };
   revalidatePath(`/pedidos/${pedidoId}`);
+  // Antes da precificação o valor do pedido é a soma dos itens: lançar ou
+  // tirar um item muda o previsto e o "a receber".
+  revalidatePath("/pedidos");
+  revalidatePath("/financeiro");
+  revalidatePath("/");
   return {};
 }
