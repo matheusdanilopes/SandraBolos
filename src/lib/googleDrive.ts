@@ -145,3 +145,15 @@ export async function deleteFileFromDrive(fileId: string): Promise<void> {
     throw err;
   }
 }
+
+export async function downloadFileFromDrive(
+  fileId: string
+): Promise<{ buffer: Buffer; mimeType: string }> {
+  const drive = getDriveClient();
+  const res = await drive.files.get(
+    { fileId, alt: "media", supportsAllDrives: true },
+    { responseType: "arraybuffer" }
+  );
+  const mimeType = String(res.headers["content-type"] ?? "application/octet-stream");
+  return { buffer: Buffer.from(res.data as ArrayBuffer), mimeType };
+}

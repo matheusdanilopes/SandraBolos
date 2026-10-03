@@ -126,7 +126,7 @@ export function ImagensSection({ pedidoId, imagens: initialImagens }: Props) {
               <ImageIcon size={16} className="text-gray-400 flex-shrink-0" />
               <span className="text-sm text-gray-700 flex-1 truncate">{img.nome_arquivo}</span>
               <a
-                href={img.url}
+                href={`/api/imagens/${img.id}/arquivo`}
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Visualizar imagem"
