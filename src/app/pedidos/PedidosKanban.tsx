@@ -11,7 +11,6 @@ import {
   Circle,
   FileEdit,
   Gift,
-  ImageIcon,
   Loader2,
   Package,
   Sparkles,
@@ -400,7 +399,6 @@ function TicketCard({
   const ModoIcon = pedido.hora_entrega ? Truck : Store;
   const fichaTopper = Array.isArray(pedido.toppers_pedido) ? pedido.toppers_pedido[0] : pedido.toppers_pedido;
   const etapaTopper = pedido.topper === "sim" ? etapaDoTopper(fichaTopper) : null;
-  const fotos = pedido.imagens_pedido?.[0]?.count ?? 0;
 
   return (
     <Link
@@ -491,7 +489,7 @@ function TicketCard({
           </p>
         )}
 
-        {isAtivo && (etapaTopper || pedido.topper === "brinde" || fotos > 0 || isRascunho) && (
+        {isAtivo && (etapaTopper || pedido.topper === "brinde" || isRascunho) && (
           <div className="flex items-center gap-1 flex-wrap">
             {etapaTopper && (
               <span
@@ -508,12 +506,6 @@ function TicketCard({
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium border bg-pink-50 text-pink-700 border-pink-200">
                 <Gift size={9} />
                 Topper de brinde
-              </span>
-            )}
-            {fotos > 0 && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium border bg-gray-50 text-gray-600 border-gray-200">
-                <ImageIcon size={9} />
-                {fotos === 1 ? "1 foto" : `${fotos} fotos`}
               </span>
             )}
             {isRascunho && (

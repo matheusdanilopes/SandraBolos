@@ -51,8 +51,6 @@ export interface PedidoComCliente extends Pedido {
         unidade_medida?: UnidadeMedida;
       }[]
     | null;
-  /** Contagem das fotos de referência (`imagens_pedido(count)`). */
-  imagens_pedido?: { count: number }[] | null;
 }
 
 /**
