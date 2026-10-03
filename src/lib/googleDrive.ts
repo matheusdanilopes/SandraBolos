@@ -2,24 +2,22 @@ import { google } from "googleapis";
 import type { drive_v3 } from "googleapis";
 import { PassThrough } from "stream";
 
-function getDriveClient(): drive_v3.Drive {
-  let credentials: { client_email: string; private_key: string };
+export function hasDriveCredentials(): boolean {
+  return !!(
+    process.env.GOOGLE_OAUTH_CLIENT_ID &&
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET &&
+    process.env.GOOGLE_OAUTH_REFRESH_TOKEN
+  );
+}
 
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
-    credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
-  } else {
-    let rawKey = process.env.GOOGLE_PRIVATE_KEY!;
-    if (rawKey.startsWith('"') && rawKey.endsWith('"')) rawKey = rawKey.slice(1, -1);
-    credentials = {
-      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
-      private_key: rawKey.replace(/\\n/g, "\n"),
-    };
-  }
-
-  const auth = new google.auth.GoogleAuth({
-    credentials,
-    scopes: ["https://www.googleapis.com/auth/drive"],
-  });
+// OAuth2 delegation: files are created as the real Google user, so they use
+// that account's storage quota (service accounts have none).
+export function getDriveClient(): drive_v3.Drive {
+  const auth = new google.auth.OAuth2(
+    process.env.GOOGLE_OAUTH_CLIENT_ID,
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET
+  );
+  auth.setCredentials({ refresh_token: process.env.GOOGLE_OAUTH_REFRESH_TOKEN });
   return google.drive({ version: "v3", auth });
 }
 
@@ -134,4 +132,28 @@ export async function uploadFileToDrive(
   });
 
   return { fileId, url: `https://drive.google.com/uc?id=${fileId}` };
+}
+
+// Também serve para pastas: apagar a pasta do pedido remove as imagens dentro dela.
+export async function deleteFileFromDrive(fileId: string): Promise<void> {
+  const drive = getDriveClient();
+  try {
+    await drive.files.delete({ fileId, supportsAllDrives: true });
+  } catch (err: unknown) {
+    // Arquivo já removido manualmente no Drive: nada a fazer.
+    if ((err as { code?: number }).code === 404) return;
+    throw err;
+  }
+}
+
+export async function downloadFileFromDrive(
+  fileId: string
+): Promise<{ buffer: Buffer; mimeType: string }> {
+  const drive = getDriveClient();
+  const res = await drive.files.get(
+    { fileId, alt: "media", supportsAllDrives: true },
+    { responseType: "arraybuffer" }
+  );
+  const mimeType = String(res.headers["content-type"] ?? "application/octet-stream");
+  return { buffer: Buffer.from(res.data as ArrayBuffer), mimeType };
 }

@@ -1,8 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ImagemPedido } from "@/types/database";
 import { ImageIcon, Plus, Trash2, ExternalLink, Upload } from "lucide-react";
 
@@ -15,11 +13,27 @@ interface Props {
 }
 
 export function ImagensSection({ pedidoId, imagens: initialImagens }: Props) {
-  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [imagens, setImagens] = useState(initialImagens);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // A lista vem do servidor ao abrir e após cada mudança: as props da página
+  // podem chegar atrasadas (cache) e não devem sobrescrever o estado.
+  const carregarImagens = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/pedidos/${pedidoId}/imagens`, { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data)) setImagens(data);
+    } catch {
+      // Mantém a lista atual se a rede falhar.
+    }
+  }, [pedidoId]);
+
+  useEffect(() => {
+    carregarImagens();
+  }, [carregarImagens]);
 
   const canAdd = imagens.length < MAX_IMAGENS;
 
@@ -41,7 +55,7 @@ export function ImagensSection({ pedidoId, imagens: initialImagens }: Props) {
         setError(data.error ?? "Erro ao enviar imagem");
       } else {
         setImagens((prev) => [...prev, data]);
-        router.refresh();
+        carregarImagens();
       }
     } catch {
       setError("Erro de conexão ao enviar imagem");
@@ -53,9 +67,19 @@ export function ImagensSection({ pedidoId, imagens: initialImagens }: Props) {
 
   async function removeImagem(id: string) {
     if (!confirm("Remover imagem?")) return;
-    await supabase.from("imagens_pedido").delete().eq("id", id);
-    setImagens((prev) => prev.filter((i) => i.id !== id));
-    router.refresh();
+    setError("");
+    try {
+      const res = await fetch(`/api/imagens/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? "Erro ao remover imagem");
+        return;
+      }
+      setImagens((prev) => prev.filter((i) => i.id !== id));
+      carregarImagens();
+    } catch {
+      setError("Erro de conexão ao remover imagem");
+    }
   }
 
   return (
@@ -68,9 +92,9 @@ export function ImagensSection({ pedidoId, imagens: initialImagens }: Props) {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={loading}
-            className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium disabled:opacity-50"
+            className="flex items-center gap-1.5 min-h-[44px] px-3 -mr-3 text-sm text-brand-600 hover:text-brand-700 font-medium disabled:opacity-50"
           >
-            {loading ? <Upload size={14} className="animate-bounce" /> : <Plus size={14} />}
+            {loading ? <Upload size={18} className="animate-bounce" /> : <Plus size={18} />}
             {loading ? "Enviando..." : "Adicionar"}
           </button>
         )}
@@ -94,22 +118,24 @@ export function ImagensSection({ pedidoId, imagens: initialImagens }: Props) {
       ) : (
         <div className="space-y-2">
           {imagens.map((img) => (
-            <div key={img.id} className="flex items-center gap-2 bg-gray-50 rounded-lg p-2">
-              <ImageIcon size={14} className="text-gray-400 flex-shrink-0" />
-              <span className="text-xs text-gray-700 flex-1 truncate">{img.nome_arquivo}</span>
+            <div key={img.id} className="flex items-center gap-1 bg-gray-50 rounded-lg pl-3 pr-1 py-1">
+              <ImageIcon size={16} className="text-gray-400 flex-shrink-0" />
+              <span className="text-sm text-gray-700 flex-1 truncate">{img.nome_arquivo}</span>
               <a
-                href={img.url}
+                href={`/api/imagens/${img.id}/arquivo`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-brand-600 hover:text-brand-700 flex-shrink-0"
+                aria-label="Visualizar imagem"
+                className="flex items-center justify-center w-11 h-11 text-brand-600 hover:text-brand-700 flex-shrink-0"
               >
-                <ExternalLink size={14} />
+                <ExternalLink size={20} />
               </a>
               <button
                 onClick={() => removeImagem(img.id)}
-                className="text-red-400 hover:text-red-600 flex-shrink-0"
+                aria-label="Remover imagem"
+                className="flex items-center justify-center w-11 h-11 text-red-400 hover:text-red-600 flex-shrink-0"
               >
-                <Trash2 size={14} />
+                <Trash2 size={20} />
               </button>
             </div>
           ))}

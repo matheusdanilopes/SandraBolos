@@ -15,6 +15,8 @@ import { isErroDeConexao } from "@/lib/erros";
 import { PainelSemConexao } from "@/components/PainelSemConexao";
 
 export const dynamic = "force-dynamic";
+// Garante que nenhuma leitura do Supabase venha do cache de dados do Next.
+export const fetchCache = "force-no-store";
 
 export default async function PedidoDetailPage({ params }: { params: { id: string } }) {
   const { data: pedido, error } = await supabase
@@ -30,28 +32,21 @@ export default async function PedidoDetailPage({ params }: { params: { id: strin
 
   const pedidoTyped = pedido as unknown as PedidoComCliente;
 
-  const { data: imagens } = await supabase
-    .from("imagens_pedido")
-    .select("*")
-    .eq("pedido_id", params.id)
-    .order("created_at");
-
-  const { data: itens } = await supabase
-    .from("itens_pedido")
-    .select("*")
-    .eq("pedido_id", params.id)
-    .order("created_at");
-
+  // As consultas abaixo não dependem umas das outras: rodam em paralelo para
+  // a página não somar a latência de cada ida ao banco.
   // A categoria vem junto (e a lista de categorias também) para o seletor de
   // item ter a mesma busca e os mesmos chips do lançamento do pedido.
-  const [{ data: produtos }, { data: categorias }] = await Promise.all([
-    supabase
-      .from("produtos")
-      .select("*, categorias_produto(nome, ordem)")
-      .eq("ativo", true)
-      .order("nome"),
-    supabase.from("categorias_produto").select("*").eq("ativo", true).order("ordem").order("nome"),
-  ]);
+  const [{ data: imagens }, { data: itens }, { data: produtos }, { data: categorias }] =
+    await Promise.all([
+      supabase.from("imagens_pedido").select("*").eq("pedido_id", params.id).order("created_at"),
+      supabase.from("itens_pedido").select("*").eq("pedido_id", params.id).order("created_at"),
+      supabase
+        .from("produtos")
+        .select("*, categorias_produto(nome, ordem)")
+        .eq("ativo", true)
+        .order("nome"),
+      supabase.from("categorias_produto").select("*").eq("ativo", true).order("ordem").order("nome"),
+    ]);
 
   const cliente = pedidoTyped.clientes ?? null;
   const valorFinal = calcularValorFinal(pedidoTyped);

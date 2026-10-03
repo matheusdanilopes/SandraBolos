@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 
+export const dynamic = "force-dynamic";
+// Garante que nenhuma leitura do Supabase venha do cache de dados do Next.
+export const fetchCache = "force-no-store";
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
