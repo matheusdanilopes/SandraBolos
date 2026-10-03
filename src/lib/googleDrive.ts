@@ -134,6 +134,7 @@ export async function uploadFileToDrive(
   return { fileId, url: `https://drive.google.com/uc?id=${fileId}` };
 }
 
+// Também serve para pastas: apagar a pasta do pedido remove as imagens dentro dela.
 export async function deleteFileFromDrive(fileId: string): Promise<void> {
   const drive = getDriveClient();
   try {
