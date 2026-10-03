@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ImagemPedido } from "@/types/database";
 import { ImageIcon, Plus, Trash2, ExternalLink, Upload } from "lucide-react";
@@ -19,6 +19,25 @@ export function ImagensSection({ pedidoId, imagens: initialImagens }: Props) {
   const [imagens, setImagens] = useState(initialImagens);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // A página pode chegar do cache do navegador com uma lista antiga: segue as
+  // props a cada atualização e confirma a lista no servidor ao abrir.
+  useEffect(() => {
+    setImagens(initialImagens);
+  }, [initialImagens]);
+
+  useEffect(() => {
+    let ativo = true;
+    fetch(`/api/pedidos/${pedidoId}/imagens`, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (ativo && Array.isArray(data)) setImagens(data);
+      })
+      .catch(() => {});
+    return () => {
+      ativo = false;
+    };
+  }, [pedidoId]);
 
   const canAdd = imagens.length < MAX_IMAGENS;
 
