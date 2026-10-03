@@ -133,3 +133,14 @@ export async function uploadFileToDrive(
 
   return { fileId, url: `https://drive.google.com/uc?id=${fileId}` };
 }
+
+export async function deleteFileFromDrive(fileId: string): Promise<void> {
+  const drive = getDriveClient();
+  try {
+    await drive.files.delete({ fileId, supportsAllDrives: true });
+  } catch (err: unknown) {
+    // Arquivo já removido manualmente no Drive: nada a fazer.
+    if ((err as { code?: number }).code === 404) return;
+    throw err;
+  }
+}

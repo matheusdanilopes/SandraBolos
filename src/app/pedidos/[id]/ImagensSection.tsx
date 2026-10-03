@@ -2,7 +2,6 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 import type { ImagemPedido } from "@/types/database";
 import { ImageIcon, Plus, Trash2, ExternalLink, Upload } from "lucide-react";
 
@@ -53,9 +52,19 @@ export function ImagensSection({ pedidoId, imagens: initialImagens }: Props) {
 
   async function removeImagem(id: string) {
     if (!confirm("Remover imagem?")) return;
-    await supabase.from("imagens_pedido").delete().eq("id", id);
-    setImagens((prev) => prev.filter((i) => i.id !== id));
-    router.refresh();
+    setError("");
+    try {
+      const res = await fetch(`/api/imagens/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? "Erro ao remover imagem");
+        return;
+      }
+      setImagens((prev) => prev.filter((i) => i.id !== id));
+      router.refresh();
+    } catch {
+      setError("Erro de conexão ao remover imagem");
+    }
   }
 
   return (
