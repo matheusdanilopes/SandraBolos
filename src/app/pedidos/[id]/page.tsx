@@ -15,6 +15,8 @@ import { isErroDeConexao } from "@/lib/erros";
 import { PainelSemConexao } from "@/components/PainelSemConexao";
 
 export const dynamic = "force-dynamic";
+// Garante que nenhuma leitura do Supabase venha do cache de dados do Next.
+export const fetchCache = "force-no-store";
 
 export default async function PedidoDetailPage({ params }: { params: { id: string } }) {
   const { data: pedido, error } = await supabase

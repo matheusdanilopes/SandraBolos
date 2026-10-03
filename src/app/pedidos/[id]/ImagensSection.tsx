@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ImagemPedido } from "@/types/database";
 import { ImageIcon, Plus, Trash2, ExternalLink, Upload } from "lucide-react";
 
@@ -14,30 +13,27 @@ interface Props {
 }
 
 export function ImagensSection({ pedidoId, imagens: initialImagens }: Props) {
-  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [imagens, setImagens] = useState(initialImagens);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // A página pode chegar do cache do navegador com uma lista antiga: segue as
-  // props a cada atualização e confirma a lista no servidor ao abrir.
-  useEffect(() => {
-    setImagens(initialImagens);
-  }, [initialImagens]);
+  // A lista vem do servidor ao abrir e após cada mudança: as props da página
+  // podem chegar atrasadas (cache) e não devem sobrescrever o estado.
+  const carregarImagens = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/pedidos/${pedidoId}/imagens`, { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data)) setImagens(data);
+    } catch {
+      // Mantém a lista atual se a rede falhar.
+    }
+  }, [pedidoId]);
 
   useEffect(() => {
-    let ativo = true;
-    fetch(`/api/pedidos/${pedidoId}/imagens`, { cache: "no-store" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (ativo && Array.isArray(data)) setImagens(data);
-      })
-      .catch(() => {});
-    return () => {
-      ativo = false;
-    };
-  }, [pedidoId]);
+    carregarImagens();
+  }, [carregarImagens]);
 
   const canAdd = imagens.length < MAX_IMAGENS;
 
@@ -59,7 +55,7 @@ export function ImagensSection({ pedidoId, imagens: initialImagens }: Props) {
         setError(data.error ?? "Erro ao enviar imagem");
       } else {
         setImagens((prev) => [...prev, data]);
-        router.refresh();
+        carregarImagens();
       }
     } catch {
       setError("Erro de conexão ao enviar imagem");
@@ -80,7 +76,7 @@ export function ImagensSection({ pedidoId, imagens: initialImagens }: Props) {
         return;
       }
       setImagens((prev) => prev.filter((i) => i.id !== id));
-      router.refresh();
+      carregarImagens();
     } catch {
       setError("Erro de conexão ao remover imagem");
     }
