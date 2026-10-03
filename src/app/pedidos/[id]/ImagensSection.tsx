@@ -68,9 +68,9 @@ export function ImagensSection({ pedidoId, imagens: initialImagens }: Props) {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={loading}
-            className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium disabled:opacity-50"
+            className="flex items-center gap-1.5 min-h-[44px] px-3 -mr-3 text-sm text-brand-600 hover:text-brand-700 font-medium disabled:opacity-50"
           >
-            {loading ? <Upload size={14} className="animate-bounce" /> : <Plus size={14} />}
+            {loading ? <Upload size={18} className="animate-bounce" /> : <Plus size={18} />}
             {loading ? "Enviando..." : "Adicionar"}
           </button>
         )}
@@ -94,22 +94,24 @@ export function ImagensSection({ pedidoId, imagens: initialImagens }: Props) {
       ) : (
         <div className="space-y-2">
           {imagens.map((img) => (
-            <div key={img.id} className="flex items-center gap-2 bg-gray-50 rounded-lg p-2">
-              <ImageIcon size={14} className="text-gray-400 flex-shrink-0" />
-              <span className="text-xs text-gray-700 flex-1 truncate">{img.nome_arquivo}</span>
+            <div key={img.id} className="flex items-center gap-1 bg-gray-50 rounded-lg pl-3 pr-1 py-1">
+              <ImageIcon size={16} className="text-gray-400 flex-shrink-0" />
+              <span className="text-sm text-gray-700 flex-1 truncate">{img.nome_arquivo}</span>
               <a
                 href={img.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-brand-600 hover:text-brand-700 flex-shrink-0"
+                aria-label="Visualizar imagem"
+                className="flex items-center justify-center w-11 h-11 text-brand-600 hover:text-brand-700 flex-shrink-0"
               >
-                <ExternalLink size={14} />
+                <ExternalLink size={20} />
               </a>
               <button
                 onClick={() => removeImagem(img.id)}
-                className="text-red-400 hover:text-red-600 flex-shrink-0"
+                aria-label="Remover imagem"
+                className="flex items-center justify-center w-11 h-11 text-red-400 hover:text-red-600 flex-shrink-0"
               >
-                <Trash2 size={14} />
+                <Trash2 size={20} />
               </button>
             </div>
           ))}
