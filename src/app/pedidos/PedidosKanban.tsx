@@ -3,23 +3,41 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { format, isToday, isTomorrow, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   Calendar,
   CheckCircle2,
   Circle,
   FileEdit,
+  Gift,
+  ImageIcon,
   Loader2,
   Package,
+  Sparkles,
+  Store,
+  Truck,
   XCircle,
   AlertTriangle,
 } from "lucide-react";
 import {
   STATUS_LABELS,
   TIPO_LABELS,
+  etapaDoTopper,
+  type EtapaTopper,
   type PedidoComCliente,
   type StatusPedido,
+  type UnidadeMedida,
 } from "@/types/database";
-import { cn, formatCurrency, formatDate, calcularValorFinal, pedidoAlerta, pedidoNumero } from "@/lib/utils";
+import {
+  cn,
+  formatCurrency,
+  formatDate,
+  formatTime,
+  calcularValorFinal,
+  pedidoAlerta,
+  pedidoNumero,
+} from "@/lib/utils";
 import { avancarStatusAction, voltarStatusAction, cancelarPedidoAction } from "./[id]/actions";
 
 /** Ordem das colunas do quadro — a mesma ordem em que um pedido percorre a cozinha. */
@@ -64,6 +82,11 @@ function getNomeDisplay(pedido: PedidoComCliente): string {
   return pedido.clientes?.nome ?? pedido.nome_cliente ?? "Sem cliente";
 }
 
+/** Chave de ordenação pelo dia e hora em que o pedido sai; sem hora, vai para o fim do dia. */
+function momentoDaSaida(pedido: PedidoComCliente): string {
+  return `${pedido.data_entrega} ${pedido.hora_entrega ?? pedido.hora_retirada ?? "99:99"}`;
+}
+
 export function PedidosKanban({ pedidos }: { pedidos: PedidoComCliente[] }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -89,6 +112,11 @@ export function PedidosKanban({ pedidos }: { pedidos: PedidoComCliente[] }) {
     const map = new Map<StatusPedido, PedidoComCliente[]>();
     for (const { status } of COLUNAS) map.set(status, []);
     for (const p of pedidosEfetivos) map.get(p.status)?.push(p);
+    // O que sai primeiro fica no topo; no histórico (entregue/cancelado), o mais recente.
+    map.forEach((lista, status) => {
+      const historico = status === "entregue" || status === "cancelado";
+      lista.sort((a, b) => (historico ? -1 : 1) * momentoDaSaida(a).localeCompare(momentoDaSaida(b)));
+    });
     return map;
   }, [pedidosEfetivos]);
 
@@ -297,6 +325,53 @@ export function PedidosKanban({ pedidos }: { pedidos: PedidoComCliente[] }) {
   );
 }
 
+/** Peso com vírgula e sem zeros sobrando: 1,5 kg em vez de 1.500 kg. */
+const pesoFormatter = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 3 });
+
+function formatQtdItem(quantidade: number, unidade?: UnidadeMedida): string {
+  if (unidade === "peso_kg") return `${pesoFormatter.format(quantidade)} kg`;
+  return `${Math.round(quantidade)} un.`;
+}
+
+/** O que a cozinha tem que produzir: os itens lançados ou, sem eles, o tipo com peso/quantidade do pedido. */
+function oQueFazer(pedido: PedidoComCliente): { qtd: string | null; nome: string }[] {
+  const itens = (pedido.itens_pedido ?? []).filter((i) => i.nome_produto);
+  if (itens.length > 0) {
+    return itens.map((i) => ({
+      qtd: i.quantidade != null ? formatQtdItem(Number(i.quantidade), i.unidade_medida) : null,
+      nome: i.nome_produto!,
+    }));
+  }
+  const qtd = pedido.peso
+    ? `${pesoFormatter.format(pedido.peso)} kg`
+    : pedido.quantidade
+    ? `${pedido.quantidade} un.`
+    : null;
+  return [{ qtd, nome: TIPO_LABELS[pedido.tipo] }];
+}
+
+/** "Hoje", "Amanhã" ou o dia da semana com a data — o que interessa para planejar a produção. */
+function diaLabel(dataEntrega: string): string {
+  const data = parseISO(dataEntrega);
+  if (isToday(data)) return "Hoje";
+  if (isTomorrow(data)) return "Amanhã";
+  return format(data, "EEE dd/MM", { locale: ptBR });
+}
+
+const TOPPER_ETAPA: Record<EtapaTopper, { label: string; cls: string }> = {
+  pendente: { label: "Topper: encomendar", cls: "bg-amber-50 text-amber-700 border-amber-200" },
+  solicitado: { label: "Topper: a caminho", cls: "bg-blue-50 text-blue-700 border-blue-200" },
+  recebido: { label: "Topper: chegou", cls: "bg-green-50 text-green-700 border-green-200" },
+};
+
+/** Faixa do topo do bilhete: quando o pedido sai, colorida pela urgência. */
+const PRAZO_COR: Record<"atrasado" | "entrega_hoje" | "vence_amanha" | "normal", string> = {
+  atrasado: "bg-red-50 text-red-700 border-red-100",
+  entrega_hoje: "bg-blue-50 text-blue-700 border-blue-100",
+  vence_amanha: "bg-orange-50 text-orange-700 border-orange-100",
+  normal: "bg-gray-50 text-gray-600 border-gray-100",
+};
+
 function TicketCard({
   pedido,
   isDraggable,
@@ -313,11 +388,19 @@ function TicketCard({
   const valor = calcularValorFinal(pedido);
   const isCancelado = pedido.status === "cancelado";
   const isRascunho = pedido.status === "rascunho";
-  const alerta =
-    !isCancelado && !isRascunho && pedido.status !== "entregue"
-      ? pedidoAlerta(pedido.data_entrega, pedido.hora_entrega, pedido.hora_retirada)
-      : null;
-  const cor = COLUNA_COR[pedido.status];
+  const isEntregue = pedido.status === "entregue";
+  // Entregue e cancelado já saíram da cozinha: o bilhete fica enxuto para a
+  // coluna de histórico não empurrar o que ainda tem trabalho.
+  const isAtivo = !isCancelado && !isEntregue;
+  const alerta = isAtivo && !isRascunho
+    ? pedidoAlerta(pedido.data_entrega, pedido.hora_entrega, pedido.hora_retirada)
+    : null;
+  const hora = pedido.hora_entrega ?? pedido.hora_retirada;
+  const modo = pedido.hora_entrega ? "Entrega" : pedido.hora_retirada ? "Retirada" : null;
+  const ModoIcon = pedido.hora_entrega ? Truck : Store;
+  const fichaTopper = Array.isArray(pedido.toppers_pedido) ? pedido.toppers_pedido[0] : pedido.toppers_pedido;
+  const etapaTopper = pedido.topper === "sim" ? etapaDoTopper(fichaTopper) : null;
+  const fotos = pedido.imagens_pedido?.[0]?.count ?? 0;
 
   return (
     <Link
@@ -326,14 +409,38 @@ function TicketCard({
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       className={cn(
-        "relative block bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all",
+        "relative block bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all overflow-hidden",
         isDraggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
         isDragging && "opacity-40",
-        isCancelado && "opacity-60"
+        isCancelado && "opacity-60",
+        alerta === "atrasado" && "border-red-300"
       )}
     >
-      {/* Cabeçalho do bilhete */}
-      <div className="px-3 pt-2.5 pb-2 flex items-start justify-between gap-2">
+      {/* Quando sai — dia, hora e se é entrega ou retirada */}
+      <div
+        className={cn(
+          "flex items-center gap-1.5 px-3 py-1.5 border-b text-[11px]",
+          PRAZO_COR[alerta ?? "normal"]
+        )}
+      >
+        {alerta === "atrasado" ? (
+          <AlertTriangle size={11} className="flex-shrink-0" />
+        ) : (
+          <Calendar size={11} className="flex-shrink-0 opacity-70" />
+        )}
+        <span className="font-semibold capitalize">{diaLabel(pedido.data_entrega)}</span>
+        {hora && <span className="font-semibold">· {formatTime(hora)}</span>}
+        {alerta === "atrasado" && <span className="font-semibold">· Atrasado</span>}
+        {modo && (
+          <span className="ml-auto flex items-center gap-1 flex-shrink-0 opacity-80">
+            <ModoIcon size={11} />
+            {modo}
+          </span>
+        )}
+      </div>
+
+      {/* Cliente */}
+      <div className="px-3 pt-2 pb-1.5 flex items-start justify-between gap-2">
         <span
           className={cn(
             "font-semibold text-[13px] text-gray-900 leading-tight",
@@ -350,44 +457,78 @@ function TicketCard({
       {/* Picote — linha tracejada com "furos" nas laterais, como um bilhete destacável */}
       <div className="relative mx-3">
         <div className="border-t border-dashed border-gray-200" />
-        <span className="absolute -left-[14px] top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-gray-50/60 border border-gray-200" />
-        <span className="absolute -right-[14px] top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-gray-50/60 border border-gray-200" />
+        <span className="absolute -left-[19px] top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-gray-50 border border-gray-200" />
+        <span className="absolute -right-[19px] top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-gray-50 border border-gray-200" />
       </div>
 
-      {/* Corpo do bilhete */}
-      <div className="px-3 pt-2 pb-3 space-y-1.5">
-        <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-gray-500">
-          <span className={cn("px-1.5 py-0.5 rounded-full font-medium", cor.header)}>
-            {TIPO_LABELS[pedido.tipo]}
-          </span>
-          {pedido.peso && <span>{pedido.peso}kg</span>}
-          {pedido.quantidade && <span>{pedido.quantidade} un.</span>}
-        </div>
-
-        <div className="flex items-center justify-between gap-2">
-          <span className="flex items-center gap-1 text-[11px] text-gray-500">
-            <Calendar size={11} className="text-gray-400" />
-            {formatDate(pedido.data_entrega)}
-            {pedido.hora_entrega && <span className="text-gray-400">· {pedido.hora_entrega}</span>}
-          </span>
-          {valor != null && (
-            <span className="text-[12px] font-semibold text-emerald-600 flex-shrink-0">
-              {formatCurrency(valor)}
-            </span>
-          )}
-        </div>
-
-        {alerta === "atrasado" && (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-700">
-            <AlertTriangle size={9} />
-            Atrasado
-          </span>
+      {/* O que fazer */}
+      <div className="px-3 pt-2 pb-2.5 space-y-2">
+        {isAtivo ? (
+          <ul className="space-y-0.5">
+            {oQueFazer(pedido).map((item, i) => (
+              <li key={i} className="flex items-baseline gap-1.5 text-[12px] leading-snug">
+                {item.qtd && (
+                  <span className="font-bold text-gray-900 tabular-nums flex-shrink-0">{item.qtd}</span>
+                )}
+                <span className="text-gray-700">{item.nome}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-[11px] text-gray-500 truncate">
+            {oQueFazer(pedido)
+              .map((item) => (item.qtd ? `${item.qtd} ${item.nome}` : item.nome))
+              .join(" · ")}
+          </p>
         )}
-        {isRascunho && (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-600 border border-amber-200">
-            <FileEdit size={8} />
-            Incompleto — completar antes de avançar
-          </span>
+
+        {isAtivo && pedido.descricao && (
+          <p
+            className="text-[11px] text-gray-600 leading-snug whitespace-pre-line line-clamp-4 bg-amber-50/40 border-l-2 border-amber-200 pl-2 py-0.5"
+            title={pedido.descricao}
+          >
+            {pedido.descricao}
+          </p>
+        )}
+
+        {isAtivo && (etapaTopper || pedido.topper === "brinde" || fotos > 0 || isRascunho) && (
+          <div className="flex items-center gap-1 flex-wrap">
+            {etapaTopper && (
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium border",
+                  TOPPER_ETAPA[etapaTopper].cls
+                )}
+              >
+                <Sparkles size={9} />
+                {TOPPER_ETAPA[etapaTopper].label}
+              </span>
+            )}
+            {pedido.topper === "brinde" && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium border bg-pink-50 text-pink-700 border-pink-200">
+                <Gift size={9} />
+                Topper de brinde
+              </span>
+            )}
+            {fotos > 0 && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium border bg-gray-50 text-gray-600 border-gray-200">
+                <ImageIcon size={9} />
+                {fotos === 1 ? "1 foto" : `${fotos} fotos`}
+              </span>
+            )}
+            {isRascunho && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-600 border border-amber-200">
+                <FileEdit size={8} />
+                Incompleto — completar antes de avançar
+              </span>
+            )}
+          </div>
+        )}
+
+        {valor != null && (
+          <div className="flex justify-end">
+            <span className="text-[11px] font-semibold text-emerald-600">{formatCurrency(valor)}</span>
+          </div>
         )}
       </div>
     </Link>

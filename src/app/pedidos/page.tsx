@@ -19,7 +19,9 @@ export default async function PedidosPage({
 }) {
   const { data: pedidos, error } = await supabase
     .from("pedidos")
-    .select("*, clientes(nome, telefone), toppers_pedido(valor), itens_pedido(valor_total)")
+    .select(
+      "*, clientes(nome, telefone), toppers_pedido(valor, solicitado, recebido), itens_pedido(valor_total, nome_produto, quantidade, unidade_medida), imagens_pedido(count)"
+    )
     .order("data_entrega", { ascending: true });
 
   return (
