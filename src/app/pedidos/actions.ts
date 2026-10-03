@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { isErroDeConexao, mensagemErro } from "@/lib/erros";
+import { deleteFileFromDrive, hasDriveCredentials } from "@/lib/googleDrive";
 import type { TipoPedido, Topper, TopperPedido } from "@/types/database";
 
 interface ItemPayload {
@@ -223,7 +224,7 @@ export async function excluirPedidoAction(
 
   const { data: pedido, error: fetchError } = await supabase
     .from("pedidos")
-    .select("status")
+    .select("*")
     .eq("id", pedidoId)
     .single();
 
@@ -233,6 +234,19 @@ export async function excluirPedidoAction(
   if (fetchError || !pedido) return { error: "Pedido não encontrado" };
   if (!EXCLUIVEIS.includes(pedido.status))
     return { error: "Só dá para excluir rascunho ou pedido novo. Use o cancelamento para os demais." };
+
+  // Apaga a pasta no Drive antes do banco: se o Drive falhar, o pedido
+  // continua no app e dá para tentar de novo, em vez de deixar a pasta órfã.
+  const folderId: string | null = pedido.drive_folder_id ?? null;
+  if (folderId && folderId.length >= 10 && hasDriveCredentials()) {
+    try {
+      await deleteFileFromDrive(folderId);
+    } catch (driveErr: unknown) {
+      console.error("[Drive] delete pasta do pedido failed:", driveErr);
+      const detalhe = mensagemErro(driveErr);
+      return { error: isErroDeConexao(driveErr) ? detalhe : `Drive: ${detalhe}` };
+    }
+  }
 
   await supabase.from("itens_pedido").delete().eq("pedido_id", pedidoId);
   await supabase.from("imagens_pedido").delete().eq("pedido_id", pedidoId);
