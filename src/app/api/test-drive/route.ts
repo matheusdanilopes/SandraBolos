@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { google } from "googleapis";
+import { getDriveAuthMode, getDriveClient } from "@/lib/googleDrive";
 
 // Diagnostic endpoint — gate with TEST_DRIVE_SECRET env var.
 // Usage: GET /api/test-drive?secret=<TEST_DRIVE_SECRET>
@@ -9,43 +9,44 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const rootFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID;
-  const hasJson = !!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-  const hasEmail = !!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const hasKey = !!process.env.GOOGLE_PRIVATE_KEY;
+  const rootFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID?.trim();
+  const mode = getDriveAuthMode();
+  const present = (v?: string) => (v ? "present" : "MISSING");
 
   const envCheck = {
-    using: hasJson ? "GOOGLE_APPLICATION_CREDENTIALS_JSON" : "separate vars",
-    GOOGLE_APPLICATION_CREDENTIALS_JSON: hasJson ? "present" : "MISSING",
-    GOOGLE_SERVICE_ACCOUNT_EMAIL: hasEmail ? "present" : "MISSING",
-    GOOGLE_PRIVATE_KEY: hasKey ? "present" : "MISSING",
+    using: mode ?? "none",
+    GOOGLE_OAUTH_CLIENT_ID: present(process.env.GOOGLE_OAUTH_CLIENT_ID),
+    GOOGLE_OAUTH_CLIENT_SECRET: present(process.env.GOOGLE_OAUTH_CLIENT_SECRET),
+    GOOGLE_OAUTH_REFRESH_TOKEN: present(process.env.GOOGLE_OAUTH_REFRESH_TOKEN),
+    GOOGLE_APPLICATION_CREDENTIALS_JSON: present(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON),
+    GOOGLE_SERVICE_ACCOUNT_EMAIL: present(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL),
+    GOOGLE_PRIVATE_KEY: present(process.env.GOOGLE_PRIVATE_KEY),
+    GOOGLE_IMPERSONATE_USER: process.env.GOOGLE_IMPERSONATE_USER?.trim() || "not set",
     GOOGLE_DRIVE_ROOT_FOLDER_ID: rootFolderId ?? "MISSING",
   };
 
-  if (!rootFolderId || (!hasJson && (!hasEmail || !hasKey))) {
+  if (!rootFolderId || !mode) {
     return NextResponse.json({ ok: false, envCheck, error: "Variáveis de ambiente faltando" });
   }
 
   try {
-    let credentials: { client_email: string; private_key: string };
-    if (hasJson) {
-      credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON!);
-    } else {
-      credentials = {
-        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!,
-        private_key: process.env.GOOGLE_PRIVATE_KEY!.replace(/\\n/g, "\n"),
-      };
-    }
-
-    const auth = new google.auth.GoogleAuth({
-      credentials,
-      scopes: ["https://www.googleapis.com/auth/drive"],
+    const drive = getDriveClient();
+    const res = await drive.files.get({
+      fileId: rootFolderId,
+      fields: "id,name,mimeType,driveId",
+      supportsAllDrives: true,
     });
 
-    const drive = google.drive({ version: "v3", auth });
-    const res = await drive.files.get({ fileId: rootFolderId, fields: "id,name,mimeType" });
+    // Conta de serviço sem Drive compartilhado nem delegação: lê a pasta, mas
+    // qualquer upload falha por falta de cota.
+    const warning =
+      mode === "service_account" && !res.data.driveId && !process.env.GOOGLE_IMPERSONATE_USER?.trim()
+        ? "A pasta raiz está num 'Meu Drive' e a autenticação é por conta de serviço, que não " +
+          "tem cota de armazenamento: uploads vão falhar. Use OAuth (GOOGLE_OAUTH_*), mova a " +
+          "pasta para um Drive compartilhado ou defina GOOGLE_IMPERSONATE_USER."
+        : undefined;
 
-    return NextResponse.json({ ok: true, envCheck, rootFolder: res.data });
+    return NextResponse.json({ ok: !warning, envCheck, rootFolder: res.data, warning });
   } catch (err: unknown) {
     const e = err as { message?: string; code?: number; errors?: unknown };
     return NextResponse.json(

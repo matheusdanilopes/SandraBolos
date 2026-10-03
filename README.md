@@ -204,3 +204,30 @@ dois. O furo estava no topper.
 | `src/app/financeiro/CanceladosSection.tsx` | bloco recolhível dos cancelados do período |
 | `src/app/pedidos/[id]/actions.ts` | `revalidatePath("/financeiro")` ao cancelar, andar/voltar status e gravar preço ou valor de entrega — são exatamente as ações que mudam receita e a receber, e sem elas o financeiro ficava mostrando o total anterior |
 | `src/app/toppers/actions.ts` | idem para salvar ficha, marcar etapa e registrar/desfazer pagamento do topper |
+
+## Fotos no Google Drive
+
+Sintoma: o upload de foto falhava com *"Service Accounts do not have storage
+quota"*. Conta de serviço não tem espaço próprio no Drive — o arquivo que ela
+cria numa pasta do "Meu Drive", mesmo compartilhada com ela, conta na cota
+dela, que é zero. Ler a pasta funciona; criar arquivo não.
+
+`src/lib/googleDrive.ts` escolhe a autenticação pelas variáveis presentes:
+
+| Modo | Variáveis | Quando usar |
+| --- | --- | --- |
+| OAuth de usuário (prioridade) | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REFRESH_TOKEN` | conta Gmail pessoal — os arquivos ficam no Drive da dona e usam a cota dela |
+| Conta de serviço + Drive compartilhado | `GOOGLE_APPLICATION_CREDENTIALS_JSON` (ou e-mail + chave) e pasta raiz dentro de um Drive compartilhado | Google Workspace |
+| Conta de serviço + delegação | as mesmas + `GOOGLE_IMPERSONATE_USER` | Google Workspace com delegação em todo o domínio |
+
+Para configurar o OAuth: crie no Google Cloud Console um "ID do cliente OAuth"
+do tipo **App para computador**, publique a tela de permissão (em modo "Teste"
+o refresh token expira em 7 dias) e rode
+
+```bash
+GOOGLE_OAUTH_CLIENT_ID=... GOOGLE_OAUTH_CLIENT_SECRET=... node scripts/gerar-token-google-drive.mjs
+```
+
+Coloque as três variáveis na Vercel e confira em
+`/api/test-drive?secret=<TEST_DRIVE_SECRET>` — ele avisa quando a configuração
+atual vai esbarrar na falta de cota.

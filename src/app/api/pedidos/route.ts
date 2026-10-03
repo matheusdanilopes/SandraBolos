@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
-import { createPedidoFolder } from "@/lib/googleDrive";
+import { createPedidoFolder, isDriveConfigured } from "@/lib/googleDrive";
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 
   // Create Drive folder (non-fatal if env vars not configured)
   let drive_folder_id: string | null = null;
-  if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID) {
+  if (isDriveConfigured()) {
     try {
       drive_folder_id = await createPedidoFolder(pedido.id, nomeParaPasta);
       await supabase
