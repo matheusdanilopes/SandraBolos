@@ -9,6 +9,10 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: ["lucide-react", "date-fns"],
   },
+  // Link curto do cardápio para a bio do Instagram
+  async redirects() {
+    return [{ source: "/c", destination: "/cardapio", permanent: false }];
+  },
   async headers() {
     return [
       {

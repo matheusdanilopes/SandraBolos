@@ -209,7 +209,15 @@ dois. O furo estava no topper.
 
 Página para clientes, sem menu do app e fora dos buscadores (`noindex`). Não há
 link para ela no app: só chega quem recebe o endereço, que fica em
-**Configurações > Cardápio Online** com botão de copiar.
+**Configurações > Cardápio Online** com botão de copiar. O endereço mostrado é o
+curto, `/c` (redireciona para `/cardapio`, em `next.config.mjs`), pensado para a
+bio do Instagram.
+
+Em **Produtos > Exportar Cardápio (PDF)** o app baixa o cardápio em PDF (A4).
+O PDF é gerado no navegador: a página `/cardapio?pdf=1` (seções abertas, tema
+claro e fotos do carrossel em grade) é carregada num iframe escondido,
+capturada com `html2canvas` e paginada com `jspdf` sem cortar itens ao meio;
+os links do WhatsApp e do Instagram continuam clicáveis no PDF.
 
 O layout é o do modelo aprovado, sem alterações. Do banco vêm só:
 
@@ -227,4 +235,5 @@ WhatsApp, Instagram) continuam no código, como no modelo.
 | `src/app/cardapio/` | página, CSS do modelo (preso a `.cardapio-sz`), fonte Babang e imagens do cabeçalho em `public/cardapio/` |
 | `src/app/api/cardapio-fotos/route.ts` | recebe a foto, reduz para 600px e converte para WebP (mantém o fundo transparente dos recortes) |
 | `src/app/configuracoes/FotosCardapioSection.tsx` | link do cardápio e cadastro das fotos |
+| `src/app/produtos/ExportarCardapioPdf.tsx` | botão e geração do PDF do cardápio |
 | `src/components/AppShell.tsx` | tira navegação e convite de instalação das páginas públicas |

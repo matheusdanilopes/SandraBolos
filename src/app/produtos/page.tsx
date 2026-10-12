@@ -1,14 +1,13 @@
 import { supabase } from "@/lib/supabase";
-import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { ProdutosClient } from "./ProdutosClient";
-import type { ProdutoComCategoria, CategoriaProduto, CardapioConfig } from "@/types/database";
+import type { ProdutoComCategoria, CategoriaProduto } from "@/types/database";
 import { houveErroDeConexao } from "@/lib/erros";
 import { AvisoConexao } from "@/components/AvisoConexao";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProdutosPage() {
-  const [produtosResult, categoriasResult, configResult] =
+  const [produtosResult, categoriasResult] =
     await Promise.all([
       supabase
         .from("produtos")
@@ -20,17 +19,11 @@ export default async function ProdutosPage() {
         .select("*")
         .order("ordem")
         .order("nome"),
-      createServerSupabaseClient()
-        .from("cardapio_config")
-        .select("*")
-        .eq("id", "00000000-0000-0000-0000-000000000001")
-        .single(),
     ]);
 
   const { data: produtosData } = produtosResult;
   const { data: categoriasData } = categoriasResult;
-  const { data: configData } = configResult;
-  const semConexao = houveErroDeConexao(produtosResult, categoriasResult, configResult);
+  const semConexao = houveErroDeConexao(produtosResult, categoriasResult);
 
   return (
     <div className="py-4 space-y-4">
@@ -43,7 +36,6 @@ export default async function ProdutosPage() {
       <ProdutosClient
         produtos={(produtosData ?? []) as ProdutoComCategoria[]}
         categorias={(categoriasData ?? []) as CategoriaProduto[]}
-        configCardapio={(configData ?? null) as CardapioConfig | null}
       />
     </div>
   );

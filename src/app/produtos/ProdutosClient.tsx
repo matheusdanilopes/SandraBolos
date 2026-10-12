@@ -6,15 +6,13 @@ import { formatCurrency } from "@/lib/utils";
 import type { ProdutoComCategoria, UnidadeMedida, CategoriaProduto } from "@/types/database";
 import { UNIDADE_LABELS } from "@/types/database";
 import { criarProdutoAction, editarProdutoAction, toggleAtivoAction } from "./actions";
-import { CardapioVisual } from "./CardapioVisual";
-import type { CardapioConfig } from "@/types/database";
+import { ExportarCardapioPdf } from "./ExportarCardapioPdf";
 
 const UNIDADES: UnidadeMedida[] = ["peso_kg", "cento", "unidade"];
 
 interface Props {
   produtos: ProdutoComCategoria[];
   categorias: CategoriaProduto[];
-  configCardapio: CardapioConfig | null;
 }
 
 interface EditState {
@@ -353,7 +351,7 @@ const NovoProdutoForm = memo(function NovoProdutoForm({ categorias }: { categori
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export function ProdutosClient({ produtos, categorias, configCardapio }: Props) {
+export function ProdutosClient({ produtos, categorias }: Props) {
   const [busca, setBusca] = useState("");
   const [categoriaId, setCategoriaId] = useState<string | null>(null);
 
@@ -499,21 +497,16 @@ export function ProdutosClient({ produtos, categorias, configCardapio }: Props) 
         </div>
       )}
 
-      {/* Cardápio Visual — preview + export only; personalization is in Configurações */}
+      {/* Cardápio — PDF da página /cardapio (fotos em Configurações > Cardápio Online) */}
       <div className="border-t border-gray-100 pt-4 space-y-2">
         <div>
-          <h2 className="text-base font-semibold text-gray-800">Cardápio Visual</h2>
+          <h2 className="text-base font-semibold text-gray-800">Cardápio</h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            Prévia do cardápio. Para personalizar, acesse{" "}
-            <span className="text-brand-600 font-medium">Configurações</span>.
+            Baixa o cardápio online em PDF, com as fotos do carrossel. Para trocar as fotos,
+            acesse <span className="text-brand-600 font-medium">Configurações</span>.
           </p>
         </div>
-        <CardapioVisual
-          produtos={produtos}
-          categorias={categorias}
-          configInicial={configCardapio}
-          modoVisualizacao
-        />
+        <ExportarCardapioPdf />
       </div>
     </div>
   );
