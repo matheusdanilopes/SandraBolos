@@ -223,6 +223,7 @@ WhatsApp, Instagram) continuam no código, como no modelo.
 | Arquivo | Papel |
 | --- | --- |
 | `supabase/migrations/014_add_cardapio_fotos.sql` | tabela `cardapio_fotos` e bucket `cardapio-fotos` — **precisa ser executada no SQL Editor do Supabase** |
+| `supabase/migrations/015_seed_cardapio_fotos.sql` | cadastra as 12 fotos do modelo, servidas de `public/cardapio/fotos/` (já em WebP, 600px) — **rodar depois da 014** |
 | `src/app/cardapio/` | página, CSS do modelo (preso a `.cardapio-sz`), fonte Babang e imagens do cabeçalho em `public/cardapio/` |
 | `src/app/api/cardapio-fotos/route.ts` | recebe a foto, reduz para 600px e converte para WebP (mantém o fundo transparente dos recortes) |
 | `src/app/configuracoes/FotosCardapioSection.tsx` | link do cardápio e cadastro das fotos |

@@ -179,8 +179,11 @@ export async function excluirFotoAction(id: string): Promise<{ error?: string }>
   const { error } = await supabase.from("cardapio_fotos").delete().eq("id", id);
   if (error) return { error: mensagemErro(error) };
 
-  // Arquivo órfão no bucket não quebra nada; a linha já saiu do carrossel
-  await supabase.storage.from("cardapio-fotos").remove([foto.storage_path]);
+  // Fotos do modelo (migration 015) ficam em public/ do app, não no bucket.
+  // Arquivo órfão no bucket não quebra nada; a linha já saiu do carrossel.
+  if (!foto.storage_path.startsWith("public/")) {
+    await supabase.storage.from("cardapio-fotos").remove([foto.storage_path]);
+  }
 
   revalidarFotos();
   return {};

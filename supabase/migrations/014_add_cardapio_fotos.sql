@@ -1,7 +1,7 @@
 -- Migration 014: fotos do carrossel do cardápio público (/cardapio)
 -- Execute no SQL Editor do Supabase (Painéis > SQL Editor > New Query)
 --
--- As fotos são cadastradas em Configurações > Fotos do cardápio e aparecem,
+-- As fotos são cadastradas em Configurações > Cardápio Online e aparecem,
 -- na ordem definida, no carrossel da página pública do cardápio.
 
 create table if not exists cardapio_fotos (
@@ -16,7 +16,11 @@ create table if not exists cardapio_fotos (
 
 create index if not exists idx_cardapio_fotos_ordem on cardapio_fotos(ordem);
 
-alter table cardapio_fotos disable row level security;
+-- Leitura pública (o cardápio é público); escrita só pelo servidor, com a
+-- service role, como em cardapio_config e categorias_produto
+alter table cardapio_fotos enable row level security;
+drop policy if exists "public_read_cardapio_fotos" on cardapio_fotos;
+create policy "public_read_cardapio_fotos" on cardapio_fotos for select using (true);
 
 -- Bucket público para as fotos (o upload passa pelo servidor, que já
 -- redimensiona e converte para WebP, que mantém o fundo transparente dos recortes)
