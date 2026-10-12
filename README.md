@@ -204,3 +204,27 @@ dois. O furo estava no topper.
 | `src/app/financeiro/CanceladosSection.tsx` | bloco recolhível dos cancelados do período |
 | `src/app/pedidos/[id]/actions.ts` | `revalidatePath("/financeiro")` ao cancelar, andar/voltar status e gravar preço ou valor de entrega — são exatamente as ações que mudam receita e a receber, e sem elas o financeiro ficava mostrando o total anterior |
 | `src/app/toppers/actions.ts` | idem para salvar ficha, marcar etapa e registrar/desfazer pagamento do topper |
+
+## Cardápio online (`/cardapio`)
+
+Página para clientes, sem menu do app e fora dos buscadores (`noindex`). Não há
+link para ela no app: só chega quem recebe o endereço, que fica em
+**Configurações > Cardápio Online** com botão de copiar.
+
+O layout é o do modelo aprovado, sem alterações. Do banco vêm só:
+
+- **Tortas** — produtos ativos com unidade `peso_kg`, preço em R$/kg e a descrição do cadastro;
+- **Doces** — produtos ativos com unidade `cento`, preço em R$/cento;
+- **Fotos do carrossel** — cadastradas em Configurações (enviar várias de uma vez, descrição, ordem, ocultar, excluir).
+
+Produtos por unidade não entram. Os textos fixos (regras de pedido, endereço,
+WhatsApp, Instagram) continuam no código, como no modelo.
+
+| Arquivo | Papel |
+| --- | --- |
+| `supabase/migrations/014_add_cardapio_fotos.sql` | tabela `cardapio_fotos` e bucket `cardapio-fotos` — **precisa ser executada no SQL Editor do Supabase** |
+| `supabase/migrations/015_seed_cardapio_fotos.sql` | cadastra as 12 fotos do modelo, servidas de `public/cardapio/fotos/` (já em WebP, 600px) — **rodar depois da 014** |
+| `src/app/cardapio/` | página, CSS do modelo (preso a `.cardapio-sz`), fonte Babang e imagens do cabeçalho em `public/cardapio/` |
+| `src/app/api/cardapio-fotos/route.ts` | recebe a foto, reduz para 600px e converte para WebP (mantém o fundo transparente dos recortes) |
+| `src/app/configuracoes/FotosCardapioSection.tsx` | link do cardápio e cadastro das fotos |
+| `src/components/AppShell.tsx` | tira navegação e convite de instalação das páginas públicas |

@@ -1,10 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { Navbar } from "@/components/Navbar";
-import { PeriodoBar } from "@/components/PeriodoBar";
-import { ComercialTabs } from "@/components/ComercialTabs";
-import { InstalarApp } from "@/components/InstalarApp";
+import { AppShell } from "@/components/AppShell";
 import { cookies } from "next/headers";
 import { isValidPreset } from "@/lib/periodo";
 
@@ -57,15 +54,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pt-BR">
       <body className={inter.className}>
-        <div className="min-h-screen flex flex-col">
-          <Navbar />
-          <PeriodoBar preset={preset} de={de} ate={ate} />
-          <ComercialTabs />
-          <main className="flex-1 max-w-2xl mx-auto w-full px-4 pb-28">
-            {children}
-          </main>
-        </div>
-        <InstalarApp />
+        <AppShell preset={preset} de={de} ate={ate}>
+          {children}
+        </AppShell>
       </body>
     </html>
   );
