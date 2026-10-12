@@ -173,6 +173,16 @@ export interface CardapioConfig {
   updated_at: string;
 }
 
+export interface CardapioFoto {
+  id: string;
+  url: string;
+  storage_path: string;
+  legenda: string | null;
+  ordem: number;
+  ativo: boolean;
+  created_at: string;
+}
+
 export interface ItemPedido {
   id: string;
   pedido_id: string;
@@ -594,6 +604,36 @@ export type Database = {
           panel_color?: string
           created_at?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      cardapio_fotos: {
+        Row: {
+          id: string
+          url: string
+          storage_path: string
+          legenda: string | null
+          ordem: number
+          ativo: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          url: string
+          storage_path: string
+          legenda?: string | null
+          ordem?: number
+          ativo?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          url?: string
+          storage_path?: string
+          legenda?: string | null
+          ordem?: number
+          ativo?: boolean
+          created_at?: string
         }
         Relationships: []
       }

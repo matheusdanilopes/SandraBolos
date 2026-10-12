@@ -2,8 +2,9 @@ import { supabase } from "@/lib/supabase";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { CategoriasSection } from "./CategoriasSection";
 import { CategoriasProdutoSection } from "./CategoriasProdutoSection";
+import { FotosCardapioSection } from "./FotosCardapioSection";
 import { CardapioVisual } from "../produtos/CardapioVisual";
-import type { CategoriaCusto, CategoriaProduto, ProdutoComCategoria, CardapioConfig } from "@/types/database";
+import type { CategoriaCusto, CategoriaProduto, ProdutoComCategoria, CardapioConfig, CardapioFoto } from "@/types/database";
 import { houveErroDeConexao } from "@/lib/erros";
 import { AvisoConexao } from "@/components/AvisoConexao";
 
@@ -15,6 +16,7 @@ export default async function ConfiguracoesPage() {
     categoriasProdutoResult,
     produtosResult,
     configResult,
+    fotosResult,
   ] = await Promise.all([
     supabase.from("categorias_custo").select("*").order("nome"),
     supabase.from("categorias_produto").select("*").order("ordem").order("nome"),
@@ -28,17 +30,24 @@ export default async function ConfiguracoesPage() {
       .select("*")
       .eq("id", "00000000-0000-0000-0000-000000000001")
       .single(),
+    createServerSupabaseClient()
+      .from("cardapio_fotos")
+      .select("*")
+      .order("ordem")
+      .order("created_at"),
   ]);
 
   const { data: categoriasCusto } = categoriasCustoResult;
   const { data: categoriasProduto } = categoriasProdutoResult;
   const { data: produtosData } = produtosResult;
   const { data: configData } = configResult;
+  const { data: fotosData } = fotosResult;
   const semConexao = houveErroDeConexao(
     categoriasCustoResult,
     categoriasProdutoResult,
     produtosResult,
-    configResult
+    configResult,
+    fotosResult
   );
 
   return (
@@ -50,6 +59,8 @@ export default async function ConfiguracoesPage() {
       <CategoriasSection categorias={(categoriasCusto ?? []) as CategoriaCusto[]} />
 
       <CategoriasProdutoSection categorias={(categoriasProduto ?? []) as CategoriaProduto[]} />
+
+      <FotosCardapioSection fotos={(fotosData ?? []) as CardapioFoto[]} />
 
       <div className="space-y-2">
         <div>

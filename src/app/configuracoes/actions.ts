@@ -119,3 +119,69 @@ export async function reordenarCategoriaProdutoAction(
   revalidatePath("/produtos");
   return {};
 }
+
+// ─── Fotos do cardápio (carrossel da página /cardapio) ───────────────────────
+
+function revalidarFotos() {
+  revalidatePath("/configuracoes");
+  revalidatePath("/cardapio");
+}
+
+export async function editarLegendaFotoAction(
+  id: string,
+  legenda: string
+): Promise<{ error?: string }> {
+  const supabase = createServerSupabaseClient();
+  const { error } = await supabase
+    .from("cardapio_fotos")
+    .update({ legenda: legenda.trim() || null })
+    .eq("id", id);
+  if (error) return { error: mensagemErro(error) };
+
+  revalidarFotos();
+  return {};
+}
+
+export async function toggleFotoAtivaAction(
+  id: string,
+  ativo: boolean
+): Promise<{ error?: string }> {
+  const supabase = createServerSupabaseClient();
+  const { error } = await supabase.from("cardapio_fotos").update({ ativo }).eq("id", id);
+  if (error) return { error: mensagemErro(error) };
+
+  revalidarFotos();
+  return {};
+}
+
+export async function reordenarFotosAction(
+  updates: { id: string; ordem: number }[]
+): Promise<{ error?: string }> {
+  const supabase = createServerSupabaseClient();
+  for (const { id, ordem } of updates) {
+    const { error } = await supabase.from("cardapio_fotos").update({ ordem }).eq("id", id);
+    if (error) return { error: mensagemErro(error) };
+  }
+
+  revalidarFotos();
+  return {};
+}
+
+export async function excluirFotoAction(id: string): Promise<{ error?: string }> {
+  const supabase = createServerSupabaseClient();
+  const { data: foto, error: buscaError } = await supabase
+    .from("cardapio_fotos")
+    .select("storage_path")
+    .eq("id", id)
+    .single();
+  if (buscaError) return { error: mensagemErro(buscaError) };
+
+  const { error } = await supabase.from("cardapio_fotos").delete().eq("id", id);
+  if (error) return { error: mensagemErro(error) };
+
+  // Arquivo órfão no bucket não quebra nada; a linha já saiu do carrossel
+  await supabase.storage.from("cardapio-fotos").remove([foto.storage_path]);
+
+  revalidarFotos();
+  return {};
+}

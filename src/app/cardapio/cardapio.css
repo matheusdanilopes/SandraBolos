@@ -1,0 +1,148 @@
+/*
+ * Estilos do cardápio público, copiados do modelo aprovado e presos ao
+ * contêiner .cardapio-sz para não vazar para o resto do app.
+ *
+ * O app usa o reset do Tailwind (preflight), que zera margens e marcadores de
+ * lista. O modelo contava com os padrões do navegador, então eles são
+ * devolvidos abaixo com especificidade baixa (:where) — as regras do modelo,
+ * que vêm depois, continuam vencendo.
+ */
+
+.cardapio-sz :where(p) { margin: 1em 0; }
+.cardapio-sz :where(ul) { list-style: disc; margin: 1em 0; padding-left: 40px; }
+.cardapio-sz :where(h3) { font-size: 1.17em; font-weight: bold; margin: 1em 0; }
+.cardapio-sz :where(svg) { display: inline; }
+
+body:has(.cardapio-sz) { background: #FBF2EA; }
+@media (prefers-color-scheme: dark) {
+  body:has(.cardapio-sz) { background: #211815; }
+}
+
+.cardapio-sz {
+  --bg:#FBF2EA; --surface:#FFFFFF; --surface-soft:#F8EEE6;
+  --text:#3A2A22; --text-soft:#8A7669; --border:#EAD9CE;
+  --wine:#7A2E3F; --rose:#B5697A; --rose-soft:#F6D9DE; --sage:#8CA084;
+  --wa:#3FA34D;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  .cardapio-sz {
+    color-scheme: dark;
+    --bg:#211815; --surface:#2C221D; --surface-soft:#332822;
+    --text:#F3E7DF; --text-soft:#C4AFA1; --border:#453731;
+    --wine:#E7A9B6; --rose:#E29AAA; --rose-soft:#3A2A2E; --sage:#9FB597;
+    --wa:#4FBF5F;
+  }
+}
+
+/* body do modelo */
+.cardapio-sz {
+  min-height: 100vh;
+  background: var(--bg); color: var(--text);
+  font-family: var(--font-poppins), 'Poppins', ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px; font-weight: 400; line-height: normal;
+  padding-inline: 16px;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px));
+}
+.cardapio-sz * { box-sizing: border-box; }
+.cardapio-sz img { max-width: 100%; }
+.cardapio-sz .wrap { max-width: 600px; margin-inline: auto; }
+
+.cardapio-sz header { padding-block: 28px 22px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.cardapio-sz header .script { font-family: var(--font-babang), 'Babang', cursive; font-weight: 400; color: var(--wine);
+  font-size: clamp(3rem, 15vw, 4.2rem); line-height: 1.1; }
+.cardapio-sz .swash { display: block; margin: 2px auto 0; color: var(--wine); opacity: .85; }
+.cardapio-sz header .wordmark { width: min(230px, 60%); height: auto; display: block; margin: 0 auto; }
+.cardapio-sz header .cake-icon { width: 118px; height: auto; margin: 2px auto 0; display: block; }
+.cardapio-sz header .sub { font-family: 'Palatino Linotype', Palatino, 'Book Antiqua', serif; font-size: .72rem; letter-spacing: .24em; text-transform: uppercase; color: var(--text-soft); margin-top: 6px; }
+.cardapio-sz header .tagline { font-size: .9rem; color: var(--text-soft); margin-top: 10px; max-width: 32ch; }
+.cardapio-sz header .tagline.quote { font-style: italic; font-size: .78rem; margin-top: 6px; }
+.cardapio-sz header .loc { font-size: .82rem; color: var(--text-soft); margin-top: 2px; }
+
+.cardapio-sz .wa-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--wa); color: #fff; text-decoration: none;
+  font-weight: 600; font-size: .95rem; padding: 14px 20px; border-radius: 14px;
+  margin-top: 16px; width: 100%;
+}
+.cardapio-sz .wa-btn svg { flex: none; width: 20px; height: 20px; }
+
+.cardapio-sz .gallery { margin-top: 8px; overflow: hidden; padding: 2px 0 12px; }
+.cardapio-sz .gallery-scroll {
+  display: flex; gap: 12px; width: max-content;
+  animation: cardapio-gallery-auto 30s linear infinite;
+}
+@keyframes cardapio-gallery-auto {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cardapio-sz .gallery-scroll { animation: none; }
+}
+.cardapio-sz .gallery-card {
+  flex: none; width: 148px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 16px;
+  padding: 8px; display: flex; align-items: center; justify-content: center;
+}
+.cardapio-sz .gallery-card img { width: 100%; height: 150px; object-fit: contain; display: block; }
+
+.cardapio-sz .menu-stack { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+.cardapio-sz details.menu-toggle { border: none; }
+.cardapio-sz summary.menu-btn {
+  list-style: none; cursor: pointer; position: relative;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  width: 100%; text-align: center; padding: 16px 44px;
+  background: var(--surface); border: 1.5px solid var(--wine); border-radius: 16px;
+}
+.cardapio-sz summary.menu-btn::-webkit-details-marker { display: none; }
+.cardapio-sz summary.menu-btn::marker { content: ""; }
+.cardapio-sz summary.menu-btn .title { font-family: var(--font-babang), 'Babang', cursive; font-size: 1.55rem; line-height: 1; color: var(--wine); }
+.cardapio-sz summary.menu-btn .sub { font-size: .76rem; color: var(--text-soft); font-weight: 500; }
+.cardapio-sz summary.menu-btn .chevron {
+  position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+  transition: transform .2s ease; color: var(--wine);
+}
+.cardapio-sz details[open] summary.menu-btn .chevron { transform: translateY(-50%) rotate(180deg); }
+.cardapio-sz details[open] summary.menu-btn { background: var(--rose-soft); border-color: var(--rose-soft); }
+.cardapio-sz .menu-content { padding-top: 16px; }
+
+.cardapio-sz section { padding-block: 10px 6px; }
+.cardapio-sz section.plain { padding-block: 28px 6px; }
+.cardapio-sz section h2 {
+  font-family: var(--font-babang), 'Babang', cursive; font-weight: 400; color: var(--wine);
+  font-size: clamp(1.6rem, 7vw, 2rem); margin: 0 0 2px;
+}
+.cardapio-sz section .h2-note { font-size: .82rem; color: var(--text-soft); margin: 0 0 14px; }
+
+.cardapio-sz .item { padding-block: 14px; border-bottom: 1px solid var(--border); }
+.cardapio-sz .item:last-child { border-bottom: none; }
+.cardapio-sz .item-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.cardapio-sz .item-top .name { font-weight: 600; font-size: .98rem; }
+.cardapio-sz .item-top .price {
+  flex: none; font-weight: 600; font-size: .9rem; color: var(--rose);
+  font-variant-numeric: tabular-nums;
+}
+.cardapio-sz .item .desc { font-size: .85rem; color: var(--text-soft); margin-top: 3px; line-height: 1.45; }
+
+.cardapio-sz .note-box {
+  background: var(--surface-soft); border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px 16px; margin-top: 16px; font-size: .85rem; color: var(--text-soft); line-height: 1.6;
+}
+.cardapio-sz .note-box ul { margin: 0; padding-left: 1.1em; }
+.cardapio-sz .note-box li + li { margin-top: 4px; }
+
+.cardapio-sz .rules { display: flex; flex-direction: column; gap: 22px; }
+.cardapio-sz .rule-group { display: flex; gap: 12px; }
+.cardapio-sz .rule-icon {
+  flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--rose-soft); color: var(--wine);
+  display: flex; align-items: center; justify-content: center;
+}
+.cardapio-sz .rule-group h3 { font-family: var(--font-playfair), 'Playfair Display', serif; font-weight: 600; font-size: 1.05rem; margin: 2px 0 8px; color: var(--text); }
+.cardapio-sz .rule-group ul { margin: 0; padding-left: 1.1em; font-size: .88rem; line-height: 1.55; color: var(--text); }
+.cardapio-sz .rule-group li + li { margin-top: 6px; }
+
+.cardapio-sz footer { margin-top: 36px; padding-top: 22px; border-top: 1px solid var(--border);
+  text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.cardapio-sz footer a.ig { color: var(--text-soft); text-decoration: none; font-size: .85rem; font-weight: 500; }
+.cardapio-sz footer .credit { font-size: .72rem; color: var(--text-soft); margin-top: 8px; }
