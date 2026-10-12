@@ -146,3 +146,25 @@ body:has(.cardapio-sz) { background: #FBF2EA; }
   text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .cardapio-sz footer a.ig { color: var(--text-soft); text-decoration: none; font-size: .85rem; font-weight: 500; }
 .cardapio-sz footer .credit { font-size: .72rem; color: var(--text-soft); margin-top: 8px; }
+
+/*
+ * Versão para o PDF (?pdf=1). O html2canvas não entende object-fit nem
+ * animação, então a grade usa só max-width/max-height. O tema é sempre claro.
+ */
+.cardapio-sz.modo-pdf {
+  color-scheme: light;
+  --bg:#FBF2EA; --surface:#FFFFFF; --surface-soft:#F8EEE6;
+  --text:#3A2A22; --text-soft:#8A7669; --border:#EAD9CE;
+  --wine:#7A2E3F; --rose:#B5697A; --rose-soft:#F6D9DE; --sage:#8CA084;
+  --wa:#3FA34D;
+  min-height: 0;
+  padding: 0 20px 24px;
+}
+.cardapio-sz.modo-pdf .gallery { overflow: visible; padding-bottom: 4px; }
+.cardapio-sz.modo-pdf .gallery-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.cardapio-sz.modo-pdf .gallery-card { width: auto; height: 166px; }
+.cardapio-sz.modo-pdf .gallery-card img { width: auto; height: auto; max-width: 100%; max-height: 150px; object-fit: initial; }
+/* o html2canvas desenha a fonte Babang um pouco abaixo: compensa no padding */
+.cardapio-sz.modo-pdf summary.menu-btn { cursor: default; padding: 6px 20px 18px; }
+.cardapio-sz.modo-pdf summary.menu-btn .sub,
+.cardapio-sz.modo-pdf summary.menu-btn .chevron { display: none; }

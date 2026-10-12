@@ -149,30 +149,6 @@ export interface CategoriaProduto {
   created_at: string;
 }
 
-export interface CardapioConfig {
-  id: string;
-  background_url: string | null;
-  background_type: string;
-  opacity: number;
-  titulo: string;
-  subtitulo: string | null;
-  cor_texto: string;
-  cor_titulo: string;
-  cor_descricao: string;
-  cor_preco: string;
-  alinhamento: string;
-  observacoes: string | null;
-  font_family: string;
-  layout_type: string;
-  overlay_anchor: string;
-  position_x: number;
-  position_y: number;
-  panel_opacity: number;
-  panel_color: string;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface CardapioFoto {
   id: string;
   url: string;

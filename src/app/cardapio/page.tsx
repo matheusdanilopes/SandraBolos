@@ -84,8 +84,24 @@ function ItemCardapio({ produto, sufixo }: { produto: Produto; sufixo: string })
   );
 }
 
-function Galeria({ fotos }: { fotos: CardapioFoto[] }) {
+function Galeria({ fotos, modoPdf }: { fotos: CardapioFoto[]; modoPdf: boolean }) {
   if (fotos.length === 0) return null;
+
+  // No PDF não há animação: cada foto aparece uma vez, em grade
+  if (modoPdf) {
+    return (
+      <section className="gallery">
+        <div className="gallery-grid">
+          {fotos.map((foto) => (
+            <div className="gallery-card" key={foto.id}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={foto.url} alt={foto.legenda ?? ""} crossOrigin="anonymous" />
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   const repeticoes = Math.ceil(MIN_CARDS_POR_VOLTA / fotos.length);
   const volta = Array.from({ length: repeticoes }, () => fotos).flat();
@@ -111,7 +127,15 @@ function Galeria({ fotos }: { fotos: CardapioFoto[] }) {
   );
 }
 
-export default async function CardapioPage() {
+export default async function CardapioPage({
+  searchParams,
+}: {
+  searchParams: { pdf?: string };
+}) {
+  // ?pdf=1 é a versão que o app captura para gerar o PDF (Produtos > Exportar
+  // Cardápio): seções abertas, tema claro e carrossel virando grade de fotos.
+  const modoPdf = searchParams.pdf === "1";
+
   const supabase = createServerSupabaseClient();
   const [produtosResult, fotosResult] = await Promise.all([
     supabase
@@ -138,7 +162,7 @@ export default async function CardapioPage() {
   const doces = produtos.filter((p) => p.unidade_medida === "cento");
 
   return (
-    <div className={`cardapio-sz ${poppins.variable} ${playfair.variable} ${babang.variable}`}>
+    <div className={`cardapio-sz ${modoPdf ? "modo-pdf " : ""}${poppins.variable} ${playfair.variable} ${babang.variable}`}>
       <div className="wrap">
         <header>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -151,12 +175,12 @@ export default async function CardapioPage() {
           </p>
         </header>
 
-        <Galeria fotos={fotos} />
+        <Galeria fotos={fotos} modoPdf={modoPdf} />
 
         <div className="menu-stack">
           {tortas.length > 0 && (
             <section id="tortas">
-              <details className="menu-toggle">
+              <details className="menu-toggle" open={modoPdf}>
                 <summary className="menu-btn">
                   <span className="title">Tortas</span>
                   <span className="sub">ver sabores e valores</span>
@@ -174,7 +198,7 @@ export default async function CardapioPage() {
 
           {doces.length > 0 && (
             <section id="doces">
-              <details className="menu-toggle">
+              <details className="menu-toggle" open={modoPdf}>
                 <summary className="menu-btn">
                   <span className="title">Doces</span>
                   <span className="sub">brigadeiros gourmet · ver valores</span>
@@ -199,7 +223,7 @@ export default async function CardapioPage() {
           )}
 
           <section id="pedir">
-            <details className="menu-toggle">
+            <details className="menu-toggle" open={modoPdf}>
               <summary className="menu-btn">
                 <span className="title">Como pedir</span>
                 <span className="sub">regras, prazos e pedido</span>

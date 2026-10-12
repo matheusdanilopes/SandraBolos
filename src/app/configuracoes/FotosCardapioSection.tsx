@@ -161,11 +161,12 @@ export function FotosCardapioSection({ fotos }: { fotos: CardapioFoto[] }) {
   const [isPending, startTransition] = useTransition();
   const [enviando, setEnviando] = useState<{ atual: number; total: number } | null>(null);
   const [erro, setErro] = useState("");
-  const [link, setLink] = useState("/cardapio");
+  const [link, setLink] = useState("/c");
   const [copiado, setCopiado] = useState(false);
 
   useEffect(() => {
-    setLink(`${window.location.origin}/cardapio`);
+    // Link curto (redireciona para /cardapio), cabe bem na bio do Instagram
+    setLink(`${window.location.host}/c`);
   }, []);
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -229,7 +230,7 @@ export function FotosCardapioSection({ fotos }: { fotos: CardapioFoto[] }) {
           <h2 className="font-semibold text-sm text-gray-800">Cardápio Online</h2>
         </div>
         <p className="text-xs text-gray-500">
-          Página para clientes com os produtos e preços do cadastro. Só acessa quem tiver o link.
+          Página para clientes com os produtos e preços do cadastro. Só acessa quem tiver o link — o link abaixo é curto para usar na bio do Instagram.
         </p>
       </div>
 
