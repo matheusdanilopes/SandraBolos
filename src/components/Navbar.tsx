@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Briefcase, TrendingUp, MoreHorizontal, Settings, type LucideIcon } from "lucide-react";
+import { LayoutDashboard, Briefcase, TrendingUp, MoreHorizontal, Settings, LogOut, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FabPedido } from "./FabPedido";
+import { sair } from "@/app/login/actions";
 
 const COMERCIAL_PATHS = ["/pedidos", "/clientes", "/produtos", "/toppers"];
 
@@ -63,6 +64,16 @@ export function Navbar() {
         >
           <Settings size={20} />
         </Link>
+        <form action={sair}>
+          <button
+            type="submit"
+            className="p-2 rounded-lg transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center text-brand-200 hover:bg-brand-700 hover:text-white"
+            aria-label="Sair"
+            title="Sair"
+          >
+            <LogOut size={20} />
+          </button>
+        </form>
       </header>
 
       <nav
