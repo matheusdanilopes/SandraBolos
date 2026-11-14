@@ -1,21 +1,9 @@
-// Login do app: usuários fixos e sessão num cookie assinado (HMAC-SHA256).
-// Usa só Web Crypto, para rodar tanto no middleware (Edge) quanto no servidor.
+// Sessão do login num cookie assinado (HMAC-SHA256). Usa só Web Crypto, para
+// rodar tanto no middleware (Edge) quanto no servidor. Os usuários e senhas
+// ficam no banco (tabela usuarios, migration 017): ver src/app/login/actions.ts.
 
 export const COOKIE_SESSAO = "sb_sessao";
 export const DURACAO_SESSAO_SEGUNDOS = 60 * 60 * 24 * 30; // 30 dias
-
-const USUARIOS: { nome: string; senha: string }[] = [
-  { nome: "Agnaldo", senha: "123456" },
-  { nome: "Sandra", senha: "123456" },
-  { nome: "Admin", senha: "123456" },
-];
-
-/** Nome do usuário (com a grafia oficial) se login e senha conferem; senão null. */
-export function validarCredenciais(login: string, senha: string): string | null {
-  const alvo = login.trim().toLowerCase();
-  const usuario = USUARIOS.find((u) => u.nome.toLowerCase() === alvo);
-  return usuario && usuario.senha === senha ? usuario.nome : null;
-}
 
 function segredo(): string | null {
   return process.env.AUTH_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || null;
