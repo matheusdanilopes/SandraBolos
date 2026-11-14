@@ -8,6 +8,8 @@ import { getPeriodoRange, isValidPreset } from "@/lib/periodo";
 import { pedidosPrevistos, resumirPrevisto } from "@/lib/receitaFutura";
 import { houveErroDeConexao } from "@/lib/erros";
 import { AvisoConexao } from "@/components/AvisoConexao";
+import { buscarAcessosCardapio } from "@/lib/acessosCardapio";
+import { DashboardAcessosCardapio } from "./DashboardAcessosCardapio";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +26,7 @@ export default async function DashboardPage() {
   const inicioMes = format(startOfMonth(agora), "yyyy-MM-dd");
   const fimMes = format(endOfMonth(agora), "yyyy-MM-dd");
 
-  const [pedidosResult, receitaResult, receitaMesResult, calendarioResult] = await Promise.all([
+  const [pedidosResult, receitaResult, receitaMesResult, calendarioResult, acessosCardapio] = await Promise.all([
     // A ficha do topper vem junto porque o valor dele faz parte do valor do
     // pedido — sem ela o "a receber" e o previsto ficavam sem o topper.
     supabase
@@ -57,6 +59,9 @@ export default async function DashboardPage() {
       .select("id, data_entrega, status, tipo, hora_entrega, hora_retirada, nome_cliente, clientes(nome)")
       .neq("status", "cancelado")
       .order("data_entrega", { ascending: true }),
+
+    // Se falhar, o card de acessos só não aparece: não atrapalha o resto
+    buscarAcessosCardapio().catch(() => null),
   ]);
 
   const receitaPeriodo =
@@ -98,6 +103,8 @@ export default async function DashboardPage() {
         fimMes={format(endOfMonth(agora), "dd/MM")}
         pedidosCalendario={(calendarioResult.data ?? []) as unknown as PedidoCalendario[]}
       />
+
+      {acessosCardapio && <DashboardAcessosCardapio acessos={acessosCardapio} />}
     </div>
   );
 }

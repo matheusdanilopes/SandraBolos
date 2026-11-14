@@ -165,8 +165,9 @@ export function FotosCardapioSection({ fotos }: { fotos: CardapioFoto[] }) {
   const [copiado, setCopiado] = useState(false);
 
   useEffect(() => {
-    // Link curto (redireciona para /cardapio), cabe bem na bio do Instagram
-    setLink(`${window.location.host}/c`);
+    // Link curto (redireciona para /cardapio), cabe bem na bio do Instagram.
+    // Com https:// para virar link clicável em qualquer app onde for colado.
+    setLink(`${window.location.origin}/c`);
   }, []);
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
