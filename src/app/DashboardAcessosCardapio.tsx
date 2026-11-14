@@ -3,28 +3,16 @@
 import { useState } from "react";
 import { BarChart3 } from "lucide-react";
 
-export interface AcessosCardapioDados {
-  total: number;
-  // Um item por dia (AAAA-MM-DD, horário de Brasília), do mais antigo para hoje
-  porDia: { dia: string; total: number }[];
-}
+import type { AcessosCardapioDados } from "@/lib/acessosCardapio";
 
 function formatarDia(dia: string) {
   const [, mes, d] = dia.split("-");
   return `${d}/${mes}`;
 }
 
-export function AcessosCardapio({ acessos }: { acessos: AcessosCardapioDados | null }) {
+// Acessos ao link do cardápio (/c), por dia, nos últimos 30 dias
+export function DashboardAcessosCardapio({ acessos }: { acessos: AcessosCardapioDados }) {
   const [selecionado, setSelecionado] = useState<number | null>(null);
-
-  if (!acessos) {
-    return (
-      <p className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3">
-        A contagem de acessos ainda não está ativa: rode a migration{" "}
-        <code>016_add_cardapio_acessos.sql</code> no SQL Editor do Supabase.
-      </p>
-    );
-  }
 
   const { total, porDia } = acessos;
   const ultimos7 = porDia.slice(-7).reduce((s, d) => s + d.total, 0);
@@ -34,10 +22,10 @@ export function AcessosCardapio({ acessos }: { acessos: AcessosCardapioDados | n
   const ativo = porDia[indiceAtivo];
 
   return (
-    <div className="border-t border-gray-100 pt-4 space-y-3">
+    <div className="card p-4 space-y-3">
       <div className="flex items-center gap-2">
-        <BarChart3 size={14} className="text-brand-600" />
-        <p className="text-sm font-medium text-gray-700">Acessos pelo link</p>
+        <BarChart3 size={15} className="text-brand-600" />
+        <h2 className="font-semibold text-sm text-gray-800">Acessos ao cardápio online</h2>
       </div>
 
       <div className="grid grid-cols-3 gap-2">

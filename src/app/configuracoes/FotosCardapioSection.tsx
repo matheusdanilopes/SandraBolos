@@ -15,7 +15,6 @@ import {
   reordenarFotosAction,
   excluirFotoAction,
 } from "./actions";
-import { AcessosCardapio, type AcessosCardapioDados } from "./AcessosCardapio";
 
 interface RowProps {
   foto: CardapioFoto;
@@ -156,13 +155,7 @@ function FotoRow({ foto, isFirst, isLast, onMoveUp, onMoveDown }: RowProps) {
   );
 }
 
-export function FotosCardapioSection({
-  fotos,
-  acessos,
-}: {
-  fotos: CardapioFoto[];
-  acessos: AcessosCardapioDados | null;
-}) {
+export function FotosCardapioSection({ fotos }: { fotos: CardapioFoto[] }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -270,8 +263,6 @@ export function FotosCardapioSection({
           <ExternalLink size={14} />
         </a>
       </div>
-
-      <AcessosCardapio acessos={acessos} />
 
       {/* Fotos */}
       <div className="border-t border-gray-100 pt-4 space-y-2">

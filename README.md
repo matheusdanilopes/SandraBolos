@@ -214,8 +214,8 @@ curto, `https://<domínio>/c`, pensado para a bio do Instagram.
 
 `/c` (`src/app/c/route.ts`) registra cada acesso na tabela `cardapio_acessos` e
 redireciona para `/cardapio`. Prévias de link (robôs do WhatsApp, Instagram
-etc.) não contam. Configurações mostra acessos de hoje, 7 e 30 dias e o gráfico
-por dia dos últimos 30 dias.
+etc.) não contam. O Dashboard mostra, no fim da tela, acessos de hoje, 7 e 30
+dias e o gráfico por dia dos últimos 30 dias.
 
 No celular com o app instalado, o link abre dentro do app; o manifest usa
 `launch_handler: navigate-existing` para que ele vá para o cardápio em vez de
@@ -245,6 +245,7 @@ WhatsApp, Instagram) continuam no código, como no modelo.
 | `src/app/cardapio/` | página, CSS do modelo (preso a `.cardapio-sz`), fonte Babang e imagens do cabeçalho em `public/cardapio/` |
 | `src/app/api/cardapio-fotos/route.ts` | recebe a foto, reduz para 600px e converte para WebP (mantém o fundo transparente dos recortes) |
 | `src/app/configuracoes/FotosCardapioSection.tsx` | link do cardápio e cadastro das fotos |
-| `src/app/configuracoes/AcessosCardapio.tsx` | contagem e gráfico de acessos ao link |
+| `src/lib/acessosCardapio.ts` | busca os acessos (total e por dia, horário de Brasília) |
+| `src/app/DashboardAcessosCardapio.tsx` | card do Dashboard com a contagem e o gráfico de acessos |
 | `src/app/produtos/ExportarCardapioPdf.tsx` | botão e geração do PDF do cardápio |
 | `src/components/AppShell.tsx` | tira navegação e convite de instalação das páginas públicas |
