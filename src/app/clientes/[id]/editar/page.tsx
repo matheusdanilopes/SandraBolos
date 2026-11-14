@@ -1,12 +1,14 @@
 import { notFound } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { ClienteForm } from "../../ClienteForm";
 import { isErroDeConexao } from "@/lib/erros";
 import { PainelSemConexao } from "@/components/PainelSemConexao";
 
 export const dynamic = "force-dynamic";
 
-export default async function EditarClientePage({ params }: { params: { id: string } }) {
+export default async function EditarClientePage(props: { params: Promise<{ id: string }> }) {
+  const supabase = createServerSupabaseClient();
+  const params = await props.params;
   const { data: cliente, error } = await supabase
     .from("clientes")
     .select("*")

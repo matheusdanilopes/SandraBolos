@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { recusarSemSessao } from "@/lib/sessao";
+import { mensagemErro } from "@/lib/erros";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { createPedidoFolder, hasDriveCredentials } from "@/lib/googleDrive";
 
 export async function POST(req: NextRequest) {
+  const negado = await recusarSemSessao(req);
+  if (negado) return negado;
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Body inválido" }, { status: 400 });
 
@@ -43,7 +47,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (dbError) {
-    return NextResponse.json({ error: dbError.message }, { status: 500 });
+    return NextResponse.json({ error: mensagemErro(dbError) }, { status: 500 });
   }
 
   // Create Drive folder (non-fatal if env vars not configured)

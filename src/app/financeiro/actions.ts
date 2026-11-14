@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { mensagemErro } from "@/lib/erros";
+import { exigirSessao } from "@/lib/sessao";
 
 export async function adicionarCustoAction(
   descricao: string,
@@ -10,6 +11,7 @@ export async function adicionarCustoAction(
   data: string,
   categoriaId: string | null
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
   const { error } = await supabase.from("custos").insert({
     descricao,
@@ -23,6 +25,7 @@ export async function adicionarCustoAction(
 }
 
 export async function excluirCustoAction(id: string): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
   const { error } = await supabase.from("custos").delete().eq("id", id);
   if (error) return { error: mensagemErro(error) };

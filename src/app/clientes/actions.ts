@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { mensagemErro } from "@/lib/erros";
 import type { Cliente } from "@/types/database";
+import { exigirSessao } from "@/lib/sessao";
 
 /** Telas que mostram a lista de clientes e precisam saber de um cadastro novo. */
 function revalidarTelasComClientes(clienteId?: string) {
@@ -31,6 +32,7 @@ export async function listarClientesAction(): Promise<{
   clientes?: ClienteOpcao[];
   error?: string;
 }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
     .from("clientes")
@@ -45,6 +47,7 @@ export async function criarClienteAction(
   nome: string,
   telefone: string
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
     .from("clientes")
@@ -63,6 +66,7 @@ export async function editarClienteAction(
   nome: string,
   telefone: string
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
   const { error } = await supabase
     .from("clientes")
@@ -86,6 +90,7 @@ export async function editarClienteAction(
 export async function excluirClienteAction(
   clienteId: string
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
 
   const { count, error: erroContagem } = await supabase

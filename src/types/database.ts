@@ -696,6 +696,18 @@ export type Database = {
         Args: { p_login: string; p_senha: string }
         Returns: string | null
       }
+      entrar_login: {
+        Args: { p_login: string; p_senha: string; p_ip: string | null }
+        Returns: { bloqueado: boolean; login?: string; versao?: number }
+      }
+      sessao_valida: {
+        Args: { p_login: string; p_versao: number }
+        Returns: boolean
+      }
+      registrar_acesso_cardapio: {
+        Args: { p_ip: string | null }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

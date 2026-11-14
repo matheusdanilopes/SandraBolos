@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { recusarSemSessao } from "@/lib/sessao";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { downloadFileFromDrive } from "@/lib/googleDrive";
 import { mensagemErro } from "@/lib/erros";
@@ -8,10 +9,10 @@ export const dynamic = "force-dynamic";
 // Serve a imagem pelo próprio app: o link do Drive, no celular, pede login
 // ou escolha de conta do Google antes de mostrar o arquivo.
 // Por padrão abre no navegador; com ?download=1 baixa o arquivo.
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const negado = await recusarSemSessao(req);
+  if (negado) return negado;
+  const params = await props.params;
   const supabase = createServerSupabaseClient();
 
   const { data: imagem, error } = await supabase

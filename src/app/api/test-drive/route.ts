@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { recusarSemSessao } from "@/lib/sessao";
 import { getDriveClient, hasDriveCredentials } from "@/lib/googleDrive";
 
-// Diagnostic endpoint — gate with TEST_DRIVE_SECRET env var.
-// Usage: GET /api/test-drive?secret=<TEST_DRIVE_SECRET>
+// Diagnóstico do Drive: GET /api/test-drive com o app logado.
+// (Antes pedia ?secret= na URL, que fica gravado em logs; agora vale o login.)
 export async function GET(req: NextRequest) {
-  const secret = process.env.TEST_DRIVE_SECRET;
-  if (!secret || req.nextUrl.searchParams.get("secret") !== secret) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const negado = await recusarSemSessao(req);
+  if (negado) return negado;
 
   const rootFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID;
   const present = (v?: string) => (v ? "present" : "MISSING");

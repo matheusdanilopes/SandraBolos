@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { supabase } from "@/lib/supabase";
+import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { formatCurrency, calcularValorFinal, formatDate } from "@/lib/utils";
 import { format } from "date-fns";
 import {
@@ -76,7 +76,8 @@ function linhaDoPedido(
 }
 
 export default async function FinanceiroPage() {
-  const cookieStore = cookies();
+  const supabase = createServerSupabaseClient();
+  const cookieStore = await cookies();
   const presetRaw = cookieStore.get("sb_periodo")?.value ?? "mes_atual";
   const preset = isValidPreset(presetRaw) ? presetRaw : "mes_atual";
   const de = cookieStore.get("sb_periodo_de")?.value;

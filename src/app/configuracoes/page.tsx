@@ -1,4 +1,3 @@
-import { supabase } from "@/lib/supabase";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { CategoriasSection } from "./CategoriasSection";
 import { CategoriasProdutoSection } from "./CategoriasProdutoSection";
@@ -10,6 +9,7 @@ import { AvisoConexao } from "@/components/AvisoConexao";
 export const dynamic = "force-dynamic";
 
 export default async function ConfiguracoesPage() {
+  const supabase = createServerSupabaseClient();
   const [
     categoriasCustoResult,
     categoriasProdutoResult,

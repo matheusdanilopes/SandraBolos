@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { recusarSemSessao } from "@/lib/sessao";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { createPedidoFolder, uploadFileToDrive } from "@/lib/googleDrive";
 import { isErroDeConexao, mensagemErro } from "@/lib/erros";
@@ -8,6 +9,8 @@ const MAX_IMAGENS = 5;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 export async function POST(req: NextRequest) {
+  const negado = await recusarSemSessao(req);
+  if (negado) return negado;
   const formData = await req.formData().catch(() => null);
   if (!formData) return NextResponse.json({ error: "FormData inválido" }, { status: 400 });
 

@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { recusarSemSessao } from "@/lib/sessao";
+import { mensagemErro } from "@/lib/erros";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
 // Garante que nenhuma leitura do Supabase venha do cache de dados do Next.
 export const fetchCache = "force-no-store";
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const negado = await recusarSemSessao(_req);
+  if (negado) return negado;
+  const params = await props.params;
   const supabase = createServerSupabaseClient();
 
   const { data: pedido } = await supabase
@@ -28,7 +30,7 @@ export async function GET(
     .order("created_at", { ascending: true });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: mensagemErro(error) }, { status: 500 });
   }
 
   return NextResponse.json(imagens);

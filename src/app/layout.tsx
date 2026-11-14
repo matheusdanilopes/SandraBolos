@@ -44,8 +44,8 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const cookieStore = cookies();
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const cookieStore = await cookies();
   const presetRaw = cookieStore.get("sb_periodo")?.value ?? "mes_atual";
   const preset = isValidPreset(presetRaw) ? presetRaw : "mes_atual";
   const de = cookieStore.get("sb_periodo_de")?.value;

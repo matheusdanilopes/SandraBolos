@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { ToppersList } from "./ToppersList";
 import { Sparkles } from "lucide-react";
 import type { PedidoComTopper } from "@/types/database";
@@ -8,6 +8,7 @@ import { AvisoConexao } from "@/components/AvisoConexao";
 export const dynamic = "force-dynamic";
 
 export default async function ToppersPage() {
+  const supabase = createServerSupabaseClient();
   const { data: pedidos, error } = await supabase
     .from("pedidos")
     .select("*, clientes(nome, telefone), toppers_pedido(*)")

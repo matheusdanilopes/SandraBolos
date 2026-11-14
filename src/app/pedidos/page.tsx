@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { PedidosList } from "./PedidosList";
 import { type PedidoComCliente } from "@/types/database";
 import { Plus } from "lucide-react";
@@ -12,11 +12,13 @@ export const dynamic = "force-dynamic";
  * `?filtro=` deixa o dashboard abrir a lista já no recorte que a pessoa tocou
  * (hoje, semana, atrasados...). Valor inválido cai em "todos" na própria lista.
  */
-export default async function PedidosPage({
-  searchParams,
-}: {
-  searchParams?: { filtro?: string };
-}) {
+export default async function PedidosPage(
+  props: {
+    searchParams?: Promise<{ filtro?: string }>;
+  }
+) {
+  const supabase = createServerSupabaseClient();
+  const searchParams = await props.searchParams;
   const { data: pedidos, error } = await supabase
     .from("pedidos")
     .select(

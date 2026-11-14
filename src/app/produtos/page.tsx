@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { ProdutosClient } from "./ProdutosClient";
 import type { ProdutoComCategoria, CategoriaProduto } from "@/types/database";
 import { houveErroDeConexao } from "@/lib/erros";
@@ -7,6 +7,7 @@ import { AvisoConexao } from "@/components/AvisoConexao";
 export const dynamic = "force-dynamic";
 
 export default async function ProdutosPage() {
+  const supabase = createServerSupabaseClient();
   const [produtosResult, categoriasResult] =
     await Promise.all([
       supabase

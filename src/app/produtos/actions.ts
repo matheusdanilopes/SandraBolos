@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { mensagemErro } from "@/lib/erros";
 import type { UnidadeMedida } from "@/types/database";
+import { exigirSessao } from "@/lib/sessao";
 
 interface ProdutoPayload {
   nome: string;
@@ -16,6 +17,7 @@ interface ProdutoPayload {
 export async function criarProdutoAction(
   data: ProdutoPayload
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   if (!data.nome.trim()) return { error: "Nome é obrigatório" };
   if (data.preco_padrao < 0) return { error: "Preço inválido" };
 
@@ -38,6 +40,7 @@ export async function editarProdutoAction(
   id: string,
   data: ProdutoPayload & { ativo: boolean }
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   if (!data.nome.trim()) return { error: "Nome é obrigatório" };
   if (data.preco_padrao < 0) return { error: "Preço inválido" };
 
@@ -63,6 +66,7 @@ export async function toggleAtivoAction(
   id: string,
   ativo: boolean
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
   const { error } = await supabase
     .from("produtos")

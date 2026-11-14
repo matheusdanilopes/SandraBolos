@@ -128,11 +128,12 @@ function Galeria({ fotos, modoPdf }: { fotos: CardapioFoto[]; modoPdf: boolean }
   );
 }
 
-export default async function CardapioPage({
-  searchParams,
-}: {
-  searchParams: { pdf?: string };
-}) {
+export default async function CardapioPage(
+  props: {
+    searchParams: Promise<{ pdf?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   // ?pdf=1 é a versão que o app captura para gerar o PDF (Produtos > Exportar
   // Cardápio): seções abertas, tema claro e carrossel virando grade de fotos.
   const modoPdf = searchParams.pdf === "1";

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { formatDate, formatPhone } from "@/lib/utils";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TIPO_LABELS, type Pedido } from "@/types/database";
@@ -11,7 +11,9 @@ import { ExcluirCliente } from "./ExcluirCliente";
 
 export const dynamic = "force-dynamic";
 
-export default async function ClienteDetailPage({ params }: { params: { id: string } }) {
+export default async function ClienteDetailPage(props: { params: Promise<{ id: string }> }) {
+  const supabase = createServerSupabaseClient();
+  const params = await props.params;
   const [clienteResult, pedidosResult] = await Promise.all([
     supabase.from("clientes").select("*").eq("id", params.id).single(),
     supabase.from("pedidos").select("*").eq("cliente_id", params.id).order("data_entrega", { ascending: false }),

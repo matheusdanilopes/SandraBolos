@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { recusarSemSessao } from "@/lib/sessao";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { deleteFileFromDrive } from "@/lib/googleDrive";
 import { isErroDeConexao, mensagemErro } from "@/lib/erros";
 
-export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const negado = await recusarSemSessao(_req);
+  if (negado) return negado;
+  const params = await props.params;
   const supabase = createServerSupabaseClient();
 
   const { data: imagem, error: fetchError } = await supabase

@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { mensagemErro } from "@/lib/erros";
+import { exigirSessao } from "@/lib/sessao";
 
 export async function adicionarCategoriaAction(nome: string): Promise<{ error?: string }> {
+  await exigirSessao();
   const nomeTrimmed = nome.trim();
   if (nomeTrimmed.length < 2) return { error: "Nome deve ter ao menos 2 caracteres." };
 
@@ -18,6 +20,7 @@ export async function adicionarCategoriaAction(nome: string): Promise<{ error?: 
 }
 
 export async function excluirCategoriaAction(id: string): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
   const { error } = await supabase.from("categorias_custo").delete().eq("id", id);
   if (error) return { error: mensagemErro(error) };
@@ -33,6 +36,7 @@ export async function adicionarCategoriaProdutoAction(
   nome: string,
   ordemAtual: number
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   const nomeTrimmed = nome.trim();
   if (nomeTrimmed.length < 2) return { error: "Nome deve ter ao menos 2 caracteres." };
 
@@ -51,6 +55,7 @@ export async function editarCategoriaProdutoAction(
   id: string,
   nome: string
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   const nomeTrimmed = nome.trim();
   if (nomeTrimmed.length < 2) return { error: "Nome deve ter ao menos 2 caracteres." };
 
@@ -67,6 +72,7 @@ export async function editarCategoriaProdutoAction(
 }
 
 export async function excluirCategoriaProdutoAction(id: string): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
 
   const { data: emUso } = await supabase
@@ -91,6 +97,7 @@ export async function toggleCategoriaProdutoAtivoAction(
   id: string,
   ativo: boolean
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
   const { error } = await supabase
     .from("categorias_produto")
@@ -106,6 +113,7 @@ export async function toggleCategoriaProdutoAtivoAction(
 export async function reordenarCategoriaProdutoAction(
   updates: { id: string; ordem: number }[]
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
   for (const { id, ordem } of updates) {
     const { error } = await supabase
@@ -131,6 +139,7 @@ export async function editarLegendaFotoAction(
   id: string,
   legenda: string
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
   const { error } = await supabase
     .from("cardapio_fotos")
@@ -146,6 +155,7 @@ export async function toggleFotoAtivaAction(
   id: string,
   ativo: boolean
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
   const { error } = await supabase.from("cardapio_fotos").update({ ativo }).eq("id", id);
   if (error) return { error: mensagemErro(error) };
@@ -157,6 +167,7 @@ export async function toggleFotoAtivaAction(
 export async function reordenarFotosAction(
   updates: { id: string; ordem: number }[]
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
   for (const { id, ordem } of updates) {
     const { error } = await supabase.from("cardapio_fotos").update({ ordem }).eq("id", id);
@@ -168,6 +179,7 @@ export async function reordenarFotosAction(
 }
 
 export async function excluirFotoAction(id: string): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
   const { data: foto, error: buscaError } = await supabase
     .from("cardapio_fotos")

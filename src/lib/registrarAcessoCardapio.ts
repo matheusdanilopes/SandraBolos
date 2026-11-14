@@ -13,11 +13,11 @@ const PREVIA_CONTADA = /whatsapp|facebookexternalhit/i;
 const ROBO = /bot|crawl|spider|preview|facebookcatalog|telegram|slack|discord|embedly|vercel-|headless/i;
 
 async function deveContar(): Promise<boolean> {
-  const h = headers();
+  const h = await headers();
   const userAgent = h.get("user-agent") ?? "";
 
   // Quem está logado no app é da equipe (conferindo o cardápio, gerando o PDF)
-  if (await lerTokenSessao(cookies().get(COOKIE_SESSAO)?.value)) return false;
+  if (await lerTokenSessao((await cookies()).get(COOKIE_SESSAO)?.value)) return false;
 
   if (PREVIA_CONTADA.test(userAgent)) return true;
   if (!userAgent || ROBO.test(userAgent)) return false;
@@ -34,8 +34,14 @@ async function deveContar(): Promise<boolean> {
 export async function registrarAcessoCardapio(): Promise<void> {
   try {
     if (!(await deveContar())) return;
-    // Prazo curto: se o banco demorar, o cardápio abre sem esperar
-    await createServerSupabaseClient(criarFetchComPrazo(3000)).from("cardapio_acessos").insert({});
+    const h = await headers();
+    const ip = (h.get("x-real-ip") ?? h.get("x-forwarded-for")?.split(",")[0])?.trim() || null;
+    // Prazo curto: se o banco demorar, o cardápio abre sem esperar.
+    // registrar_acesso_cardapio (migration 018) ignora o excesso de um mesmo IP,
+    // para ninguém inflar o contador; sem a 018, grava direto como antes.
+    const supabase = createServerSupabaseClient(criarFetchComPrazo(3000));
+    const { error } = await supabase.rpc("registrar_acesso_cardapio", { p_ip: ip });
+    if (error?.code === "PGRST202") await supabase.from("cardapio_acessos").insert({});
   } catch {
     // ignora
   }

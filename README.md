@@ -242,9 +242,10 @@ WhatsApp, Instagram) continuam no código, como no modelo.
 | `supabase/migrations/014_add_cardapio_fotos.sql` | tabela `cardapio_fotos` e bucket `cardapio-fotos` — **precisa ser executada no SQL Editor do Supabase** |
 | `supabase/migrations/015_seed_cardapio_fotos.sql` | cadastra as 12 fotos do modelo, servidas de `public/cardapio/fotos/` (já em WebP, 600px) — **rodar depois da 014** |
 | `supabase/migrations/016_add_cardapio_acessos.sql` | tabela `cardapio_acessos` e view `cardapio_acessos_por_dia` — **precisa ser executada no SQL Editor do Supabase** |
-| `supabase/migrations/017_add_usuarios.sql` | tabela `usuarios` (senha em hash bcrypt), função `verificar_login` e os usuários iniciais — **precisa ser executada no SQL Editor do Supabase**; sem ela ninguém consegue entrar no app |
+| `supabase/migrations/017_add_usuarios.sql` | tabela `usuarios` (senha em hash bcrypt), função `verificar_login` e os usuários iniciais (com senha aleatória: defina a de cada um com o `update` do fim do arquivo) — **precisa ser executada no SQL Editor do Supabase**; sem ela ninguém consegue entrar no app |
+| `supabase/migrations/018_seguranca.sql` | fecha todas as tabelas para a chave anon (RLS sem policies), limita tentativas de login, derruba sessões ao trocar senha/desativar e limita a contagem de acessos do cardápio a 30 por IP por hora — **executar no SQL Editor depois de publicar o app**; o app precisa de `SUPABASE_SERVICE_ROLE_KEY` e `AUTH_SECRET` na Vercel |
 | `src/app/c/route.ts` | link curto: redireciona para `/cardapio` |
-| `src/lib/registrarAcessoCardapio.ts` | registra a abertura do cardápio (exceto robôs, prefetch e usuários logados) |
+| `src/lib/registrarAcessoCardapio.ts` | registra a abertura do cardápio (exceto robôs, prefetch e usuários logados; no máximo 30 por IP por hora) |
 | `src/app/cardapio/` | página, CSS do modelo (preso a `.cardapio-sz`), fonte Babang e imagens do cabeçalho em `public/cardapio/` |
 | `src/app/api/cardapio-fotos/route.ts` | recebe a foto, reduz para 600px e converte para WebP (mantém o fundo transparente dos recortes) |
 | `src/app/configuracoes/FotosCardapioSection.tsx` | link do cardápio e cadastro das fotos |
