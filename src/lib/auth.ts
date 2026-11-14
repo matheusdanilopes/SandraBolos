@@ -6,7 +6,18 @@ export const COOKIE_SESSAO = "sb_sessao";
 export const DURACAO_SESSAO_SEGUNDOS = 60 * 60 * 24 * 30; // 30 dias
 
 function segredo(): string | null {
-  return process.env.AUTH_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || null;
+  if (process.env.AUTH_SECRET) return process.env.AUTH_SECRET;
+  // A chave de serviço só serve de segredo se for mesmo secreta: a chave pública
+  // (anon/publishable) vai para o navegador e permitiria forjar o cookie de login.
+  const chaveServico = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (
+    !chaveServico ||
+    chaveServico === process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    chaveServico.startsWith("sb_publishable_")
+  ) {
+    return null;
+  }
+  return chaveServico;
 }
 
 function paraBase64Url(bytes: Uint8Array): string {
