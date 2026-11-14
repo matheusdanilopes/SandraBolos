@@ -1,9 +1,30 @@
 // Sessão do login num cookie assinado (HMAC-SHA256). Usa só Web Crypto, para
 // rodar tanto no middleware (Edge) quanto no servidor. Os usuários e senhas
-// ficam no banco (tabela usuarios, migration 017): ver src/app/login/actions.ts.
+// ficam no banco (tabela usuarios, migrations 017 e 018): ver src/app/login/actions.ts.
+//
+// O token leva a "versão" do usuário, que o banco aumenta ao trocar a senha ou
+// desativar a pessoa. O middleware confere essa versão no banco a cada
+// REVALIDAR_SESSAO_SEGUNDOS: assim uma sessão roubada ou de alguém desligado
+// para de valer em até 1 hora, sem consultar o banco a cada página.
 
 export const COOKIE_SESSAO = "sb_sessao";
-export const DURACAO_SESSAO_SEGUNDOS = 60 * 60 * 24 * 30; // 30 dias
+export const DURACAO_SESSAO_SEGUNDOS = 60 * 60 * 24 * 30; // 30 dias sem uso
+export const REVALIDAR_SESSAO_SEGUNDOS = 60 * 60; // 1 hora
+
+export interface Sessao {
+  usuario: string;
+  versao: number;
+  /** Quando o token foi emitido ou conferido no banco pela última vez (segundos). */
+  emitidoEm: number;
+}
+
+export const OPCOES_COOKIE_SESSAO = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  path: "/",
+  maxAge: DURACAO_SESSAO_SEGUNDOS,
+};
 
 function segredo(): string | null {
   if (process.env.AUTH_SECRET) return process.env.AUTH_SECRET;
@@ -45,17 +66,24 @@ async function assinar(dados: string, chave: string): Promise<string> {
   return paraBase64Url(new Uint8Array(sig));
 }
 
+export function agoraEmSegundos(): number {
+  return Math.floor(Date.now() / 1000);
+}
+
 /** Token da sessão; null se não há segredo configurado no servidor. */
-export async function criarTokenSessao(usuario: string): Promise<string | null> {
+export async function criarTokenSessao(usuario: string, versao: number): Promise<string | null> {
   const chave = segredo();
   if (!chave) return null;
-  const exp = Math.floor(Date.now() / 1000) + DURACAO_SESSAO_SEGUNDOS;
-  const payload = paraBase64Url(new TextEncoder().encode(JSON.stringify({ u: usuario, exp })));
+  const iat = agoraEmSegundos();
+  const exp = iat + DURACAO_SESSAO_SEGUNDOS;
+  const payload = paraBase64Url(
+    new TextEncoder().encode(JSON.stringify({ u: usuario, v: versao, iat, exp }))
+  );
   return `${payload}.${await assinar(payload, chave)}`;
 }
 
-/** Nome do usuário da sessão, ou null se o token é inválido ou expirou. */
-export async function lerTokenSessao(token: string | undefined): Promise<string | null> {
+/** Sessão do token, ou null se ele é inválido, de formato antigo ou expirou. */
+export async function lerTokenSessao(token: string | undefined): Promise<Sessao | null> {
   const chave = segredo();
   if (!token || !chave) return null;
   const [payload, sig] = token.split(".");
@@ -68,10 +96,11 @@ export async function lerTokenSessao(token: string | undefined): Promise<string 
   if (diff !== 0) return null;
 
   try {
-    const { u, exp } = JSON.parse(new TextDecoder().decode(deBase64Url(payload)));
-    if (typeof u !== "string" || typeof exp !== "number") return null;
-    if (exp < Math.floor(Date.now() / 1000)) return null;
-    return u;
+    const { u, v, iat, exp } = JSON.parse(new TextDecoder().decode(deBase64Url(payload)));
+    if (typeof u !== "string" || typeof v !== "number") return null;
+    if (typeof iat !== "number" || typeof exp !== "number") return null;
+    if (exp < agoraEmSegundos()) return null;
+    return { usuario: u, versao: v, emitidoEm: iat };
   } catch {
     return null;
   }
@@ -79,9 +108,18 @@ export async function lerTokenSessao(token: string | undefined): Promise<string 
 
 /** Evita redirecionar para fora do app depois do login. */
 export function destinoSeguro(destino: string | null | undefined): string {
-  if (!destino || !destino.startsWith("/") || destino.startsWith("//") || destino.startsWith("/\\")) {
+  if (!destino || !destino.startsWith("/")) return "/";
+  // O navegador ignora tabs e quebras de linha e trata "\" como "/" ao montar a
+  // URL: "/\t/site.com" vira "//site.com". Por isso a conferência é feita na
+  // URL já interpretada, e o que segue adiante é a versão normalizada.
+  const base = "http://app.invalido";
+  let url: URL;
+  try {
+    url = new URL(destino, base);
+  } catch {
     return "/";
   }
-  if (destino === "/login" || destino.startsWith("/login?")) return "/";
-  return destino;
+  if (url.origin !== base) return "/";
+  if (url.pathname === "/login") return "/";
+  return url.pathname + url.search + url.hash;
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { recusarSemSessao } from "@/lib/sessao";
 import { revalidatePath } from "next/cache";
 import sharp from "sharp";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
@@ -10,6 +11,8 @@ const MAX_SIZE = 4 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export async function POST(request: NextRequest) {
+  const negado = await recusarSemSessao(request);
+  if (negado) return negado;
   try {
     const form = await request.formData().catch(() => null);
     if (!form) return NextResponse.json({ error: "FormData inválido" }, { status: 400 });

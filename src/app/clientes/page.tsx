@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { ClientesList } from "./ClientesList";
 import { Plus } from "lucide-react";
 import { isErroDeConexao } from "@/lib/erros";
@@ -8,6 +8,7 @@ import { AvisoConexao } from "@/components/AvisoConexao";
 export const dynamic = "force-dynamic";
 
 export default async function ClientesPage() {
+  const supabase = createServerSupabaseClient();
   const { data: clientes, error } = await supabase
     .from("clientes")
     .select("*")

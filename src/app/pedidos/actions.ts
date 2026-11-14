@@ -6,6 +6,7 @@ import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { isErroDeConexao, mensagemErro } from "@/lib/erros";
 import { deleteFileFromDrive, hasDriveCredentials } from "@/lib/googleDrive";
 import type { TipoPedido, Topper, TopperPedido } from "@/types/database";
+import { exigirSessao } from "@/lib/sessao";
 
 interface ItemPayload {
   produtoId: string;
@@ -129,6 +130,7 @@ async function sincronizarTopperPedido(
 export async function criarPedidoAction(
   data: PedidoPayload
 ): Promise<{ error?: string; pedidoId?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
   let resolvedClienteId: string | null = data.clienteId || null;
 
@@ -220,6 +222,7 @@ const EXCLUIVEIS = ["rascunho", "novo"];
 export async function excluirPedidoAction(
   pedidoId: string
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
 
   const { data: pedido, error: fetchError } = await supabase
@@ -272,6 +275,7 @@ export async function criarPedidoRapidoAction(data: {
   valorEstimado?: number;
   dataEntrega?: string;
 }): Promise<{ pedidoId?: string; error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
 
   const hoje = new Date().toISOString().split("T")[0];
@@ -302,6 +306,7 @@ export async function editarPedidoAction(
   pedidoId: string,
   data: Pick<PedidoPayload, "tipo" | "dataEntrega" | "horaEntrega" | "horaRetirada" | "descricao" | "topper" | "topperDetalhes" | "valorBrinde" | "peso" | "quantidade">
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
   const { error } = await supabase
     .from("pedidos")

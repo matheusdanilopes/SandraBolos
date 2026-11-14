@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { mensagemErro } from "@/lib/erros";
 import type { EtapaTopper } from "@/types/database";
+import { exigirSessao } from "@/lib/sessao";
 
 interface TopperPayload {
   pedidoId: string;
@@ -14,6 +15,7 @@ interface TopperPayload {
 }
 
 export async function salvarTopperAction(data: TopperPayload): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
 
   const { error } = await supabase
@@ -58,6 +60,7 @@ export async function definirEtapaTopperAction(
   pedidoId: string,
   etapa: EtapaTopper
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
   const flags = FLAGS_POR_ETAPA[etapa];
 
@@ -89,6 +92,7 @@ export async function registrarPagamentoAction(
   pedidoId: string,
   dataPagamento: string
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
 
   const { data: existing } = await supabase
@@ -124,6 +128,7 @@ export async function registrarPagamentoAction(
 export async function desfazerPagamentoAction(
   pedidoId: string
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
 
   const { error } = await supabase
@@ -141,6 +146,7 @@ export async function registrarPagamentoLoteAction(
   pedidoIds: string[],
   dataPagamento: string
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   if (pedidoIds.length === 0) return {};
   const supabase = createServerSupabaseClient();
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { isErroDeConexao, mensagemErro } from "@/lib/erros";
+import { exigirSessao } from "@/lib/sessao";
 
 const CANCELAVEIS = ["novo", "produzindo", "feito"];
 
@@ -10,6 +11,7 @@ export async function cancelarPedidoAction(
   pedidoId: string,
   motivo?: string
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
 
   const { data: pedido, error: fetchError } = await supabase
@@ -55,6 +57,7 @@ export async function avancarStatusAction(
   pedidoId: string,
   proximoStatus: string
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
   const { error } = await supabase
     .from("pedidos")
@@ -76,6 +79,7 @@ export async function voltarStatusAction(
   pedidoId: string,
   statusAnterior: string
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
   const { error } = await supabase
     .from("pedidos")
@@ -98,6 +102,7 @@ export async function salvarPrecificacaoAction(
   precoCorrigido: number | null,
   valorCobrado: number | null
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
   const { error } = await supabase
     .from("pedidos")
@@ -124,6 +129,7 @@ export async function salvarEntregaAction(
   pedidoId: string,
   valorCobrado: number | null
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
   const { error } = await supabase
     .from("pedidos")
@@ -175,6 +181,7 @@ export async function salvarPrecificacaoItensAction(
   precoCorrigido: number | null,
   valorCobrado: number | null
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
 
   const resultados = await Promise.all(

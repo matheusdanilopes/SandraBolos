@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { supabase } from "@/lib/supabase";
+import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { type PedidoCalendario, type PedidoComCliente } from "@/types/database";
 import { DashboardClient } from "./DashboardClient";
 import { endOfMonth, format, startOfMonth } from "date-fns";
@@ -14,7 +14,8 @@ import { DashboardAcessosCardapio } from "./DashboardAcessosCardapio";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const cookieStore = cookies();
+  const supabase = createServerSupabaseClient();
+  const cookieStore = await cookies();
   const presetRaw = cookieStore.get("sb_periodo")?.value ?? "mes_atual";
   const preset = isValidPreset(presetRaw) ? presetRaw : "mes_atual";
   const de = cookieStore.get("sb_periodo_de")?.value;

@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { recusarSemSessao } from "@/lib/sessao";
+import { mensagemErro } from "@/lib/erros";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import type { StatusPedido } from "@/types/database";
 import { STATUS_FLOW } from "@/types/database";
 
 const VALID_STATUSES: StatusPedido[] = ["novo", "produzindo", "feito", "entregue"];
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const negado = await recusarSemSessao(req);
+  if (negado) return negado;
+  const params = await props.params;
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Body inválido" }, { status: 400 });
 
@@ -54,7 +56,7 @@ export async function PATCH(
     .single();
 
   if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 });
+    return NextResponse.json({ error: mensagemErro(updateError) }, { status: 500 });
   }
 
   return NextResponse.json(atualizado);

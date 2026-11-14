@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { mensagemErro } from "@/lib/erros";
+import { exigirSessao } from "@/lib/sessao";
 
 export async function adicionarItemAction(
   pedidoId: string,
@@ -15,6 +16,7 @@ export async function adicionarItemAction(
     valorTotal: number;
   }
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   if (data.quantidade <= 0) return { error: "Quantidade inválida" };
   if (data.precoUnitario < 0) return { error: "Preço inválido" };
 
@@ -43,6 +45,7 @@ export async function removerItemAction(
   itemId: string,
   pedidoId: string
 ): Promise<{ error?: string }> {
+  await exigirSessao();
   const supabase = createServerSupabaseClient();
   const { error } = await supabase
     .from("itens_pedido")

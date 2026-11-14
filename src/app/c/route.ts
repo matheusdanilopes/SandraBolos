@@ -22,10 +22,13 @@ export async function GET(request: NextRequest) {
 
   if (contar) {
     try {
-      // Prazo curto: se o banco demorar, o cliente segue para o cardápio sem esperar
-      await createServerSupabaseClient(criarFetchComPrazo(3000))
-        .from("cardapio_acessos")
-        .insert({});
+      // Prazo curto: se o banco demorar, o cliente segue para o cardápio sem esperar.
+      // registrar_acesso_cardapio (migration 018) ignora o excesso de um mesmo IP,
+      // para ninguém inflar o contador; sem a 018, grava direto como antes.
+      const supabase = createServerSupabaseClient(criarFetchComPrazo(3000));
+      const ip = request.headers.get("x-real-ip") ?? request.headers.get("x-forwarded-for")?.split(",")[0];
+      const { error } = await supabase.rpc("registrar_acesso_cardapio", { p_ip: ip?.trim() || null });
+      if (error?.code === "PGRST202") await supabase.from("cardapio_acessos").insert({});
     } catch {
       // Falha ao registrar não pode impedir a abertura do cardápio
     }

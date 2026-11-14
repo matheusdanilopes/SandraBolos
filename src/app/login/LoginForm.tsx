@@ -1,6 +1,7 @@
 "use client";
 
-import { useFormState, useFormStatus } from "react-dom";
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
 import { entrar, type EstadoLogin } from "./actions";
 
 function BotaoEntrar() {
@@ -17,7 +18,7 @@ function BotaoEntrar() {
 }
 
 export function LoginForm({ de }: { de?: string }) {
-  const [estado, acao] = useFormState<EstadoLogin, FormData>(entrar, {});
+  const [estado, acao] = useActionState<EstadoLogin, FormData>(entrar, {});
 
   return (
     <form action={acao} className="space-y-4">

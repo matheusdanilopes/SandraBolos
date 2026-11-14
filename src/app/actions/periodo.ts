@@ -2,13 +2,15 @@
 
 import { cookies } from "next/headers";
 import { isValidPreset, type PeriodoPreset } from "@/lib/periodo";
+import { exigirSessao } from "@/lib/sessao";
 
 export async function setPeriodoCookie(
   preset: string,
   de?: string,
   ate?: string
 ) {
-  const cookieStore = cookies();
+  await exigirSessao();
+  const cookieStore = await cookies();
   const validPreset: PeriodoPreset = isValidPreset(preset) ? preset : "mes_atual";
   const opts = { path: "/", maxAge: 60 * 60 * 24 * 365 };
 

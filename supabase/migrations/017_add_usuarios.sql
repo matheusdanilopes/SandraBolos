@@ -39,14 +39,15 @@ $$;
 revoke all on function verificar_login(text, text) from public, anon, authenticated;
 grant execute on function verificar_login(text, text) to service_role;
 
--- Usuários iniciais
+-- Usuários iniciais com uma senha aleatória que ninguém conhece: defina a senha
+-- de cada um com o comando abaixo antes de usar (nunca grave senhas neste arquivo).
 insert into usuarios (login, senha_hash) values
-  ('Agnaldo', extensions.crypt('123456', extensions.gen_salt('bf'))),
-  ('Sandra',  extensions.crypt('123456', extensions.gen_salt('bf'))),
-  ('Admin',   extensions.crypt('123456', extensions.gen_salt('bf')))
+  ('Agnaldo', extensions.crypt(gen_random_uuid()::text, extensions.gen_salt('bf'))),
+  ('Sandra',  extensions.crypt(gen_random_uuid()::text, extensions.gen_salt('bf'))),
+  ('Admin',   extensions.crypt(gen_random_uuid()::text, extensions.gen_salt('bf')))
 on conflict do nothing;
 
--- Para trocar a senha de alguém:
+-- Para definir ou trocar a senha de alguém:
 --   update usuarios set senha_hash = extensions.crypt('NOVA_SENHA', extensions.gen_salt('bf'))
 --   where lower(login) = 'sandra';
 

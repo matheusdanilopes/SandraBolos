@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AlertaBadge } from "@/components/AlertaBadge";
 import { formatDate, formatTime, formatPhone, calcularValorFinal, valorTopperDoPedido, formatCurrency, pedidoNumero } from "@/lib/utils";
@@ -18,7 +18,9 @@ export const dynamic = "force-dynamic";
 // Garante que nenhuma leitura do Supabase venha do cache de dados do Next.
 export const fetchCache = "force-no-store";
 
-export default async function PedidoDetailPage({ params }: { params: { id: string } }) {
+export default async function PedidoDetailPage(props: { params: Promise<{ id: string }> }) {
+  const supabase = createServerSupabaseClient();
+  const params = await props.params;
   const { data: pedido, error } = await supabase
     .from("pedidos")
     .select("*, clientes(nome, telefone), toppers_pedido(valor), itens_pedido(valor_total)")

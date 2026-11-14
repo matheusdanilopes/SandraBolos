@@ -3,7 +3,8 @@ import { LoginForm } from "./LoginForm";
 
 export const metadata: Metadata = { title: "Entrar · Sandra Bolos" };
 
-export default function LoginPage({ searchParams }: { searchParams: { de?: string } }) {
+export default async function LoginPage(props: { searchParams: Promise<{ de?: string }> }) {
+  const searchParams = await props.searchParams;
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">

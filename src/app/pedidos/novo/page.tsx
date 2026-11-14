@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { PedidoForm } from "../PedidoForm";
 import type { CategoriaProduto, ProdutoComCategoria } from "@/types/database";
 import { houveErroDeConexao } from "@/lib/erros";
@@ -7,6 +7,7 @@ import { AvisoConexao } from "@/components/AvisoConexao";
 export const dynamic = "force-dynamic";
 
 export default async function NovoPedidoPage() {
+  const supabase = createServerSupabaseClient();
   const [clientesResult, produtosResult, categoriasResult] = await Promise.all([
     supabase.from("clientes").select("id, nome, telefone").order("nome"),
     // A categoria vem junto para o seletor de item poder filtrar por ela.
