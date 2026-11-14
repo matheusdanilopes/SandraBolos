@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Poppins, Playfair_Display } from "next/font/google";
 import localFont from "next/font/local";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
+import { registrarAcessoCardapio } from "@/lib/registrarAcessoCardapio";
 import type { CardapioFoto, Produto } from "@/types/database";
 import "./cardapio.css";
 
@@ -150,6 +151,8 @@ export default async function CardapioPage({
       .eq("ativo", true)
       .order("ordem")
       .order("created_at"),
+    // Em paralelo com as consultas, para não atrasar a abertura
+    modoPdf ? Promise.resolve() : registrarAcessoCardapio(),
   ]);
 
   if (produtosResult.error) throw produtosResult.error;

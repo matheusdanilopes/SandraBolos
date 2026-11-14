@@ -1,6 +1,6 @@
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 
-// Acessos ao link curto do cardápio (/c), registrados em src/app/c/route.ts
+// Aberturas do cardápio, registradas em src/lib/registrarAcessoCardapio.ts
 
 export interface AcessosCardapioDados {
   total: number;
