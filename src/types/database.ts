@@ -613,6 +613,21 @@ export type Database = {
         }
         Relationships: []
       }
+      cardapio_acessos: {
+        Row: {
+          id: number
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
       categorias_custo: {
         Row: {
           id: string
@@ -668,7 +683,13 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      cardapio_acessos_por_dia: {
+        Row: {
+          dia: string
+          total: number
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never

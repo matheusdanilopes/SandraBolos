@@ -9,10 +9,7 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: ["lucide-react", "date-fns"],
   },
-  // Link curto do cardápio para a bio do Instagram
-  async redirects() {
-    return [{ source: "/c", destination: "/cardapio", permanent: false }];
-  },
+  // O link curto do cardápio (/c) fica em src/app/c/route.ts: registra o acesso e redireciona
   async headers() {
     return [
       {

@@ -15,6 +15,7 @@ import {
   reordenarFotosAction,
   excluirFotoAction,
 } from "./actions";
+import { AcessosCardapio, type AcessosCardapioDados } from "./AcessosCardapio";
 
 interface RowProps {
   foto: CardapioFoto;
@@ -155,7 +156,13 @@ function FotoRow({ foto, isFirst, isLast, onMoveUp, onMoveDown }: RowProps) {
   );
 }
 
-export function FotosCardapioSection({ fotos }: { fotos: CardapioFoto[] }) {
+export function FotosCardapioSection({
+  fotos,
+  acessos,
+}: {
+  fotos: CardapioFoto[];
+  acessos: AcessosCardapioDados | null;
+}) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -165,8 +172,9 @@ export function FotosCardapioSection({ fotos }: { fotos: CardapioFoto[] }) {
   const [copiado, setCopiado] = useState(false);
 
   useEffect(() => {
-    // Link curto (redireciona para /cardapio), cabe bem na bio do Instagram
-    setLink(`${window.location.host}/c`);
+    // Link curto (redireciona para /cardapio), cabe bem na bio do Instagram.
+    // Com https:// para virar link clicável em qualquer app onde for colado.
+    setLink(`${window.location.origin}/c`);
   }, []);
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -262,6 +270,8 @@ export function FotosCardapioSection({ fotos }: { fotos: CardapioFoto[] }) {
           <ExternalLink size={14} />
         </a>
       </div>
+
+      <AcessosCardapio acessos={acessos} />
 
       {/* Fotos */}
       <div className="border-t border-gray-100 pt-4 space-y-2">
