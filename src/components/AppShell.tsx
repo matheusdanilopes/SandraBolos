@@ -7,8 +7,8 @@ import { ComercialTabs } from "./ComercialTabs";
 import { InstalarApp } from "./InstalarApp";
 import type { PeriodoPreset } from "@/lib/periodo";
 
-// Páginas abertas a clientes: sem a navegação e o convite de instalação do app
-const PAGINAS_PUBLICAS = ["/cardapio"];
+// Páginas sem a navegação e o convite de instalação do app (cardápio dos clientes e login)
+const PAGINAS_PUBLICAS = ["/cardapio", "/login"];
 
 interface Props {
   preset: PeriodoPreset;

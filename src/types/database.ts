@@ -692,7 +692,10 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      verificar_login: {
+        Args: { p_login: string; p_senha: string }
+        Returns: string | null
+      }
     }
     Enums: {
       [_ in never]: never
