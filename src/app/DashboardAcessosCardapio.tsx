@@ -10,7 +10,7 @@ function formatarDia(dia: string) {
   return `${d}/${mes}`;
 }
 
-// Acessos ao link do cardápio (/c), por dia, nos últimos 30 dias
+// Aberturas do cardápio (/cardapio, inclusive pelo link curto /c), por dia, nos últimos 30 dias
 export function DashboardAcessosCardapio({ acessos }: { acessos: AcessosCardapioDados }) {
   const [selecionado, setSelecionado] = useState<number | null>(null);
 
